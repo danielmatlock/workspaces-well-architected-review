@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WorkSpaces WAFR Tool</title>
-<script src="https://cdn.jsdelivr.net/npm/aws-amplify@6/dist/aws-amplify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f3f5; color: #16191f; min-height: 100vh; }
@@ -200,57 +200,54 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <script>
 
-// === AMPLIFY CONFIGURATION ===
-// After running 'amplify push', copy values from src/aws-exports.js here
-var amplifyConfig = {
-  Auth: {
-    Cognito: {
-      userPoolId: 'eu-west-2_Wy0eJHyN3',
-      userPoolClientId: '1kj98mt2cjbci4sa9okfg4o5dk'
-    }
-  },
-  API: {
-    GraphQL: {
-      endpoint: 'https://zernxhslmvhe3o7ucljc55dmjq.appsync-api.eu-west-2.amazonaws.com/graphql',
-      region: 'eu-west-2',
-      defaultAuthMode: 'userPool'
-    }
-  }
-};
+// === CONFIGURATION ===
+var COGNITO_USER_POOL_ID = 'eu-west-2_Wy0eJHyN3';
+var COGNITO_CLIENT_ID = '1kj98mt2cjbci4sa9okfg4o5dk';
+var APPSYNC_ENDPOINT = 'https://zernxhslmvhe3o7ucljc55dmjq.appsync-api.eu-west-2.amazonaws.com/graphql';
 
 var amplifyReady = false;
 var currentUser = null;
-var amplifyClient = null;
+var cognitoUserPool = null;
+var idToken = null;
 
-// Try to initialise Amplify
+// Initialise Cognito
 try {
-  if (typeof aws_amplify !== 'undefined' && amplifyConfig.Auth.Cognito.userPoolId !== 'YOUR_USER_POOL_ID') {
-    aws_amplify.Amplify.configure(amplifyConfig);
-    amplifyClient = aws_amplify.generateClient();
+  if (typeof AmazonCognitoIdentity !== 'undefined') {
+    cognitoUserPool = new AmazonCognitoIdentity.CognitoUserPool({
+      UserPoolId: COGNITO_USER_POOL_ID,
+      ClientId: COGNITO_CLIENT_ID
+    });
     amplifyReady = true;
   }
 } catch(e) {
-  console.log('Amplify not configured - running in offline mode');
+  console.log('Cognito SDK not loaded - running in offline mode');
+}
+
+// GraphQL helper
+async function gql(query, variables) {
+  if (!idToken) return null;
+  var res = await fetch(APPSYNC_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': idToken },
+    body: JSON.stringify({ query: query, variables: variables || {} })
+  });
+  var json = await res.json();
+  if (json.errors) { console.log('GraphQL error:', json.errors); return null; }
+  return json.data;
 }
 
 // === AUTH FUNCTIONS ===
-async function checkAuth() {
-  if (!amplifyReady) {
-    showAuthScreen();
-    return;
-  }
-  try {
-    var session = await aws_amplify.fetchAuthSession();
-    if (session && session.tokens) {
-      var attrs = await aws_amplify.fetchUserAttributes();
-      currentUser = { username: attrs.name || attrs.email.split('@')[0], email: attrs.email };
-      showApp();
-    } else {
-      showAuthScreen();
-    }
-  } catch(e) {
-    showAuthScreen();
-  }
+function checkAuth() {
+  if (!amplifyReady || !cognitoUserPool) { showAuthScreen(); return; }
+  var cognitoUser = cognitoUserPool.getCurrentUser();
+  if (!cognitoUser) { showAuthScreen(); return; }
+  cognitoUser.getSession(function(err, session) {
+    if (err || !session || !session.isValid()) { showAuthScreen(); return; }
+    idToken = session.getIdToken().getJwtToken();
+    var payload = session.getIdToken().payload;
+    currentUser = { username: payload.name || payload.email.split('@')[0], email: payload.email };
+    showApp();
+  });
 }
 
 function showAuthScreen() {
@@ -280,93 +277,99 @@ function showSignup() {
 
 function offlineMode() {
   currentUser = { username: 'Offline User', email: 'offline@local' };
+  amplifyReady = false;
   showApp();
 }
 
 var pendingEmail = '';
-async function handleLogin() {
+function handleLogin() {
   var email = document.getElementById('auth-email').value;
   var pw = document.getElementById('auth-password').value;
   var errEl = document.getElementById('auth-error');
   errEl.style.display = 'none';
-  if (!amplifyReady) { offlineMode(); return; }
-  try {
-    await aws_amplify.signIn({ username: email, password: pw });
-    await checkAuth();
-  } catch(e) {
-    errEl.textContent = e.message || 'Login failed';
-    errEl.style.display = 'block';
-  }
+  if (!amplifyReady || !cognitoUserPool) { offlineMode(); return; }
+  var authDetails = new AmazonCognitoIdentity.AuthenticationDetails({ Username: email, Password: pw });
+  var cognitoUser = new AmazonCognitoIdentity.CognitoUser({ Username: email, Pool: cognitoUserPool });
+  cognitoUser.authenticateUser(authDetails, {
+    onSuccess: function(session) {
+      idToken = session.getIdToken().getJwtToken();
+      var payload = session.getIdToken().payload;
+      currentUser = { username: payload.name || payload.email.split('@')[0], email: payload.email };
+      showApp();
+    },
+    onFailure: function(err) {
+      errEl.textContent = err.message || 'Login failed';
+      errEl.style.display = 'block';
+    },
+    newPasswordRequired: function(userAttributes) {
+      cognitoUser.completeNewPasswordChallenge(pw, {}, this);
+    }
+  });
 }
 
-async function handleSignup() {
+function handleSignup() {
   var email = document.getElementById('signup-email').value;
   var pw = document.getElementById('signup-password').value;
   var name = document.getElementById('signup-name').value;
   var errEl = document.getElementById('auth-error');
   errEl.style.display = 'none';
-  if (!amplifyReady) { offlineMode(); return; }
-  try {
-    await aws_amplify.signUp({ username: email, password: pw, options: { userAttributes: { name: name } } });
+  if (!amplifyReady || !cognitoUserPool) { offlineMode(); return; }
+  var attrs = [new AmazonCognitoIdentity.CognitoUserAttribute({ Name: 'name', Value: name })];
+  cognitoUserPool.signUp(email, pw, attrs, null, function(err, result) {
+    if (err) { errEl.textContent = err.message || 'Signup failed'; errEl.style.display = 'block'; return; }
     pendingEmail = email;
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('signup-form').style.display = 'none';
     document.getElementById('confirm-form').style.display = 'block';
     document.querySelector('.auth-box h2').textContent = 'Verify Email';
-  } catch(e) {
-    errEl.textContent = e.message || 'Signup failed';
-    errEl.style.display = 'block';
-  }
+  });
 }
 
-async function handleConfirm() {
+function handleConfirm() {
   var code = document.getElementById('confirm-code').value;
   var errEl = document.getElementById('auth-error');
   errEl.style.display = 'none';
-  try {
-    await aws_amplify.confirmSignUp({ username: pendingEmail, confirmationCode: code });
+  var cognitoUser = new AmazonCognitoIdentity.CognitoUser({ Username: pendingEmail, Pool: cognitoUserPool });
+  cognitoUser.confirmRegistration(code, true, function(err) {
+    if (err) { errEl.textContent = err.message || 'Verification failed'; errEl.style.display = 'block'; return; }
     showLogin();
-  } catch(e) {
-    errEl.textContent = e.message || 'Verification failed';
-    errEl.style.display = 'block';
-  }
+  });
 }
 
-async function handleLogout() {
-  if (amplifyReady) { try { await aws_amplify.signOut(); } catch(e) {} }
+function handleLogout() {
+  if (cognitoUserPool) {
+    var user = cognitoUserPool.getCurrentUser();
+    if (user) user.signOut();
+  }
   currentUser = null;
+  idToken = null;
   showAuthScreen();
 }
 
 function initApp() {
-  // Load from cloud if available
-  if (amplifyReady) { loadFromCloud(); }
+  if (idToken) { loadFromCloud(); }
   showHome();
 }
 
 // Cloud sync (non-blocking)
 async function syncReviewToCloud(review) {
-  if (!amplifyReady || !amplifyClient) return;
+  if (!idToken) return;
   try {
-    await amplifyClient.graphql({
-      query: `mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`,
-      variables: { input: {
-        id: review.id, templateId: review.templateId || '', templateName: review.template || review.templateName || '',
-        customerName: review.customer || review.customerName || '', reviewerName: review.reviewer || review.reviewerName || '',
-        reviewDate: review.date || review.reviewDate || '', answers: JSON.stringify(review.answers || {}),
-        notes: JSON.stringify(review.notes || {}), status: review.status || 'in-progress'
-      }}
-    });
+    await gql(`mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`, { input: {
+      id: review.id, templateId: review.templateId || '', templateName: review.template || review.templateName || '',
+      customerName: review.customer || review.customerName || '', reviewerName: review.reviewer || review.reviewerName || '',
+      reviewDate: review.date || review.reviewDate || '', answers: JSON.stringify(review.answers || {}),
+      notes: JSON.stringify(review.notes || {}), status: review.status || 'in-progress'
+    }});
   } catch(e) { console.log('Cloud sync error:', e); }
 }
 
 async function loadFromCloud() {
-  if (!amplifyReady || !amplifyClient) return;
+  if (!idToken) return;
   try {
-    var result = await amplifyClient.graphql({
-      query: `query Q { listReviews { id templateId templateName customerName reviewerName reviewDate answers notes status } }`
-    });
-    var items = result.data.listReviews;
+    var data = await gql(`query Q { listReviews { id templateId templateName customerName reviewerName reviewDate answers notes status } }`);
+    if (!data) return;
+    var items = data.listReviews;
     if (items && items.length > 0) {
       var cloudReviews = items.map(function(r) {
         return { id: r.id, templateId: r.templateId, template: r.templateName,
@@ -427,8 +430,7 @@ function getReviews() {
 
 function saveReviews(reviews) {
   localStorage.setItem('wafr-reviews', JSON.stringify(reviews));
-  // Sync all reviews to cloud
-  if (amplifyReady && amplifyClient) {
+  if (idToken) {
     reviews.forEach(function(r) { syncReviewToCloud(r); });
   }
 }
