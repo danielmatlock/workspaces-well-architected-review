@@ -381,11 +381,15 @@ async function loadFromCloud() {
     if (!data) return;
     var items = data.listReviews;
     if (items && items.length > 0) {
+      var templates = getTemplates();
       var cloudReviews = items.map(function(r) {
+        var answers = typeof r.answers === 'string' ? JSON.parse(r.answers || '{}') : (r.answers || {});
+        var notes = typeof r.notes === 'string' ? JSON.parse(r.notes || '{}') : (r.notes || {});
+        var tmpl = templates.find(function(t) { return t.id === r.templateId; });
         return { id: r.id, templateId: r.templateId, template: r.templateName,
           customer: r.customerName, reviewer: r.reviewerName,
-          date: r.reviewDate, answers: JSON.parse(r.answers || '{}'),
-          notes: JSON.parse(r.notes || '{}'), status: r.status };
+          date: r.reviewDate, answers: answers, notes: notes,
+          status: r.status, pillars: tmpl ? JSON.parse(JSON.stringify(tmpl.pillars)) : [] };
       });
       var local = getReviews();
       cloudReviews.forEach(function(cr) {
