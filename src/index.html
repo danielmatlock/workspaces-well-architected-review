@@ -97,7 +97,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .overall-score .label { font-size: 14px; color: #5f6b7a; margin-top: 4px; }
 
 /* Question view */
-.question-container { background: #fff; border-radius: 8px; border: 1px solid #e1e4e8; padding: 24px; margin: 20px 0; }
+.question-layout { display: flex; gap: 20px; align-items: flex-start; }
+.question-container { background: #fff; border-radius: 8px; border: 1px solid #e1e4e8; padding: 24px; margin: 20px 0; flex: 1; min-width: 0; }
+.explain-panel { width: 380px; flex-shrink: 0; background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; margin: 20px 0; overflow: hidden; transition: width 0.2s; }
+.explain-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #232f3e; color: #fff; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.explain-toggle { background: none; border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 16px; line-height: 1; }
+.explain-toggle:hover { border-color: #ff9900; color: #ff9900; }
+.explain-content { padding: 16px; max-height: 70vh; overflow-y: auto; }
+.explain-text { font-size: 13px; line-height: 1.6; color: #16191f; }
+.explain-text strong { color: #232f3e; }
+.explain-loading { font-size: 13px; color: #5f6b7a; font-style: italic; }
+.explain-error { font-size: 13px; color: #d13212; }
 .question-id { font-size: 12px; color: #ff9900; font-weight: 600; margin-bottom: 8px; }
 .question-text { font-size: 16px; font-weight: 600; margin-bottom: 16px; line-height: 1.4; }
 .best-practice { background: #f8f9fa; border-left: 3px solid #1d8102; padding: 12px 16px; margin-bottom: 20px; border-radius: 0 4px 4px 0; }
@@ -769,7 +779,7 @@ function renderQuestion() {
   else if (answer.score === 'fully') scoreClass = ' sel-green';
   else if (answer.score === 'na') scoreClass = ' sel-na';
   
-  var html = '<div class="question-container"><div class="question-id">' + q.id + '</div>' +
+  var html = '<div class="question-layout"><div class="question-container"><div class="question-id">' + q.id + '</div>' +
     '<div class="question-text">' + q.q + '</div>' +
     '<div class="best-practice"><div class="bp-label">What good looks like</div><p>' + q.best + '</p></div>' +
     '<div class="answer-group"><label>Assessment</label><div class="answer-options">' +
@@ -779,7 +789,10 @@ function renderQuestion() {
     '<div class="answer-opt' + (answer.score === 'na' ? ' selected sel-na' : '') + '" onclick="setAnswer(\'' + q.id + '\',\'na\')">Not Applicable</div>' +
     '</div></div>' +
     '<div class="notes-group"><label>Notes / Observations</label>' +
-    '<textarea id="notes-input" placeholder="Capture observations, customer comments, and discussion points here..." onblur="saveNotes(\'' + q.id + '\')">' + (answer.notes || '') + '</textarea></div></div>';
+    '<textarea id="notes-input" placeholder="Capture observations, customer comments, and discussion points here..." onblur="saveNotes(\'' + q.id + '\')">' + (answer.notes || '') + '</textarea></div></div>' +
+    '<div class="explain-panel" id="explain-panel">' +
+    '<div class="explain-header"><span>AI Guidance</span><button class="explain-toggle" onclick="toggleExplainPanel()">−</button></div>' +
+    '<div class="explain-content" id="explain-content"><div class="explain-loading">Loading guidance...</div></div></div></div>';
   
   html += '<div class="question-nav">';
   if (state.activeQuestion > 0) {
@@ -795,6 +808,41 @@ function renderQuestion() {
   html += '</div>';
   
   document.getElementById('content').innerHTML = html;
+  loadExplanation(q.q, q.best);
+}
+
+var explainPanelVisible = true;
+function toggleExplainPanel() {
+  var panel = document.getElementById('explain-panel');
+  var content = document.getElementById('explain-content');
+  var btn = panel.querySelector('.explain-toggle');
+  explainPanelVisible = !explainPanelVisible;
+  if (explainPanelVisible) {
+    content.style.display = 'block';
+    panel.style.width = '380px';
+    btn.textContent = '\u2212';
+  } else {
+    content.style.display = 'none';
+    panel.style.width = '40px';
+    btn.textContent = '+';
+  }
+}
+
+async function loadExplanation(question, bestPractice) {
+  var el = document.getElementById('explain-content');
+  if (!el) return;
+  el.innerHTML = '<div class="explain-loading">Loading AI guidance...</div>';
+  try {
+    var res = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/explain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: question, bestPractice: bestPractice })
+    });
+    var data = await res.json();
+    el.innerHTML = '<div class="explain-text">' + data.explanation.replace(/\n/g, '<br>').replace(/## /g, '<strong>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') + '</div>';
+  } catch(e) {
+    el.innerHTML = '<div class="explain-error">Could not load guidance. Check network connection.</div>';
+  }
 }
 
 function setAnswer(qId, score) {
