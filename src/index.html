@@ -348,40 +348,40 @@ function initApp() {
 async function syncReviewToCloud(review) {
   if (!amplifyReady || !amplifyClient) return;
   try {
-    // Upsert review
     await amplifyClient.graphql({
       query: `mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`,
       variables: { input: {
-        id: review.id, templateId: review.templateId, templateName: review.templateName || '',
-        customerName: review.customerName, reviewerName: review.reviewerName,
-        reviewDate: review.reviewDate, answers: JSON.stringify(review.answers || {}),
+        id: review.id, templateId: review.templateId || '', templateName: review.template || review.templateName || '',
+        customerName: review.customer || review.customerName || '', reviewerName: review.reviewer || review.reviewerName || '',
+        reviewDate: review.date || review.reviewDate || '', answers: JSON.stringify(review.answers || {}),
         notes: JSON.stringify(review.notes || {}), status: review.status || 'in-progress'
       }}
     });
-  } catch(e) { /* silent */ }
+  } catch(e) { console.log('Cloud sync error:', e); }
 }
 
 async function loadFromCloud() {
   if (!amplifyReady || !amplifyClient) return;
   try {
     var result = await amplifyClient.graphql({
-      query: `query Q { listReviews { items { id templateId templateName customerName reviewerName reviewDate answers notes status } } }`
+      query: `query Q { listReviews { id templateId templateName customerName reviewerName reviewDate answers notes status } }`
     });
-    var items = result.data.listReviews.items;
+    var items = result.data.listReviews;
     if (items && items.length > 0) {
       var cloudReviews = items.map(function(r) {
-        return { id: r.id, templateId: r.templateId, templateName: r.templateName,
-          customerName: r.customerName, reviewerName: r.reviewerName,
-          reviewDate: r.reviewDate, answers: JSON.parse(r.answers || '{}'),
+        return { id: r.id, templateId: r.templateId, template: r.templateName,
+          customer: r.customerName, reviewer: r.reviewerName,
+          date: r.reviewDate, answers: JSON.parse(r.answers || '{}'),
           notes: JSON.parse(r.notes || '{}'), status: r.status };
       });
       var local = getReviews();
       cloudReviews.forEach(function(cr) {
-        if (!local.find(function(lr) { return lr.id === cr.id; })) local.push(cr);
+        var existing = local.findIndex(function(lr) { return lr.id === cr.id; });
+        if (existing >= 0) { local[existing] = cr; } else { local.push(cr); }
       });
-      saveReviews(local);
+      localStorage.setItem('wafr-reviews', JSON.stringify(local));
     }
-  } catch(e) { console.log('Cloud sync skipped'); }
+  } catch(e) { console.log('Cloud load error:', e); }
 }
 
 
@@ -427,6 +427,10 @@ function getReviews() {
 
 function saveReviews(reviews) {
   localStorage.setItem('wafr-reviews', JSON.stringify(reviews));
+  // Sync all reviews to cloud
+  if (amplifyReady && amplifyClient) {
+    reviews.forEach(function(r) { syncReviewToCloud(r); });
+  }
 }
 
 function getReview(id) {
