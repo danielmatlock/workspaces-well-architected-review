@@ -60,6 +60,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .review-card .meta, .template-card .meta { font-size: 12px; color: #5f6b7a; }
 .review-card .progress-bar { height: 4px; background: #e1e4e8; border-radius: 2px; margin-top: 8px; }
 .review-card .progress-fill { height: 100%; background: #ff9900; border-radius: 2px; transition: width 0.3s; }
+.pillar-toggle { font-size: 12px; color: #0073bb; cursor: pointer; margin-top: 8px; user-select: none; transition: all 0.15s; }
+.pillar-toggle:hover { text-decoration: underline; }
+.pillar-toggle.open { color: #16191f; }
+.pillar-details { display: none; margin-top: 8px; padding: 8px 0; border-top: 1px solid #e1e4e8; }
+.pillar-details.open { display: block; }
+.pillar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+.pillar-name { flex: 1; color: #16191f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pillar-score { width: 40px; text-align: right; color: #5f6b7a; font-variant-numeric: tabular-nums; }
+.pillar-bar { width: 60px; height: 4px; background: #e1e4e8; border-radius: 2px; flex-shrink: 0; }
+.pillar-bar-fill { height: 100%; border-radius: 2px; }
 .card-actions { display: flex; gap: 6px; margin-top: 8px; }
 
 /* Dashboard */
@@ -508,13 +518,27 @@ function showHome() {
   } else {
     reviews.forEach(function(r) {
       var totalQ = 0, answeredQ = 0;
-      r.pillars.forEach(function(p, i) { var s = getPillarScore(r, i); totalQ += s.total; answeredQ += s.answered; });
+      var pillarHtml = '';
+      r.pillars.forEach(function(p, i) {
+        var s = getPillarScore(r, i);
+        totalQ += s.total; answeredQ += s.answered;
+        var rag = getRag(s.pct);
+        var ragColor = rag === 'green' ? '#1d8102' : rag === 'amber' ? '#ff9900' : '#d13212';
+        var barColor = s.answered === 0 ? '#d5dbdb' : ragColor;
+        pillarHtml += '<div class="pillar-row">' +
+          '<span class="pillar-name">' + p.name + '</span>' +
+          '<span class="pillar-score">' + s.answered + '/' + s.total + '</span>' +
+          '<div class="pillar-bar"><div class="pillar-bar-fill" style="width:' + (s.total > 0 ? Math.round(s.answered/s.total*100) : 0) + '%;background:' + barColor + '"></div></div>' +
+          '</div>';
+      });
       var pct = totalQ > 0 ? Math.round(answeredQ / totalQ * 100) : 0;
       html += '<div class="review-card" onclick="openReview(\'' + r.id + '\')">' +
         '<h4>' + r.customer + '</h4>' +
         '<div class="meta">' + r.template + ' | ' + r.date + ' | Reviewer: ' + r.reviewer + '</div>' +
         '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
         '<div class="meta" style="margin-top:4px">' + answeredQ + '/' + totalQ + ' questions (' + pct + '%)</div>' +
+        '<div class="pillar-toggle" onclick="event.stopPropagation();var d=this.nextElementSibling;d.classList.toggle(\'open\');this.textContent=d.classList.contains(\'open\')?\'▾ Pillar breakdown\':\'▸ Pillar breakdown\';">▸ Pillar breakdown</div>' +
+        '<div class="pillar-details">' + pillarHtml + '</div>' +
         '<div class="card-actions">' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();exportReview(\'' + r.id + '\')">Export JSON</button>' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();exportReviewAsPrintHTML(\'' + r.id + '\')">Print Report</button>' +
