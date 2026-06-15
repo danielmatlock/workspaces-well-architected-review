@@ -25,3 +25,7 @@ To deploy: Actions tab → "Deploy WorkSpaces WAFR Amplify App" → Run workflow
 |------|--------|
 | 2025-06-15 | Initial repo setup, Amplify app imported, GitHub Actions workflow created (paused) |
 | 2025-06-15 | OIDC role created in 590183747733 (`github-actions-amplify-deploy`), scoped to this repo + main branch only |
+| 2026-06-15 | App deployed to Amplify Hosting (manual deployment, app ID: `d1p2543h8l2mfc`) |
+| 2026-06-15 | Cognito auth configured (User Pool: `eu-west-2_Wy0eJHyN3`) |
+| 2026-06-15 | AppSync API + DynamoDB tables created for cloud storage (`wafr-templates`, `wafr-reviews`) |
+| 2026-06-15 | Fixed multiline string syntax error (line 1045) |
