@@ -1,0 +1,18 @@
+{
+  "name": "workspaces-wafr-app",
+  "version": "6.0.0",
+  "description": "AWS WorkSpaces Well-Architected Framework Review Tool",
+  "main": "src/index.html",
+  "scripts": {
+    "start": "npx serve src",
+    "deploy": "amplify publish"
+  },
+  "dependencies": {
+    "aws-amplify": "^6.0.0"
+  },
+  "devDependencies": {
+    "serve": "^14.0.0"
+  },
+  "author": "Daniel Matlock",
+  "license": "ISC"
+}

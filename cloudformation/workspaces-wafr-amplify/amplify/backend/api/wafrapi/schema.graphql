@@ -1,0 +1,26 @@
+type Template @model @auth(rules: [{allow: owner}, {allow: groups, groups: ["Admins"], operations: [create, update, delete, read]}]) {
+  id: ID!
+  name: String!
+  description: String
+  pillars: AWSJSON!
+  isDefault: Boolean
+  createdBy: String!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type Review @model @auth(rules: [{allow: owner}]) {
+  id: ID!
+  templateId: String!
+  templateName: String!
+  customerName: String!
+  reviewerName: String!
+  reviewDate: String!
+  answers: AWSJSON!
+  notes: AWSJSON!
+  status: String!
+  overallScore: Float
+  pillarScores: AWSJSON
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}

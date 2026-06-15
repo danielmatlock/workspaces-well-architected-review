@@ -1,0 +1,37 @@
+name: Deploy WorkSpaces WAFR Amplify App
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-west-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::590183747733:role/github-actions-amplify-deploy
+          aws-region: eu-west-2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        working-directory: cloudformation/workspaces-wafr-amplify
+        run: npm ci
+
+      - name: Deploy
+        working-directory: cloudformation/workspaces-wafr-amplify
+        run: echo "Deploy step placeholder — configure when ready"

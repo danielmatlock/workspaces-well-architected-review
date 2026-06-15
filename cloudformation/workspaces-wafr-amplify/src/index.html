@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WorkSpaces WAFR Tool</title>
+<script src="https://cdn.jsdelivr.net/npm/aws-amplify@6/dist/aws-amplify.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f3f5; color: #16191f; min-height: 100vh; }
+
+/* Layout */
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 280px; background: #232f3e; color: #fff; position: fixed; height: 100vh; overflow-y: auto; z-index: 100; display: flex; flex-direction: column; }
+.main { margin-left: 280px; flex: 1; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar-header { padding: 20px 16px; border-bottom: 1px solid #3a4a5c; }
+.sidebar-header h1 { font-size: 13px; font-weight: 600; color: #ff9900; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.sidebar-header h2 { font-size: 16px; font-weight: 600; color: #fff; }
+.sidebar-header .sub { font-size: 11px; color: #aab7c4; margin-top: 4px; }
+.sidebar-nav { flex: 1; padding: 8px 0; }
+.nav-section { padding: 16px 16px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #aab7c4; }
+.nav-item { padding: 10px 16px; cursor: pointer; display: flex; align-items: center; gap: 10px; border-left: 3px solid transparent; transition: all 0.15s; font-size: 13px; }
+.nav-item:hover { background: #3a4a5c; }
+.nav-item.active { background: #3a4a5c; border-left-color: #ff9900; }
+.nav-item .badge { width: 8px; height: 8px; border-radius: 50%; margin-left: auto; }
+.badge-red { background: #d13212; }
+.badge-amber { background: #ff9900; }
+.badge-green { background: #1d8102; }
+.badge-grey { background: #5f6b7a; }
+.nav-item .progress-text { font-size: 11px; color: #aab7c4; margin-left: auto; }
+.sidebar-footer { padding: 12px 16px; border-top: 1px solid #3a4a5c; }
+.sidebar-footer button { width: 100%; padding: 8px; background: transparent; border: 1px solid #5f6b7a; color: #aab7c4; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.sidebar-footer button:hover { border-color: #ff9900; color: #ff9900; }
+
+/* Topbar */
+.topbar { background: #fff; padding: 14px 32px; border-bottom: 1px solid #e1e4e8; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+.topbar h3 { font-size: 18px; font-weight: 600; }
+.topbar-actions { display: flex; gap: 8px; }
+
+/* Buttons */
+.btn { padding: 8px 16px; border-radius: 4px; border: 1px solid #d5dbdb; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+.btn:hover { background: #fafafa; border-color: #aab7c4; }
+.btn-primary { background: #ff9900; border-color: #ff9900; color: #fff; }
+.btn-primary:hover { background: #ec7211; border-color: #ec7211; }
+.btn-danger { color: #d13212; border-color: #d13212; }
+.btn-danger:hover { background: #fdf3f1; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* Content */
+.content { padding: 32px; max-width: 1100px; }
+
+/* Home view */
+.home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
+.home-section h3 { font-size: 16px; margin-bottom: 12px; color: #232f3e; }
+.review-card, .template-card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: all 0.15s; }
+.review-card:hover, .template-card:hover { border-color: #ff9900; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.review-card h4, .template-card h4 { font-size: 14px; margin-bottom: 4px; }
+.review-card .meta, .template-card .meta { font-size: 12px; color: #5f6b7a; }
+.review-card .progress-bar { height: 4px; background: #e1e4e8; border-radius: 2px; margin-top: 8px; }
+.review-card .progress-fill { height: 100%; background: #ff9900; border-radius: 2px; transition: width 0.3s; }
+.card-actions { display: flex; gap: 6px; margin-top: 8px; }
+
+/* Dashboard */
+.dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0; }
+.pillar-card { background: #fff; border-radius: 8px; padding: 20px; border: 1px solid #e1e4e8; cursor: pointer; transition: all 0.15s; }
+.pillar-card:hover { border-color: #ff9900; }
+.pillar-card h4 { font-size: 14px; margin-bottom: 8px; }
+.pillar-card .score { font-size: 28px; font-weight: 700; }
+.pillar-card .score-bar { height: 6px; background: #e1e4e8; border-radius: 3px; margin-top: 8px; }
+.pillar-card .score-fill { height: 100%; border-radius: 3px; }
+.rag-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; color: #fff; }
+.rag-red { background: #d13212; }
+.rag-amber { background: #ff9900; }
+.rag-green { background: #1d8102; }
+.overall-score { text-align: center; padding: 24px; background: #fff; border-radius: 8px; border: 1px solid #e1e4e8; margin-bottom: 20px; }
+.overall-score .big { font-size: 48px; font-weight: 700; color: #232f3e; }
+.overall-score .label { font-size: 14px; color: #5f6b7a; margin-top: 4px; }
+
+/* Question view */
+.question-container { background: #fff; border-radius: 8px; border: 1px solid #e1e4e8; padding: 24px; margin: 20px 0; }
+.question-id { font-size: 12px; color: #ff9900; font-weight: 600; margin-bottom: 8px; }
+.question-text { font-size: 16px; font-weight: 600; margin-bottom: 16px; line-height: 1.4; }
+.best-practice { background: #f8f9fa; border-left: 3px solid #1d8102; padding: 12px 16px; margin-bottom: 20px; border-radius: 0 4px 4px 0; }
+.best-practice .bp-label { font-size: 11px; font-weight: 600; color: #1d8102; text-transform: uppercase; margin-bottom: 4px; }
+.best-practice p { font-size: 13px; color: #545b64; line-height: 1.5; }
+.answer-group { margin-bottom: 20px; }
+.answer-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+.answer-options { display: flex; gap: 8px; flex-wrap: wrap; }
+.answer-opt { padding: 8px 14px; border: 2px solid #e1e4e8; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.15s; }
+.answer-opt:hover { border-color: #ff9900; }
+.answer-opt.selected { border-color: #ff9900; background: #fff8f0; font-weight: 600; }
+.answer-opt.sel-red { border-color: #d13212; background: #fdf3f1; }
+.answer-opt.sel-amber { border-color: #ff9900; background: #fff8f0; }
+.answer-opt.sel-green { border-color: #1d8102; background: #f2f8f0; }
+.answer-opt.sel-na { border-color: #5f6b7a; background: #f5f6f7; }
+.notes-group { margin-top: 16px; }
+.notes-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+.notes-group textarea { width: 100%; min-height: 80px; padding: 10px; border: 1px solid #e1e4e8; border-radius: 4px; font-size: 13px; font-family: inherit; resize: vertical; }
+.notes-group textarea:focus { outline: none; border-color: #ff9900; }
+.question-nav { display: flex; justify-content: space-between; margin-top: 20px; }
+
+/* Improvement plan */
+.improvement-item { background: #fff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 16px; margin-bottom: 12px; }
+.improvement-item .imp-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.improvement-item .imp-id { font-size: 12px; color: #ff9900; font-weight: 600; }
+.improvement-item .imp-q { font-size: 14px; font-weight: 500; }
+.improvement-item .imp-action { font-size: 13px; color: #545b64; margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; }
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.modal { background: #fff; border-radius: 8px; padding: 24px; width: 500px; max-width: 90vw; max-height: 80vh; overflow-y: auto; }
+.modal h3 { margin-bottom: 16px; }
+.modal .form-group { margin-bottom: 14px; }
+.modal .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.modal .form-group input, .modal .form-group select { width: 100%; padding: 8px; border: 1px solid #e1e4e8; border-radius: 4px; font-size: 13px; }
+.modal .form-group input:focus, .modal .form-group select:focus { outline: none; border-color: #ff9900; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+/* Radar chart container */
+.radar-container { display: flex; justify-content: center; margin: 20px 0; }
+
+/* Print */
+@media print {
+  .sidebar, .topbar, .btn, .question-nav { display: none !important; }
+  .main { margin-left: 0 !important; }
+  .content { padding: 10px !important; }
+}
+
+/* Auth Screen */
+.auth-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #232f3e; }
+.auth-box { background: #fff; border-radius: 8px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+.auth-box h1 { font-size: 20px; color: #232f3e; margin-bottom: 4px; }
+.auth-box h2 { font-size: 13px; color: #ff9900; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 24px; }
+.auth-box .logo { font-size: 14px; color: #ff9900; font-weight: 600; margin-bottom: 20px; }
+.auth-field { margin-bottom: 16px; }
+.auth-field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #232f3e; }
+.auth-field input { width: 100%; padding: 10px 12px; border: 1px solid #d5dbdb; border-radius: 4px; font-size: 14px; }
+.auth-field input:focus { outline: none; border-color: #ff9900; }
+.auth-error { color: #d13212; font-size: 12px; margin-bottom: 12px; display: none; }
+.auth-btn { width: 100%; padding: 12px; background: #ff9900; border: none; border-radius: 4px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
+.auth-btn:hover { background: #ec7211; }
+.auth-btn-secondary { background: transparent; border: 1px solid #d5dbdb; color: #232f3e; }
+.auth-btn-secondary:hover { border-color: #ff9900; color: #ff9900; background: transparent; }
+.auth-link { text-align: center; margin-top: 16px; font-size: 13px; color: #5f6b7a; }
+.auth-link a { color: #ff9900; cursor: pointer; text-decoration: none; }
+.auth-link a:hover { text-decoration: underline; }
+.user-bar { padding: 12px 16px; border-top: 1px solid #3a4a5c; display: flex; align-items: center; gap: 8px; }
+.user-bar .user-icon { width: 28px; height: 28px; border-radius: 50%; background: #ff9900; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; }
+.user-bar .user-name { font-size: 12px; color: #fff; flex: 1; }
+.user-bar .logout-btn { font-size: 11px; color: #aab7c4; cursor: pointer; border: none; background: none; }
+.user-bar .logout-btn:hover { color: #ff9900; }
+.sync-indicator { font-size: 10px; color: #1d8102; padding: 2px 6px; border-radius: 3px; background: rgba(29,129,2,0.1); }
+
+</style>
+</head>
+<body>
+
+<!-- Auth Screen -->
+<div id="auth-screen" class="auth-container" style="display:none;">
+  <div class="auth-box">
+    <div class="logo">AWS WELL-ARCHITECTED</div>
+    <h1>WorkSpaces WAFR Tool</h1>
+    <h2>Sign In</h2>
+    <div id="auth-error" class="auth-error"></div>
+    <div id="login-form">
+      <div class="auth-field"><label>Email</label><input type="email" id="auth-email" placeholder="you@example.com"></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="auth-password" placeholder="Password"></div>
+      <button class="auth-btn" onclick="handleLogin()">Sign In</button>
+      <div class="auth-link">Don't have an account? <a onclick="showSignup()">Sign up</a></div>
+    </div>
+    <div id="signup-form" style="display:none;">
+      <div class="auth-field"><label>Email</label><input type="email" id="signup-email" placeholder="you@example.com"></div>
+      <div class="auth-field"><label>Password</label><input type="password" id="signup-password" placeholder="Minimum 8 characters"></div>
+      <div class="auth-field"><label>Display Name</label><input type="text" id="signup-name" placeholder="Your name"></div>
+      <button class="auth-btn" onclick="handleSignup()">Create Account</button>
+      <div class="auth-link">Already have an account? <a onclick="showLogin()">Sign in</a></div>
+    </div>
+    <div id="confirm-form" style="display:none;">
+      <p style="font-size:13px;margin-bottom:16px;color:#545b64;">Check your email for a verification code.</p>
+      <div class="auth-field"><label>Verification Code</label><input type="text" id="confirm-code" placeholder="Enter code"></div>
+      <button class="auth-btn" onclick="handleConfirm()">Verify</button>
+    </div>
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e1e4e8;">
+      <button class="auth-btn auth-btn-secondary" onclick="offlineMode()">Continue Offline (localStorage only)</button>
+    </div>
+  </div>
+</div>
+
+<div id="app-root" class="app" style="display:none;">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main">
+    <div class="topbar" id="topbar"></div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+</div>
+<div id="modal-root"></div>
+
+<script>
+
+// === AMPLIFY CONFIGURATION ===
+// After running 'amplify push', copy values from src/aws-exports.js here
+var amplifyConfig = {
+  Auth: {
+    Cognito: {
+      userPoolId: 'YOUR_USER_POOL_ID',
+      userPoolClientId: 'YOUR_CLIENT_ID',
+      identityPoolId: 'YOUR_IDENTITY_POOL_ID'
+    }
+  },
+  API: {
+    GraphQL: {
+      endpoint: 'YOUR_APPSYNC_ENDPOINT',
+      region: 'eu-west-2',
+      defaultAuthMode: 'userPool'
+    }
+  },
+  Storage: {
+    S3: {
+      bucket: 'YOUR_S3_BUCKET',
+      region: 'eu-west-2'
+    }
+  }
+};
+
+var amplifyReady = false;
+var currentUser = null;
+var amplifyClient = null;
+
+// Try to initialise Amplify
+try {
+  if (typeof aws_amplify !== 'undefined' && amplifyConfig.Auth.Cognito.userPoolId !== 'YOUR_USER_POOL_ID') {
+    aws_amplify.Amplify.configure(amplifyConfig);
+    amplifyClient = aws_amplify.generateClient();
+    amplifyReady = true;
+  }
+} catch(e) {
+  console.log('Amplify not configured - running in offline mode');
+}
+
+// === AUTH FUNCTIONS ===
+async function checkAuth() {
+  if (!amplifyReady) {
+    showAuthScreen();
+    return;
+  }
+  try {
+    var session = await aws_amplify.fetchAuthSession();
+    if (session && session.tokens) {
+      var attrs = await aws_amplify.fetchUserAttributes();
+      currentUser = { username: attrs.name || attrs.email.split('@')[0], email: attrs.email };
+      showApp();
+    } else {
+      showAuthScreen();
+    }
+  } catch(e) {
+    showAuthScreen();
+  }
+}
+
+function showAuthScreen() {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app-root').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-root').style.display = 'flex';
+  initApp();
+}
+
+function showLogin() {
+  document.getElementById('login-form').style.display = 'block';
+  document.getElementById('signup-form').style.display = 'none';
+  document.getElementById('confirm-form').style.display = 'none';
+  document.querySelector('.auth-box h2').textContent = 'Sign In';
+}
+
+function showSignup() {
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('signup-form').style.display = 'block';
+  document.getElementById('confirm-form').style.display = 'none';
+  document.querySelector('.auth-box h2').textContent = 'Create Account';
+}
+
+function offlineMode() {
+  currentUser = { username: 'Offline User', email: 'offline@local' };
+  showApp();
+}
+
+var pendingEmail = '';
+async function handleLogin() {
+  var email = document.getElementById('auth-email').value;
+  var pw = document.getElementById('auth-password').value;
+  var errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  if (!amplifyReady) { offlineMode(); return; }
+  try {
+    await aws_amplify.signIn({ username: email, password: pw });
+    await checkAuth();
+  } catch(e) {
+    errEl.textContent = e.message || 'Login failed';
+    errEl.style.display = 'block';
+  }
+}
+
+async function handleSignup() {
+  var email = document.getElementById('signup-email').value;
+  var pw = document.getElementById('signup-password').value;
+  var name = document.getElementById('signup-name').value;
+  var errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  if (!amplifyReady) { offlineMode(); return; }
+  try {
+    await aws_amplify.signUp({ username: email, password: pw, options: { userAttributes: { name: name } } });
+    pendingEmail = email;
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('signup-form').style.display = 'none';
+    document.getElementById('confirm-form').style.display = 'block';
+    document.querySelector('.auth-box h2').textContent = 'Verify Email';
+  } catch(e) {
+    errEl.textContent = e.message || 'Signup failed';
+    errEl.style.display = 'block';
+  }
+}
+
+async function handleConfirm() {
+  var code = document.getElementById('confirm-code').value;
+  var errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  try {
+    await aws_amplify.confirmSignUp({ username: pendingEmail, confirmationCode: code });
+    showLogin();
+  } catch(e) {
+    errEl.textContent = e.message || 'Verification failed';
+    errEl.style.display = 'block';
+  }
+}
+
+async function handleLogout() {
+  if (amplifyReady) { try { await aws_amplify.signOut(); } catch(e) {} }
+  currentUser = null;
+  showAuthScreen();
+}
+
+function initApp() {
+  // Load from cloud if available
+  if (amplifyReady) { loadFromCloud(); }
+  showHome();
+}
+
+// Cloud sync (non-blocking)
+async function syncReviewToCloud(review) {
+  if (!amplifyReady || !amplifyClient) return;
+  try {
+    // Upsert review
+    await amplifyClient.graphql({
+      query: `mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`,
+      variables: { input: {
+        id: review.id, templateId: review.templateId, templateName: review.templateName || '',
+        customerName: review.customerName, reviewerName: review.reviewerName,
+        reviewDate: review.reviewDate, answers: JSON.stringify(review.answers || {}),
+        notes: JSON.stringify(review.notes || {}), status: review.status || 'in-progress'
+      }}
+    });
+  } catch(e) { /* silent */ }
+}
+
+async function loadFromCloud() {
+  if (!amplifyReady || !amplifyClient) return;
+  try {
+    var result = await amplifyClient.graphql({
+      query: `query Q { listReviews { items { id templateId templateName customerName reviewerName reviewDate answers notes status } } }`
+    });
+    var items = result.data.listReviews.items;
+    if (items && items.length > 0) {
+      var cloudReviews = items.map(function(r) {
+        return { id: r.id, templateId: r.templateId, templateName: r.templateName,
+          customerName: r.customerName, reviewerName: r.reviewerName,
+          reviewDate: r.reviewDate, answers: JSON.parse(r.answers || '{}'),
+          notes: JSON.parse(r.notes || '{}'), status: r.status };
+      });
+      var local = getReviews();
+      cloudReviews.forEach(function(cr) {
+        if (!local.find(function(lr) { return lr.id === cr.id; })) local.push(cr);
+      });
+      saveReviews(local);
+    }
+  } catch(e) { console.log('Cloud sync skipped'); }
+}
+
+
+// === DEFAULT TEMPLATE DATA ===
+var DEFAULT_TEMPLATE = {
+  id: 'workspaces-default',
+  name: 'Amazon WorkSpaces WAFR',
+  description: 'Well-Architected Framework Review tailored for Amazon WorkSpaces deployments',
+  pillars: [{"name": "Operational Excellence", "questions": [{"id": "OPS-WS-01", "q": "How do you manage your WorkSpaces deployment lifecycle through Infrastructure as Code?", "best": "WorkSpaces infrastructure (VPCs, directories, security groups, IP access control groups, and WorkSpace provisioning) is managed through CloudFormation, Terraform, or CDK. Changes follow version-controlled pipelines with peer review. Manual console operations are minimised and reserved for break-glass scenarios."}, {"id": "OPS-WS-02", "q": "How do you manage and version your WorkSpaces images and bundles?", "best": "A documented image management lifecycle exists covering creation, testing, validation, promotion, and retirement. Images are versioned with clear naming conventions. Image validation steps are performed before publishing (BYOL Image Checker for BYOL imports, manual validation checklist for custom images). A golden image pipeline automates base OS patching, application installation, and validation. Image sprawl is controlled\u2014unused images are regularly reviewed and deregistered."}, {"id": "OPS-WS-03", "q": "How do you patch and update your WorkSpaces fleet?", "best": "A patching strategy addresses both the base image (for new deployments) and running WorkSpaces. For AutoStop WorkSpaces (which may be powered off 70\u201380% of the time), mechanisms such as AWS Systems Manager Patch Manager with maintenance windows, or scheduled wake-and-patch routines, ensure compliance. Patch compliance is measured against defined SLAs (e.g., critical patches within 14 days per Cyber Essentials). Patching does not rely solely on WorkSpaces being online during business hours."}, {"id": "OPS-WS-04", "q": "How do you monitor the health and performance of your WorkSpaces environment?", "best": "CloudWatch metrics are actively monitored, including `Unhealthy`, `ConnectionAttempt`, `ConnectionSuccess`, `ConnectionFailure`, `SessionLaunchTime`, `InSessionLatency`, and `SessionDisconnect`. CloudWatch dashboards (ideally using the pre-built CloudFormation templates) provide at-a-glance fleet health. Alarms are configured for key thresholds (e.g., unhealthy WorkSpaces exceeding a percentage, latency spikes). CloudWatch Logs captures WorkSpaces event data for trend analysis."}, {"id": "OPS-WS-05", "q": "How do you handle WorkSpaces provisioning and deprovisioning at scale?", "best": "Provisioning is automated via API/CLI integration with identity lifecycle systems (e.g., Joiner-Mover-Leaver processes). When a user joins, their WorkSpace is automatically provisioned from the appropriate bundle. When they leave, the WorkSpace is terminated following a defined data-retention period. Self-service provisioning portals may be available for approved use cases. Tagging standards are enforced at creation time."}, {"id": "OPS-WS-06", "q": "How do you manage tagging and cost allocation for your WorkSpaces?", "best": "A consistent tagging strategy is applied to all WorkSpaces resources (WorkSpaces, images, bundles, directories). Tags capture business-relevant metadata: cost centre, department, project, environment, and owner. Tags are enforced through Service Control Policies or tag policies. Tags propagate to Systems Manager managed instances for unified operational views."}, {"id": "OPS-WS-07", "q": "How do you manage user self-service capabilities?", "best": "Self-service options are deliberately configured per directory\u2014not left at defaults. Users can restart and rebuild their own WorkSpaces. Volume increase, compute type changes, and running mode switches are either disabled or gated behind an approval workflow (e.g., ITSM integration). The rationale for each enabled/disabled option is documented."}, {"id": "OPS-WS-08", "q": "How do you respond to and resolve WorkSpaces operational incidents?", "best": "Runbooks exist for common failure scenarios: unhealthy WorkSpaces, connection failures, directory connectivity issues, and image corruption. Escalation paths are defined. EventBridge rules capture WorkSpaces state changes and trigger automated remediation (e.g., auto-reboot of unhealthy instances). Mean time to resolution (MTTR) is tracked for WorkSpaces-related incidents."}, {"id": "OPS-WS-09", "q": "How do you manage application delivery to your WorkSpaces?", "best": "Applications are delivered through a managed mechanism\u2014SCCM, Intune, Ansible, Chef, Puppet, or AWS Systems Manager Distributor. Application versions are tracked and consistent across the fleet. A decision framework exists for determining which applications are baked into the image versus deployed post-provisioning. Layer-based approaches (thin/hybrid images) are considered for environments with diverse application requirements."}, {"id": "OPS-WS-10", "q": "How do you track and report on WorkSpaces utilisation?", "best": "Utilisation data is collected, aggregated, and reviewed regularly (at minimum monthly). Reports identify unused or underutilised WorkSpaces, enabling right-sizing or termination decisions. Tools such as the WorkSpaces Cost Optimizer, Amazon QuickSight dashboards, or custom CloudWatch-based reporting are in use. Utilisation trends inform capacity planning and licensing decisions."}, {"id": "OPS-WS-11", "q": "How do you manage the migration from PCoIP to Amazon DCV protocol?", "best": "A documented migration plan exists for transitioning WorkSpaces from PCoIP (legacy) to Amazon DCV. The \"Modify protocols\" feature is used to convert WorkSpaces without requiring a rebuild. Migration is phased by user group with pilot testing before broad rollout. User communication covers any client-side changes required. Rollback procedures are defined. Performance baselines are captured pre- and post-migration. Group Policy ADMX templates are updated from PCoIP to DCV settings. The migration timeline aligns with PCoIP deprecation guidance from AWS."}]}, {"name": "Security", "questions": [{"id": "SEC-WS-01", "q": "How do you manage identity and directory integration for your WorkSpaces?", "best": "A deliberate directory strategy is in place\u2014AD Connector for proxied authentication, AWS Managed Microsoft AD for cloud-native, or a trust relationship for hybrid scenarios. The chosen architecture meets requirements for user authentication, Group Policy application, and resource access. Directory health is monitored. Directory service accounts use least-privilege principles. The directory design supports the required scale (users, WorkSpaces, and Group Policy objects)."}, {"id": "SEC-WS-02", "q": "How do you enforce multi-factor authentication (MFA) for WorkSpaces access?", "best": "MFA is mandatory for all WorkSpaces connections. A RADIUS-compatible MFA solution is integrated (e.g., Azure MFA with NPS extension, Duo, RSA SecurID, or AWS-native solutions). MFA is configured at the directory level and applies universally. Fallback procedures exist for MFA service disruptions. Certificate-Based Authentication (CBA) is evaluated for passwordless workflows where DCV protocol is in use. WebAuthN-based authentication is considered for FIDO2 security key support."}, {"id": "SEC-WS-03", "q": "How do you control which devices can connect to your WorkSpaces?", "best": "IP Access Control Groups restrict connections to known network ranges (corporate offices, VPN exit points). Trusted device policies enforce client certificate validation where required. Device type restrictions limit access to approved client platforms. Access policies are reviewed when network architecture changes (e.g., new office locations, VPN provider changes)."}, {"id": "SEC-WS-04", "q": "How do you protect data at rest within your WorkSpaces?", "best": "WorkSpaces volume encryption is enabled using AWS KMS customer-managed keys (CMKs). Encryption covers both root and user volumes. KMS key policies follow least privilege. Key rotation is configured. The implications of encryption on WorkSpace rebuild and migration operations are understood and documented."}, {"id": "SEC-WS-05", "q": "How do you protect data in transit for your WorkSpaces?", "best": "The streaming protocol (Amazon DCV (formerly WSP) or PCoIP (legacy)) encrypts all pixel data in transit using AES-256. Where additional network-level controls are required, PrivateLink/VPC Interface Endpoints are configured to keep streaming traffic entirely within the AWS network\u2014eliminating internet traversal. TLS 1.2+ is enforced for all management plane operations."}, {"id": "SEC-WS-06", "q": "How do you prevent data exfiltration from your WorkSpaces?", "best": "Group Policy and WorkSpaces properties are configured to control: clipboard redirection (copy/paste), local drive mapping, printing, USB redirection, and audio input. Settings are tailored by user group based on data sensitivity. For high-security environments, all local device redirection is disabled, and WorkSpaces operate as secure enclaves. AWS Verified Access is considered for zero-trust architectures."}, {"id": "SEC-WS-07", "q": "How do you manage network security for your WorkSpaces VPC?", "best": "WorkSpaces reside in dedicated private subnets with no direct internet access. Internet egress routes through a NAT Gateway or centralised inspection (AWS Network Firewall, third-party NGFW). Security groups on WorkSpaces ENIs follow least privilege\u2014only required ports are open. Network ACLs provide an additional layer of defence. Separate security groups exist for management traffic versus user data traffic. DNS resolution is controlled (e.g., Route 53 Resolver with forwarding rules)."}, {"id": "SEC-WS-08", "q": "How do you manage endpoint protection on your WorkSpaces?", "best": "Anti-malware/EDR agents are deployed to all WorkSpaces (baked into the image or deployed via management tooling). Agents are kept current and report to a centralised console. Exclusions are configured for WorkSpaces-specific processes to avoid performance degradation (e.g., PCoIP/DCV agent processes). Windows Defender or third-party solutions are actively managed\u2014not relying on default configurations."}, {"id": "SEC-WS-09", "q": "How do you audit and log WorkSpaces activity?", "best": "CloudTrail captures all WorkSpaces API calls (management plane). CloudWatch Events/EventBridge captures WorkSpaces access events (login, disconnect, reconnect). Windows Event Logs are forwarded to a centralised SIEM (via CloudWatch Agent or third-party forwarder). Login success/failure patterns are monitored for anomalies. Logs are retained per compliance requirements and protected from tampering."}, {"id": "SEC-WS-10", "q": "How do you manage Group Policy for your WorkSpaces fleet?", "best": "Group Policy Objects (GPOs) are used to enforce security baselines across the WorkSpaces fleet. GPOs are version-controlled and tested in a staging OU before production deployment. WorkSpaces-specific ADMX templates (for PCoIP and Amazon DCV settings) are deployed. GPO conflicts are identified and resolved. A documented baseline exists covering: screen lock timeout, password policy, removable storage, software restriction policies, and browser configuration."}, {"id": "SEC-WS-11", "q": "How do you handle Windows operating system end-of-support for your WorkSpaces?", "best": "A migration plan exists for end-of-support operating systems (e.g., Windows 10 EOS October 2025, Amazon Linux 2 EOL June 30, 2026). BYOL images are migrated to supported OS versions. Timelines, testing, and user communication plans are documented. Extended Security Updates (ESU) are considered only as a short-term bridge while migration completes\u2014not as a long-term strategy. The GraphicsPro bundle EOL (October 2025) is addressed with migration to Graphics G6/Gr6/G6f bundles. Amazon Linux 2 WorkSpaces require urgent migration to Ubuntu or other supported OS before the June 30, 2026 deadline."}, {"id": "SEC-WS-12", "q": "How do you manage Microsoft Entra ID integration for your WorkSpaces?", "best": "Where the organisation uses Microsoft Entra ID (formerly Azure AD) as their primary identity provider, the integration approach is deliberate. For BYOL WorkSpaces (Windows 10/11), Entra ID join via Custom directories is evaluated. The prerequisites are understood: BYOL licensing, supported OS versions, and network connectivity to Entra ID endpoints. Conditional Access policies are configured to enforce device compliance and MFA for WorkSpaces sessions. The distinction between Entra ID join (cloud-native) and hybrid Entra ID join (on-premises AD synced) is understood and the appropriate model selected."}, {"id": "SEC-WS-13", "q": "How do you manage security for WorkSpaces Web Access?", "best": "Web Access is deliberately enabled or disabled per directory based on the security posture required. Where enabled, DCV Web Access is used (PCoIP Web Access is deprecated for new customers since November 2025). Browser-based access introduces unique risks \u2014 session token management, browser extension interference, and data residency in browser cache are addressed. IP Access Control Groups apply equally to web and native client connections. Users are guided to supported browser versions. Web Access is disabled for high-security user populations where native client with certificate-based device trust is required."}]}, {"name": "Reliability", "questions": [{"id": "REL-WS-01", "q": "How do you design your VPC and subnets for WorkSpaces resilience?", "best": "WorkSpaces are deployed across a minimum of two Availability Zones via directory subnet configuration. Subnet sizing accounts for current fleet and growth projections (each WorkSpace consumes one IP address). CIDR ranges are planned to avoid conflicts with on-premises networks and other VPCs. IP address exhaustion is monitored and alerted upon. A dedicated VPC or dedicated subnets within a shared VPC provide appropriate isolation."}, {"id": "REL-WS-02", "q": "How do you ensure directory service high availability?", "best": "AWS Managed Microsoft AD is deployed with domain controllers in at least two AZs. For AD Connector scenarios, the connector targets multiple on-premises domain controllers. Directory health metrics are monitored (replication status, LDAP response times). DNS resolution for directory services is redundant. If on-premises connectivity fails, the impact on WorkSpaces authentication is understood and documented (e.g., cached credentials behaviour)."}, {"id": "REL-WS-03", "q": "How do you handle WorkSpaces failure and recovery?", "best": "Automated snapshots are understood (every 12 hours for user volumes). Rebuild procedures are documented and tested\u2014staff know the difference between reboot, rebuild, and restore. Users understand that rebuild reverts to the last snapshot. For critical users, more frequent backup mechanisms are considered (e.g., FSLogix profile containers on FSx, OneDrive/SharePoint sync). WorkSpace health checks trigger automated remediation via EventBridge and Lambda."}, {"id": "REL-WS-04", "q": "How do you plan for business continuity and disaster recovery?", "best": "Multi-Region Resilience (MRR) is evaluated and implemented for business-critical user populations. Standby WorkSpaces in a secondary Region provide an RTO of less than 30 minutes. Cross-Region DNS failover is configured. For less critical populations, documented manual procedures exist for re-provisioning in an alternate Region. Recovery procedures are tested at least annually. RTO and RPO targets are defined and achievable."}, {"id": "REL-WS-05", "q": "How do you ensure reliable network connectivity between users and WorkSpaces?", "best": "Network path redundancy exists for all connectivity scenarios: user-to-WorkSpace (internet/VPN), WorkSpace-to-backend (VPC routing, Direct Connect, Transit Gateway). PrivateLink/VPC Interface Endpoints are evaluated for private streaming connectivity where applicable. Network latency is monitored\u2014PCoIP requires < 100ms RTT, Amazon DCV tolerates higher latency but degrades beyond 250ms. Failover paths are tested for Direct Connect and VPN scenarios."}, {"id": "REL-WS-06", "q": "How do you manage WorkSpaces capacity and scaling?", "best": "Capacity planning accounts for peak concurrent users plus a buffer. For WorkSpaces Personal, provisioning automation ensures new WorkSpaces are available within SLA when users are onboarded. For WorkSpaces Pools, scaling policies and warm pools are configured to handle demand spikes. Subnet capacity and service quotas are monitored and increases requested proactively. Account-level WorkSpaces limits are understood and sufficient."}, {"id": "REL-WS-07", "q": "How do you handle dependency failures (internet, DNS, backend applications)?", "best": "The impact of upstream dependency failures on WorkSpaces usability is mapped and documented. Internet gateway or NAT Gateway failures are mitigated through multi-AZ NAT deployment. DNS failures are mitigated through Route 53 Resolver with appropriate forwarding. Backend application unavailability is communicated to users. WorkSpaces can still function (login, basic operation) even if individual backend services are degraded."}, {"id": "REL-WS-08", "q": "How do you ensure Amazon Linux 2 WorkSpaces are migrated before end-of-life (June 30, 2026)?", "best": "All Amazon Linux 2 WorkSpaces are identified and an urgent migration plan is in place. The deadline of June 30, 2026 is understood \u2014 after this date, Amazon Linux 2 will no longer receive security patches or updates. Migration targets are defined (Ubuntu WorkSpaces or Windows alternatives). User data preservation is planned (user volume snapshots, profile migration). Application compatibility on the target OS is validated. A phased migration timeline with user communication exists. Post-migration validation confirms all users are functional on the new OS."}]}, {"name": "Performance Efficiency", "questions": [{"id": "PERF-WS-01", "q": "How do you select the appropriate streaming protocol for your WorkSpaces?", "best": "The protocol choice (Amazon DCV vs. PCoIP) is a deliberate decision based on requirements: Amazon DCV (formerly WSP) offers superior features (bidirectional audio/video, certificate-based auth, smart card, SDK extensions, 4K resolution on non-GPU instances) and is the strategic direction. PCoIP is the legacy protocol, retained only where specific compatibility is required. A migration plan from PCoIP to Amazon DCV exists with rollback procedures \u2014 the \"Modify protocols\" feature enables conversion without rebuild. Protocol performance metrics (latency, frame rate, bandwidth) are monitored per user."}, {"id": "PERF-WS-02", "q": "How do you select the appropriate bundle types for your user populations?", "best": "User personas are defined (e.g., task worker, knowledge worker, power user, developer, graphics professional) with corresponding bundle specifications. Bundle selection is validated through user acceptance testing\u2014not guesswork. Over-provisioned bundles are identified through utilisation monitoring (CPU, memory via CloudWatch). Right-sizing reviews occur at least quarterly. GPU bundles (Graphics.g4dn, Graphics G6, Gr6, G6f on NVIDIA L4 with fractional GPU options) are reserved for validated graphics workloads. Note: GraphicsPro bundle reached EOL October 2025 \u2014 migrate to G6/Gr6/G6f bundles."}, {"id": "PERF-WS-03", "q": "How do you optimise network performance for your WorkSpaces users?", "best": "WorkSpaces are deployed in the AWS Region closest to the majority of users. For globally distributed users, multi-Region deployment with connection aliases enables users to connect to their nearest Region. Network path quality is measured (RTT, jitter, packet loss). Quality of Service (QoS) policies prioritise WorkSpaces streaming traffic on corporate networks. Users connecting from home/remote are guided on minimum bandwidth requirements (typically 2\u20134 Mbps per session)."}, {"id": "PERF-WS-04", "q": "How do you optimise storage performance for your WorkSpaces?", "best": "Root volume and user volume sizes are right-sized per persona\u2014oversized volumes waste cost while undersized volumes cause user friction. SSD-backed volumes (gp3 equivalent) are standard. For I/O-intensive workloads, volume performance characteristics are validated. User data that does not require local storage is directed to network shares (FSx, EFS) or cloud storage (S3, OneDrive). Volume increase requests are tracked to identify patterns requiring baseline adjustments."}, {"id": "PERF-WS-05", "q": "How do you manage WorkSpaces performance for real-time communication workloads?", "best": "If users run Microsoft Teams, Zoom, or similar UC applications within WorkSpaces, media optimisation is configured. For Teams, the WorkSpaces client-side media optimisation offloads audio/video processing to the client device. For Amazon Connect, the Connect Optimization for WorkSpaces feature is evaluated. Without optimisation, real-time audio/video traverses the pixel stream, degrading quality and consuming excessive bandwidth. Performance metrics specific to UC workloads are monitored."}, {"id": "PERF-WS-06", "q": "How do you manage WorkSpaces client experience across diverse endpoint devices?", "best": "Supported client versions are documented and communicated to users. Client auto-update policies are in place. The experience is validated across all supported client platforms (Windows, macOS, Linux, iPad, Android, Web Access, Thin Client). Display configuration best practices are communicated (resolution, multi-monitor support varies by protocol and client). Note: PCoIP Web Access is deprecated for new customers (November 2025) \u2014 DCV Web Access is the supported path forward. WorkSpaces Thin Client reaches end of support on March 31, 2027 \u2014 new device investments should consider third-party thin client alternatives (IGEL, 10ZiG, Dell Wyse)."}, {"id": "PERF-WS-07", "q": "How do you address latency and performance for users connecting from varying locations?", "best": "A Connection Health Check URL or similar diagnostic is available for users to validate connectivity before raising support tickets. CloudWatch `InSessionLatency` metrics are trended per user/location. Users experiencing degraded performance are guided through network diagnostics. For users consistently above latency thresholds, alternative approaches are considered (Region re-deployment, VPN optimisation, SD-WAN). Protocol-specific tuning (Amazon DCV adaptive settings, PCoIP bandwidth limits) is applied where needed."}, {"id": "PERF-WS-08", "q": "How do you leverage WorkSpaces for AI agent workloads?", "best": "Where the organisation is exploring AI-powered automation of legacy desktop applications, WorkSpaces as agent compute is evaluated (May 2026 preview). The use case is clearly defined \u2014 AI agents operating legacy applications that lack APIs benefit from a virtual desktop environment. Performance requirements for agent workloads are understood (compute-intensive, potentially GPU-accelerated). Security boundaries between agent WorkSpaces and production environments are enforced. Agent session monitoring and audit logging capture all automated actions. Cost modelling accounts for the potentially 24/7 running nature of agent WorkSpaces (AlwaysOn mode)."}]}, {"name": "Cost Optimisation", "questions": [{"id": "COST-WS-01", "q": "How do you optimise WorkSpaces running mode selection?", "best": "The Cost Optimizer for Amazon WorkSpaces solution is deployed and actively converting WorkSpaces between AlwaysOn and AutoStop based on the ~80-hour monthly breakeven point. Running mode decisions are data-driven, not assumed. For GPU bundles, the different breakeven calculations are understood. Exceptions (e.g., WorkSpaces that must remain AlwaysOn for operational reasons) are tagged with `Skip_Convert` and documented."}, {"id": "COST-WS-02", "q": "How do you identify and terminate unused WorkSpaces?", "best": "A process exists to identify WorkSpaces with zero or minimal usage over a defined period (e.g., 30\u201360 days). The Cost Optimizer's termination feature is evaluated (dry-run first, then active). Joiner-Mover-Leaver processes trigger WorkSpace termination on user departure. Orphaned WorkSpaces (user account disabled/deleted) are identified and cleaned up. Monthly reports surface candidates for termination with appropriate data backup confirmation."}, {"id": "COST-WS-03", "q": "How do you manage WorkSpaces licensing costs?", "best": "A clear decision exists between AWS-included licensing and BYOL. For BYOL: the minimum 100 WorkSpaces per Region commitment on dedicated hardware is met, Microsoft licensing agreements permit VDI use (VDA E3/E5 subscription), and the cost differential is regularly validated. Microsoft 365 licensing (Apps for Enterprise) is addressed\u2014either included in the user's existing M365 subscription or separately licensed. Windows Server CALs are understood for WorkSpaces Core scenarios."}, {"id": "COST-WS-04", "q": "How do you right-size WorkSpaces compute and storage?", "best": "Bundle specifications are reviewed against actual utilisation data at least quarterly. Over-provisioned WorkSpaces (consistently low CPU/memory utilisation) are migrated to smaller bundles. Volume sizes are started at the minimum appropriate level, with self-service or approved increase workflows. Storage increase is a one-way operation (cannot reduce later)\u2014this is communicated and controlled. WorkSpaces Pools are evaluated for non-persistent use cases (task workers, training, contact centres) to reduce per-user costs."}, {"id": "COST-WS-05", "q": "How do you manage data transfer and networking costs for WorkSpaces?", "best": "Data transfer costs are understood and monitored\u2014particularly egress from WorkSpaces to the internet and cross-AZ/cross-Region traffic. NAT Gateway data processing charges are tracked. VPC Endpoints are used for AWS service traffic (S3, DynamoDB) to reduce NAT costs. Internet breakout architecture is optimised (centralised vs. per-VPC). For large-scale deployments, the cost of PrivateLink endpoints is weighed against internet-based streaming costs."}, {"id": "COST-WS-06", "q": "How do you evaluate WorkSpaces Personal versus WorkSpaces Pools for your use cases?", "best": "A framework exists for determining which user populations suit Personal (persistent, stateful) versus Pools (non-persistent, shared). Task workers, seasonal staff, training environments, and contact centre agents are candidates for Pools. Profile persistence for Pools users is addressed through application-level sync (OneDrive, FSLogix with FSx). Cost modelling compares per-user costs across both models including profile storage overhead."}, {"id": "COST-WS-07", "q": "How do you forecast and budget for WorkSpaces costs?", "best": "Monthly WorkSpaces spend is predictable and within budget. Cost anomaly detection (AWS Cost Anomaly Detection) is configured for the WorkSpaces service. Forecasting accounts for: user growth, seasonal patterns (e.g., contractors), running mode mix, and planned bundle changes. Chargeback/showback mechanisms allocate costs to consuming business units using tags. Reserved pricing or commitment discounts are evaluated where applicable."}]}, {"name": "Sustainability", "questions": [{"id": "SUS-WS-01", "q": "How do you align WorkSpaces resource provisioning with actual demand?", "best": "AutoStop mode is the default for WorkSpaces where the use case permits\u2014stopped WorkSpaces consume minimal resources. The AutoStop timeout is set appropriately (not too long, causing unnecessary running time; not too short, causing user frustration). Unused WorkSpaces are terminated rather than left in a stopped state indefinitely. WorkSpaces Pools with appropriate scaling policies avoid over-provisioning compared to idle Personal WorkSpaces."}, {"id": "SUS-WS-02", "q": "How do you select an appropriate Region for sustainability?", "best": "Where multiple Regions meet latency requirements, preference is given to Regions powered by renewable energy. AWS publishes sustainability information per Region that informs this decision. User proximity is balanced against carbon intensity. For DR/secondary Regions, the sustainability characteristics are considered alongside cost and performance."}, {"id": "SUS-WS-03", "q": "How do you minimise the environmental impact of end-user devices?", "best": "Low-power thin client devices are evaluated as an alternative to full desktop PCs, consuming approximately 4W compared to 50\u2013150W for traditional desktops. Note: AWS WorkSpaces Thin Client reaches end of support on March 31, 2027 \u2014 for new deployments, consider third-party thin client devices (IGEL, 10ZiG, Dell Wyse, HP t-series) which offer equivalent power savings. BYOD policies extending the life of existing personal devices are considered. The shift from physical desktops to virtual desktops is quantified in terms of energy savings and hardware refresh reduction. E-waste from decommissioned physical desktops is responsibly recycled."}, {"id": "SUS-WS-04", "q": "How do you right-size WorkSpaces to avoid wasteful over-provisioning?", "best": "Compute bundles match actual workload requirements\u2014provisioning a Power bundle for a user running only web browsers and email wastes cloud resources. Regular right-sizing reviews ensure bundles track changing user needs. Image sizes are optimised (removing unnecessary applications reduces storage footprint and deployment time). Data stored on user volumes is relevant and current\u2014stale data is archived or removed."}, {"id": "SUS-WS-05", "q": "How do you optimise image management for sustainability?", "best": "Golden images are consolidated where possible\u2014minimising the number of unique images reduces storage and management overhead. Thin/hybrid image approaches reduce image size (smaller images = less storage, faster provisioning, less network transfer during deployment). Image lifecycle policies ensure outdated images are deregistered and associated snapshots deleted. Application layering is preferred over proliferating full-fat images for every application combination. The following topics should be validated during the review but may not warrant a full question: | Topic | Key Consideration | |-------|-------------------| | **WorkSpaces Web Access** | Enabled/disabled per directory; understand security implications of browser-based access | | **Amazon WorkSpaces Thin Client management** | Device fleet management, environment assignment, firmware updates | | **Cross-account WorkSpaces** | Shared services model using RAM or cross-account directory sharing | | **WorkSpaces migration** | Migrating between bundles, protocols, or Regions\u2014process and data preservation | | **Maintenance windows** | Understanding the weekly maintenance window and its impact on AlwaysOn WorkSpaces | | **WorkSpaces Personal vs. Core** | Core provides infrastructure only (no management plane)\u2014understanding the split responsibility | | **Smart card redirection** | Pre-session (authentication) vs. in-session (application signing) support requirements | | **Custom DNS configuration** | DHCP option sets, DNS forwarding rules, and split-horizon DNS | | **Printing** | Local printer redirection, network printing, and print server integration approaches | | **USB redirection** | Supported device types, security implications, and protocol compatibility | Before conducting this review, request the following from the customer: 1. **Architecture diagram** \u2014 VPC design, subnet layout, directory placement, connectivity paths 2. **WorkSpaces inventory** \u2014 Count by bundle type, running mode, protocol, and Region 3. **Directory architecture** \u2014 Type, trust relationships, OU structure, GPO summary 4. **Monitoring dashboard** \u2014 Current CloudWatch configuration and alerting 5. **Image catalogue** \u2014 List of active images/bundles with purpose and last update date 6. **Cost report** \u2014 Last 3 months' WorkSpaces spend from Cost Explorer 7. **Incident history** \u2014 Recent WorkSpaces-related incidents and resolutions 8. **User population breakdown** \u2014 Personas, locations, device types, and access patterns | Resource | URL | |----------|-----| | Best Practices for Deploying Amazon WorkSpaces | docs.aws.amazon.com/whitepapers/latest/best-practices-deploying-amazon-workspaces/ | | Well-Architected End User Computing Lens | docs.aws.amazon.com/wellarchitected/latest/end-user-computing-lens/ | | WorkSpaces Cost Optimizer Solution | aws.amazon.com/solutions/implementations/cost-optimizer-for-amazon-workspaces/ | | WorkSpaces Administration Guide | docs.aws.amazon.com/workspaces/latest/adminguide/ | | Multi-Region Resilience Guide | docs.aws.amazon.com/workspaces/latest/adminguide/multi-region-resilience.html | | CloudWatch Dashboard Templates | aws.amazon.com/blogs/desktop-and-application-streaming/monitor-amazon-workspaces-at-scale/ | | Amazon DCV Migration Guide | aws.amazon.com/blogs/desktop-and-application-streaming/considerations-for-a-successful-amazon-workspaces-migration-to-workspaces-streaming-protocol/ | *Document prepared for TAM-led customer engagements. Review and adapt based on customer-specific deployment model, scale, and compliance requirements.*"}]}]
+};
+
+// === STATE ===
+var state = {
+  view: 'home',
+  activeReview: null,
+  activePillar: 0,
+  activeQuestion: 0
+};
+
+function getTemplates() {
+  var t = localStorage.getItem('wafr-templates');
+  if (!t) {
+    localStorage.setItem('wafr-templates', JSON.stringify([DEFAULT_TEMPLATE]));
+    return [DEFAULT_TEMPLATE];
+  }
+  var parsed = JSON.parse(t);
+  // Ensure default template is always present
+  if (!parsed.find(function(x) { return x.id === 'workspaces-default'; })) {
+    parsed.unshift(DEFAULT_TEMPLATE);
+    localStorage.setItem('wafr-templates', JSON.stringify(parsed));
+  }
+  return parsed;
+}
+
+function saveTemplates(templates) {
+  localStorage.setItem('wafr-templates', JSON.stringify(templates));
+}
+
+function getReviews() {
+  var r = localStorage.getItem('wafr-reviews');
+  return r ? JSON.parse(r) : [];
+}
+
+function saveReviews(reviews) {
+  localStorage.setItem('wafr-reviews', JSON.stringify(reviews));
+}
+
+function getReview(id) {
+  return getReviews().find(function(r) { return r.id === id; });
+}
+
+function updateReview(review) {
+  var reviews = getReviews();
+  var idx = reviews.findIndex(function(r) { return r.id === review.id; });
+  if (idx >= 0) reviews[idx] = review;
+  saveReviews(reviews);
+}
+
+// === SCORING ===
+function getScoreValue(answer) {
+  if (answer === 'fully') return 100;
+  if (answer === 'partial') return 50;
+  if (answer === 'not') return 0;
+  return -1; // N/A
+}
+
+function getPillarScore(review, pillarIdx) {
+  var pillar = review.pillars[pillarIdx];
+  var total = 0, count = 0, answered = 0;
+  pillar.questions.forEach(function(q) {
+    var a = review.answers[q.id];
+    if (a && a.score) {
+      answered++;
+      var v = getScoreValue(a.score);
+      if (v >= 0) { total += v; count++; }
+    }
+  });
+  var pct = count > 0 ? Math.round(total / count) : 0;
+  return { pct: pct, answered: answered, total: pillar.questions.length, count: count };
+}
+
+function getOverallScore(review) {
+  var total = 0, count = 0;
+  review.pillars.forEach(function(_, i) {
+    var s = getPillarScore(review, i);
+    if (s.count > 0) { total += s.pct; count++; }
+  });
+  return count > 0 ? Math.round(total / count) : 0;
+}
+
+function getRag(pct) {
+  if (pct >= 80) return 'green';
+  if (pct >= 40) return 'amber';
+  return 'red';
+}
+
+// === RENDER: HOME ===
+function showHome() {
+  state.view = 'home';
+  state.activeReview = null;
+  
+  document.getElementById('sidebar').innerHTML = '<div class="sidebar-header"><h1>WAFR Review Tool</h1><h2>Home</h2><div class="sub">v4.0</div></div>' +
+    '<div class="sidebar-nav"><div class="nav-section">Navigation</div>' +
+    '<div class="nav-item active" onclick="showHome()">My Reviews</div></div>';
+  
+  document.getElementById('topbar').innerHTML = '<h3>Well-Architected Framework Reviews</h3>' +
+    '<div class="topbar-actions">' +
+    '<button class="btn" onclick="importReview()">Import Review</button>' +
+    '<button class="btn" onclick="importTemplate()">Import Template</button>' +
+    '<button class="btn btn-primary" onclick="showNewReviewModal()">+ New Review</button></div>';
+  
+  var reviews = getReviews();
+  var templates = getTemplates();
+  
+  var html = '<div class="home-grid"><div class="home-section"><h3>My Reviews (' + reviews.length + ')</h3>';
+  if (reviews.length === 0) {
+    html += '<p style="color:#5f6b7a;font-size:13px;">No reviews yet. Click "+ New Review" to start.</p>';
+  } else {
+    reviews.forEach(function(r) {
+      var totalQ = 0, answeredQ = 0;
+      r.pillars.forEach(function(p, i) { var s = getPillarScore(r, i); totalQ += s.total; answeredQ += s.answered; });
+      var pct = totalQ > 0 ? Math.round(answeredQ / totalQ * 100) : 0;
+      html += '<div class="review-card" onclick="openReview(\'' + r.id + '\')">' +
+        '<h4>' + r.customer + '</h4>' +
+        '<div class="meta">' + r.template + ' | ' + r.date + ' | Reviewer: ' + r.reviewer + '</div>' +
+        '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+        '<div class="meta" style="margin-top:4px">' + answeredQ + '/' + totalQ + ' questions (' + pct + '%)</div>' +
+        '<div class="card-actions">' +
+        '<button class="btn btn-sm" onclick="event.stopPropagation();exportReview(\'' + r.id + '\')">Export JSON</button>' +
+        '<button class="btn btn-sm" onclick="event.stopPropagation();exportReviewAsPrintHTML(\'' + r.id + '\')">Print Report</button>' +
+        '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteReview(\'' + r.id + '\')">Delete</button></div></div>';
+    });
+  }
+  html += '</div><div class="home-section"><h3>Templates (' + templates.length + ')</h3>';
+  templates.forEach(function(t) {
+    var qCount = 0;
+    t.pillars.forEach(function(p) { qCount += p.questions.length; });
+    html += '<div class="template-card"><h4>' + t.name + '</h4>' +
+      '<div class="meta">' + t.pillars.length + ' pillars, ' + qCount + ' questions</div>' +
+      '<div class="meta">' + (t.description || '') + '</div>' +
+      '<div class="card-actions">' +
+      '<button class="btn btn-sm" onclick="event.stopPropagation();exportTemplate(\'' + t.id + '\')">Export</button>' +
+      (t.id !== 'workspaces-default' ? '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteTemplate(\'' + t.id + '\')">Delete</button>' : '') +
+      '</div></div>';
+  });
+  html += '</div></div>';
+  document.getElementById('content').innerHTML = html;
+}
+
+// === MODAL: NEW REVIEW ===
+function showNewReviewModal() {
+  var templates = getTemplates();
+  var opts = templates.map(function(t) { return '<option value="' + t.id + '">' + t.name + '</option>'; }).join('');
+  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
+    '<div class="modal" onclick="event.stopPropagation()"><h3>New Review</h3>' +
+    '<div class="form-group"><label>Template</label><select id="m-template">' + opts + '</select></div>' +
+    '<div class="form-group"><label>Customer Name</label><input id="m-customer" placeholder="e.g. FCA"></div>' +
+    '<div class="form-group"><label>Reviewer Name</label><input id="m-reviewer" placeholder="e.g. Daniel Matlock"></div>' +
+    '<div class="form-group"><label>Date</label><input id="m-date" type="date" value="' + new Date().toISOString().split('T')[0] + '"></div>' +
+    '<div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="createReview()">Create</button></div></div></div>';
+}
+
+function closeModal(e) {
+  if (!e || e.target.classList.contains('modal-overlay')) {
+    document.getElementById('modal-root').innerHTML = '';
+  }
+}
+
+function createReview() {
+  var templateId = document.getElementById('m-template').value;
+  var customer = document.getElementById('m-customer').value.trim();
+  var reviewer = document.getElementById('m-reviewer').value.trim();
+  var date = document.getElementById('m-date').value;
+  
+  if (!customer) { alert('Please enter a customer name'); return; }
+  
+  var templates = getTemplates();
+  var template = templates.find(function(t) { return t.id === templateId; });
+  if (!template) return;
+  
+  var review = {
+    id: 'review-' + Date.now(),
+    customer: customer,
+    reviewer: reviewer,
+    date: date,
+    template: template.name,
+    templateId: template.id,
+    pillars: JSON.parse(JSON.stringify(template.pillars)),
+    answers: {},
+    createdAt: new Date().toISOString()
+  };
+  
+  var reviews = getReviews();
+  reviews.unshift(review);
+  saveReviews(reviews);
+  closeModal();
+  openReview(review.id);
+}
+
+// === REVIEW VIEW ===
+function openReview(id) {
+  var review = getReview(id);
+  if (!review) return;
+  state.activeReview = id;
+  state.view = 'dashboard';
+  state.activePillar = 0;
+  state.activeQuestion = 0;
+  showReviewDashboard();
+}
+
+function renderSidebar() {
+  var review = getReview(state.activeReview);
+  if (!review) return;
+  
+  var nav = '<div class="sidebar-header"><h1>' + review.template + '</h1><h2>' + review.customer + '</h2>' +
+    '<div class="sub">' + review.date + ' | ' + review.reviewer + '</div></div>';
+  nav += '<div class="sidebar-nav"><div class="nav-section">Views</div>';
+  nav += '<div class="nav-item' + (state.view === 'dashboard' ? ' active' : '') + '" onclick="showReviewDashboard()">Dashboard</div>';
+  nav += '<div class="nav-item' + (state.view === 'improvement' ? ' active' : '') + '" onclick="showImprovement()">Improvement Plan</div>';
+  nav += '<div class="nav-section">Pillars</div>';
+  
+  review.pillars.forEach(function(p, i) {
+    var s = getPillarScore(review, i);
+    var rag = s.answered > 0 ? getRag(s.pct) : 'grey';
+    var isActive = state.view === 'questions' && state.activePillar === i;
+    nav += '<div class="nav-item' + (isActive ? ' active' : '') + '" onclick="showPillar(' + i + ')">' +
+      '<span>' + p.name + '</span><span class="progress-text">' + s.answered + '/' + s.total + '</span>' +
+      '<span class="badge badge-' + rag + '"></span></div>';
+  });
+  
+  nav += '</div><div class="sidebar-footer"><button onclick="showHome()">Back to Home</button></div>';
+  document.getElementById('sidebar').innerHTML = nav;
+}
+
+// === DASHBOARD ===
+function showReviewDashboard() {
+  state.view = 'dashboard';
+  renderSidebar();
+  var review = getReview(state.activeReview);
+  
+  document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
+    '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
+    '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">Generate Report</button></div>';
+  
+  var overall = getOverallScore(review);
+  var html = '<div class="overall-score"><div class="big">' + overall + '%</div><div class="label">Overall Score</div>' +
+    '<span class="rag-badge rag-' + getRag(overall) + '">' + getRag(overall).toUpperCase() + '</span></div>';
+  
+  // SVG Radar chart
+  html += '<div class="radar-container">' + renderRadar(review) + '</div>';
+  
+  // Pillar cards
+  html += '<div class="dashboard-grid">';
+  review.pillars.forEach(function(p, i) {
+    var s = getPillarScore(review, i);
+    var rag = s.answered > 0 ? getRag(s.pct) : 'grey';
+    html += '<div class="pillar-card" onclick="showPillar(' + i + ')"><h4>' + p.name + '</h4>' +
+      '<div class="score">' + s.pct + '% <span class="rag-badge rag-' + rag + '" style="font-size:11px">' + rag.toUpperCase() + '</span></div>' +
+      '<div class="meta">' + s.answered + ' of ' + s.total + ' answered</div>' +
+      '<div class="score-bar"><div class="score-fill" style="width:' + s.pct + '%;background:' + (rag === 'green' ? '#1d8102' : rag === 'amber' ? '#ff9900' : '#d13212') + '"></div></div></div>';
+  });
+  html += '</div>';
+  document.getElementById('content').innerHTML = html;
+}
+
+function renderRadar(review) {
+  var scores = review.pillars.map(function(_, i) { return getPillarScore(review, i).pct; });
+  var labels = review.pillars.map(function(p) { return p.name.split(' ').slice(0, 2).join(' '); });
+  var cx = 150, cy = 150, r = 110, n = scores.length;
+  var step = (2 * Math.PI) / n;
+  var start = -Math.PI / 2;
+  var svg = '<svg width="300" height="300" viewBox="0 0 300 300">';
+  
+  // Grid
+  [20,40,60,80,100].forEach(function(pct) {
+    var gr = r * pct / 100;
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      var a = start + i * step;
+      pts.push((cx + gr * Math.cos(a)).toFixed(1) + ',' + (cy + gr * Math.sin(a)).toFixed(1));
+    }
+    svg += '<polygon points="' + pts.join(' ') + '" fill="none" stroke="#e1e4e8" stroke-width="0.5"/>';
+  });
+  
+  // Axes
+  for (var i = 0; i < n; i++) {
+    var a = start + i * step;
+    svg += '<line x1="' + cx + '" y1="' + cy + '" x2="' + (cx + r * Math.cos(a)).toFixed(1) + '" y2="' + (cy + r * Math.sin(a)).toFixed(1) + '" stroke="#e1e4e8" stroke-width="0.5"/>';
+  }
+  
+  // Data
+  var pts = [];
+  for (var i = 0; i < n; i++) {
+    var a = start + i * step;
+    var dr = r * scores[i] / 100;
+    pts.push((cx + dr * Math.cos(a)).toFixed(1) + ',' + (cy + dr * Math.sin(a)).toFixed(1));
+  }
+  svg += '<polygon points="' + pts.join(' ') + '" fill="rgba(255,153,0,0.2)" stroke="#ff9900" stroke-width="2"/>';
+  
+  // Labels
+  for (var i = 0; i < n; i++) {
+    var a = start + i * step;
+    var lx = cx + (r + 25) * Math.cos(a);
+    var ly = cy + (r + 25) * Math.sin(a);
+    svg += '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" font-size="10" fill="#545b64">' + labels[i] + '</text>';
+  }
+  
+  svg += '</svg>';
+  return svg;
+}
+
+// === QUESTIONS ===
+function showPillar(idx) {
+  state.view = 'questions';
+  state.activePillar = idx;
+  state.activeQuestion = 0;
+  renderQuestion();
+}
+
+function renderQuestion() {
+  renderSidebar();
+  var review = getReview(state.activeReview);
+  var pillar = review.pillars[state.activePillar];
+  var q = pillar.questions[state.activeQuestion];
+  var answer = review.answers[q.id] || {};
+  
+  document.getElementById('topbar').innerHTML = '<h3>' + pillar.name + '</h3>' +
+    '<div class="topbar-actions"><span style="font-size:13px;color:#5f6b7a">Question ' + (state.activeQuestion + 1) + ' of ' + pillar.questions.length + '</span></div>';
+  
+  var scoreClass = '';
+  if (answer.score === 'not') scoreClass = ' sel-red';
+  else if (answer.score === 'partial') scoreClass = ' sel-amber';
+  else if (answer.score === 'fully') scoreClass = ' sel-green';
+  else if (answer.score === 'na') scoreClass = ' sel-na';
+  
+  var html = '<div class="question-container"><div class="question-id">' + q.id + '</div>' +
+    '<div class="question-text">' + q.q + '</div>' +
+    '<div class="best-practice"><div class="bp-label">What good looks like</div><p>' + q.best + '</p></div>' +
+    '<div class="answer-group"><label>Assessment</label><div class="answer-options">' +
+    '<div class="answer-opt' + (answer.score === 'not' ? ' selected sel-red' : '') + '" onclick="setAnswer(\'' + q.id + '\',\'not\')">Not Implemented</div>' +
+    '<div class="answer-opt' + (answer.score === 'partial' ? ' selected sel-amber' : '') + '" onclick="setAnswer(\'' + q.id + '\',\'partial\')">Partially Implemented</div>' +
+    '<div class="answer-opt' + (answer.score === 'fully' ? ' selected sel-green' : '') + '" onclick="setAnswer(\'' + q.id + '\',\'fully\')">Fully Implemented</div>' +
+    '<div class="answer-opt' + (answer.score === 'na' ? ' selected sel-na' : '') + '" onclick="setAnswer(\'' + q.id + '\',\'na\')">Not Applicable</div>' +
+    '</div></div>' +
+    '<div class="notes-group"><label>Notes / Observations</label>' +
+    '<textarea id="notes-input" placeholder="Capture observations, customer comments, and discussion points here..." onblur="saveNotes(\'' + q.id + '\')">' + (answer.notes || '') + '</textarea></div></div>';
+  
+  html += '<div class="question-nav">';
+  if (state.activeQuestion > 0) {
+    html += '<button class="btn" onclick="prevQuestion()">Previous</button>';
+  } else {
+    html += '<span></span>';
+  }
+  if (state.activeQuestion < pillar.questions.length - 1) {
+    html += '<button class="btn btn-primary" onclick="nextQuestion()">Next</button>';
+  } else {
+    html += '<button class="btn btn-primary" onclick="showReviewDashboard()">Finish Pillar</button>';
+  }
+  html += '</div>';
+  
+  document.getElementById('content').innerHTML = html;
+}
+
+function setAnswer(qId, score) {
+  var review = getReview(state.activeReview);
+  if (!review.answers[qId]) review.answers[qId] = {};
+  review.answers[qId].score = score;
+  // Preserve notes
+  var notesEl = document.getElementById('notes-input');
+  if (notesEl) review.answers[qId].notes = notesEl.value;
+  updateReview(review);
+  renderQuestion();
+}
+
+function saveNotes(qId) {
+  var review = getReview(state.activeReview);
+  if (!review.answers[qId]) review.answers[qId] = {};
+  var notesEl = document.getElementById('notes-input');
+  if (notesEl) review.answers[qId].notes = notesEl.value;
+  updateReview(review);
+}
+
+function prevQuestion() {
+  saveCurrentNotes();
+  if (state.activeQuestion > 0) { state.activeQuestion--; renderQuestion(); }
+}
+
+function nextQuestion() {
+  saveCurrentNotes();
+  var review = getReview(state.activeReview);
+  if (state.activeQuestion < review.pillars[state.activePillar].questions.length - 1) {
+    state.activeQuestion++; renderQuestion();
+  }
+}
+
+function saveCurrentNotes() {
+  var review = getReview(state.activeReview);
+  var pillar = review.pillars[state.activePillar];
+  var q = pillar.questions[state.activeQuestion];
+  var notesEl = document.getElementById('notes-input');
+  if (notesEl) {
+    if (!review.answers[q.id]) review.answers[q.id] = {};
+    review.answers[q.id].notes = notesEl.value;
+    updateReview(review);
+  }
+}
+
+// === IMPROVEMENT PLAN ===
+function showImprovement() {
+  state.view = 'improvement';
+  renderSidebar();
+  var review = getReview(state.activeReview);
+  
+  document.getElementById('topbar').innerHTML = '<h3>Improvement Plan</h3><div class="topbar-actions"></div>';
+  
+  var html = '<p style="color:#5f6b7a;font-size:13px;margin-bottom:20px">Items scored as "Not Implemented" or "Partially Implemented" requiring attention:</p>';
+  var hasItems = false;
+  
+  review.pillars.forEach(function(p, pi) {
+    var items = [];
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id];
+      if (a && (a.score === 'not' || a.score === 'partial')) {
+        items.push({ q: q, a: a });
+      }
+    });
+    if (items.length > 0) {
+      hasItems = true;
+      html += '<h4 style="margin:16px 0 8px;color:#232f3e">' + p.name + ' (' + items.length + ' items)</h4>';
+      items.forEach(function(item) {
+        var ragClass = item.a.score === 'not' ? 'rag-red' : 'rag-amber';
+        var ragLabel = item.a.score === 'not' ? 'NOT IMPLEMENTED' : 'PARTIALLY';
+        html += '<div class="improvement-item"><div class="imp-header">' +
+          '<span class="imp-id">' + item.q.id + '</span>' +
+          '<span class="rag-badge ' + ragClass + '">' + ragLabel + '</span></div>' +
+          '<div class="imp-q">' + item.q.q + '</div>' +
+          (item.a.notes ? '<div style="font-size:12px;color:#5f6b7a;margin-top:6px"><strong>Notes:</strong> ' + item.a.notes + '</div>' : '') +
+          '<div class="imp-action"><strong>Recommended:</strong> ' + item.q.best + '</div></div>';
+      });
+    }
+  });
+  
+  if (!hasItems) {
+    html += '<p style="text-align:center;padding:40px;color:#1d8102;font-weight:500">No improvement items found. All answered questions are fully implemented or not applicable.</p>';
+  }
+  
+  document.getElementById('content').innerHTML = html;
+}
+
+// === ACTIONS ===
+function exportReview(id) {
+  var review = getReview(id);
+  if (!review) return;
+  var blob = new Blob([JSON.stringify(review, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = review.customer.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-wafr-' + review.date + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function deleteReview(id) {
+  if (!confirm('Are you sure you want to delete this review? This cannot be undone.')) return;
+  var reviews = getReviews().filter(function(r) { return r.id !== id; });
+  saveReviews(reviews);
+  showHome();
+}
+
+
+// === IMPORT/EXPORT ===
+function exportTemplate(id) {
+  var templates = getTemplates();
+  var template = null;
+  for (var i = 0; i < templates.length; i++) { if (templates[i].id === id) { template = templates[i]; break; } }
+  if (!template) return;
+  var blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url;
+  a.download = template.name.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-template.json';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function importTemplate() {
+  var input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
+  input.onchange = function(e) {
+    var file = e.target.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        if (!data.name || !data.pillars || !Array.isArray(data.pillars)) { alert('Invalid template file. Must contain "name" and "pillars" array.'); return; }
+        for (var i = 0; i < data.pillars.length; i++) {
+          if (!data.pillars[i].name || !data.pillars[i].questions) { alert('Invalid: each pillar must have "name" and "questions".'); return; }
+        }
+        if (!data.id) data.id = 'imported-' + Date.now();
+        var templates = getTemplates();
+        var existing = -1;
+        for (var j = 0; j < templates.length; j++) { if (templates[j].id === data.id) { existing = j; break; } }
+        if (existing >= 0) { if (!confirm('Template exists. Overwrite?')) return; templates[existing] = data; }
+        else { templates.push(data); }
+        saveTemplates(templates); showHome();
+        alert('Template "' + data.name + '" imported successfully.');
+      } catch(err) { alert('Error: ' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function importReview() {
+  var input = document.createElement('input'); input.type = 'file'; input.accept = '.json';
+  input.onchange = function(e) {
+    var file = e.target.files[0]; if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        if (!data.customer || !data.pillars || !data.answers) { alert('Invalid review file.'); return; }
+        if (!data.id) data.id = 'imported-' + Date.now();
+        var reviews = getReviews();
+        var existing = -1;
+        for (var j = 0; j < reviews.length; j++) { if (reviews[j].id === data.id) { existing = j; break; } }
+        if (existing >= 0) { if (!confirm('Review exists. Overwrite?')) return; reviews[existing] = data; }
+        else { reviews.push(data); }
+        saveReviews(reviews); showHome();
+        alert('Review for "' + data.customer + '" imported successfully.');
+      } catch(err) { alert('Error: ' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function deleteTemplate(id) {
+  if (id === 'workspaces-default') { alert('Cannot delete the default template.'); return; }
+  if (!confirm('Delete this template?')) return;
+  var templates = getTemplates().filter(function(t) { return t.id !== id; });
+  saveTemplates(templates); showHome();
+}
+
+function exportReviewAsPrintHTML(id) {
+  var review = getReview(id); if (!review) return;
+  var overall = getOverallScore(review);
+  var overallRag = getRag(overall);
+  
+  // Count findings
+  var redCount = 0, amberCount = 0, greenCount = 0, naCount = 0, unanswered = 0;
+  review.pillars.forEach(function(p) {
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id];
+      if (!a || !a.score) { unanswered++; }
+      else if (a.score === 'not') redCount++;
+      else if (a.score === 'partial') amberCount++;
+      else if (a.score === 'fully') greenCount++;
+      else naCount++;
+    });
+  });
+  
+  // Top 3 priority recommendations (red items first, then amber)
+  var priorities = [];
+  review.pillars.forEach(function(p) {
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id];
+      if (a && a.score === 'not') priorities.push({ pillar: p.name, q: q, priority: 'High' });
+    });
+  });
+  review.pillars.forEach(function(p) {
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id];
+      if (a && a.score === 'partial') priorities.push({ pillar: p.name, q: q, priority: 'Medium' });
+    });
+  });
+  
+  // Generate SVG radar for report
+  var radarSvg = renderRadar(review);
+  
+  var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>AWS WAFR Report - ' + review.customer + '</title>';
+  html += '<style>';
+  html += '@page { size: A4; margin: 25mm 20mm 30mm 20mm; }';
+  html += 'body { font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif; color: #16191f; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 40px; }';
+  html += '.no-print { margin-bottom: 20px; padding: 12px 20px; background: #232f3e; border-radius: 6px; text-align: center; }';
+  html += '.no-print button { padding: 10px 24px; background: #ff9900; border: none; color: #fff; border-radius: 4px; font-size: 14px; font-weight: 600; cursor: pointer; margin: 0 8px; }';
+  html += '.no-print button:hover { background: #ec7211; }';
+  html += '.no-print p { color: #aab7c4; font-size: 12px; margin-top: 8px; }';
+  
+  // Cover page
+  html += '.cover { text-align: center; padding: 120px 0 60px; page-break-after: always; }';
+  html += '.cover .aws-label { font-size: 14px; font-weight: 600; color: #ff9900; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }';
+  html += '.cover h1 { font-size: 32px; font-weight: 700; color: #232f3e; margin-bottom: 8px; }';
+  html += '.cover h2 { font-size: 22px; font-weight: 400; color: #545b64; margin-bottom: 40px; }';
+  html += '.cover .divider { width: 80px; height: 4px; background: #ff9900; margin: 30px auto; }';
+  html += '.cover .details { font-size: 14px; color: #545b64; line-height: 2; }';
+  html += '.cover .details strong { color: #232f3e; }';
+  
+  // Section styling
+  html += 'h2 { color: #232f3e; font-size: 22px; border-bottom: 3px solid #ff9900; padding-bottom: 8px; margin-top: 40px; margin-bottom: 16px; }';
+  html += 'h3 { color: #232f3e; font-size: 16px; margin-top: 24px; margin-bottom: 8px; }';
+  html += '.section { page-break-before: always; }';
+  html += '.section-first { page-break-before: avoid; }';
+  
+  // Executive summary
+  html += '.exec-summary { background: #f8f9fa; border-radius: 8px; padding: 24px; margin: 16px 0; }';
+  html += '.exec-summary p { margin: 8px 0; font-size: 14px; }';
+  html += '.exec-kpi { display: inline-block; text-align: center; padding: 16px 24px; margin: 8px; border-radius: 8px; border: 1px solid #e1e4e8; background: #fff; }';
+  html += '.exec-kpi .kpi-value { font-size: 28px; font-weight: 700; }';
+  html += '.exec-kpi .kpi-label { font-size: 11px; color: #5f6b7a; text-transform: uppercase; margin-top: 4px; }';
+  
+  // Scoring table
+  html += '.score-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }';
+  html += '.score-table th { background: #232f3e; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; }';
+  html += '.score-table td { padding: 10px 12px; border-bottom: 1px solid #e1e4e8; }';
+  html += '.score-table tr:nth-child(even) { background: #f8f9fa; }';
+  
+  // RAG badges
+  html += '.rag { display: inline-block; padding: 3px 10px; border-radius: 3px; font-size: 11px; font-weight: 600; color: #fff; }';
+  html += '.rag-red { background: #d13212; }';
+  html += '.rag-amber { background: #ff9900; }';
+  html += '.rag-green { background: #1d8102; }';
+  html += '.rag-grey { background: #5f6b7a; }';
+  
+  // Question cards
+  html += '.q-card { border: 1px solid #e1e4e8; border-radius: 6px; padding: 16px; margin: 12px 0; page-break-inside: avoid; }';
+  html += '.q-card.q-red { border-left: 4px solid #d13212; }';
+  html += '.q-card.q-amber { border-left: 4px solid #ff9900; }';
+  html += '.q-card.q-green { border-left: 4px solid #1d8102; }';
+  html += '.q-card.q-na { border-left: 4px solid #5f6b7a; }';
+  html += '.q-id { font-size: 11px; color: #ff9900; font-weight: 600; }';
+  html += '.q-text { font-size: 14px; font-weight: 600; margin: 6px 0; }';
+  html += '.q-status { margin-top: 6px; }';
+  html += '.q-notes { margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 13px; color: #545b64; }';
+  html += '.q-notes strong { color: #232f3e; }';
+  html += '.q-best { margin-top: 10px; padding: 10px; background: #f2f8f0; border-left: 3px solid #1d8102; border-radius: 0 4px 4px 0; font-size: 12px; color: #545b64; }';
+  html += '.q-gap { margin-top: 10px; padding: 10px; background: #fff8f0; border-left: 3px solid #ff9900; border-radius: 0 4px 4px 0; font-size: 12px; color: #545b64; }';
+  html += '.q-gap strong { color: #ff9900; }';
+  
+  // Improvement plan table
+  html += '.imp-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }';
+  html += '.imp-table th { background: #232f3e; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }';
+  html += '.imp-table td { padding: 8px 10px; border-bottom: 1px solid #e1e4e8; vertical-align: top; }';
+  html += '.imp-table tr:nth-child(even) { background: #f8f9fa; }';
+  html += '.priority-high { color: #d13212; font-weight: 600; }';
+  html += '.priority-medium { color: #ff9900; font-weight: 600; }';
+  
+  // Radar container
+  html += '.radar-wrap { text-align: center; margin: 20px 0; }';
+  
+  // Footer
+  html += '.report-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e1e4e8; font-size: 11px; color: #5f6b7a; }';
+  
+  // Print rules
+  html += '@media print { .no-print { display: none; } body { padding: 0; } .cover { padding: 80px 0 40px; } }';
+  html += '
+/* Auth Screen */
+.auth-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #232f3e; }
+.auth-box { background: #fff; border-radius: 8px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+.auth-box h1 { font-size: 20px; color: #232f3e; margin-bottom: 4px; }
+.auth-box h2 { font-size: 13px; color: #ff9900; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 24px; }
+.auth-box .logo { font-size: 14px; color: #ff9900; font-weight: 600; margin-bottom: 20px; }
+.auth-field { margin-bottom: 16px; }
+.auth-field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: #232f3e; }
+.auth-field input { width: 100%; padding: 10px 12px; border: 1px solid #d5dbdb; border-radius: 4px; font-size: 14px; }
+.auth-field input:focus { outline: none; border-color: #ff9900; }
+.auth-error { color: #d13212; font-size: 12px; margin-bottom: 12px; display: none; }
+.auth-btn { width: 100%; padding: 12px; background: #ff9900; border: none; border-radius: 4px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
+.auth-btn:hover { background: #ec7211; }
+.auth-btn-secondary { background: transparent; border: 1px solid #d5dbdb; color: #232f3e; }
+.auth-btn-secondary:hover { border-color: #ff9900; color: #ff9900; background: transparent; }
+.auth-link { text-align: center; margin-top: 16px; font-size: 13px; color: #5f6b7a; }
+.auth-link a { color: #ff9900; cursor: pointer; text-decoration: none; }
+.auth-link a:hover { text-decoration: underline; }
+.user-bar { padding: 12px 16px; border-top: 1px solid #3a4a5c; display: flex; align-items: center; gap: 8px; }
+.user-bar .user-icon { width: 28px; height: 28px; border-radius: 50%; background: #ff9900; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; }
+.user-bar .user-name { font-size: 12px; color: #fff; flex: 1; }
+.user-bar .logout-btn { font-size: 11px; color: #aab7c4; cursor: pointer; border: none; background: none; }
+.user-bar .logout-btn:hover { color: #ff9900; }
+.sync-indicator { font-size: 10px; color: #1d8102; padding: 2px 6px; border-radius: 3px; background: rgba(29,129,2,0.1); }
+
+</style></head><body>';
+  
+  // Print button bar (hidden in print)
+  html += '<div class="no-print"><button onclick="window.print()">Save as PDF (Cmd+P)</button><button onclick="window.close()">Close</button>';
+  html += '<p>Use Cmd+P (Mac) or Ctrl+P (Windows) to save as PDF. Set margins to "Default" for best results.</p></div>';
+  
+  // === COVER PAGE ===
+  html += '<div class="cover">';
+  html += '<div class="aws-label">AWS Well-Architected Review Report</div>';
+  html += '<h1>Well-Architected Framework Review</h1>';
+  html += '<h2>Amazon WorkSpaces</h2>';
+  html += '<div class="divider"></div>';
+  html += '<div class="details">';
+  html += '<strong>Customer:</strong> ' + review.customer + '<br>';
+  html += '<strong>Date:</strong> ' + review.date + '<br>';
+  html += '<strong>Reviewer:</strong> ' + review.reviewer + '<br>';
+  html += '<strong>Prepared by:</strong> ' + review.reviewer + ', Technical Account Manager';
+  html += '</div></div>';
+  
+  // === EXECUTIVE SUMMARY ===
+  html += '<div class="section-first"><h2>Executive Summary</h2>';
+  html += '<div class="exec-summary">';
+  html += '<p>This Well-Architected Framework Review was conducted for <strong>' + review.customer + '</strong> on ' + review.date + ', assessing their Amazon WorkSpaces deployment against the six pillars of the AWS Well-Architected Framework.</p>';
+  html += '<p>The overall assessment resulted in a score of <strong>' + overall + '%</strong>, rated <span class="rag rag-' + overallRag + '">' + overallRag.toUpperCase() + '</span>.</p>';
+  html += '</div>';
+  
+  // KPI boxes
+  html += '<div style="text-align:center;margin:20px 0;">';
+  html += '<div class="exec-kpi"><div class="kpi-value" style="color:#d13212">' + redCount + '</div><div class="kpi-label">High Risk</div></div>';
+  html += '<div class="exec-kpi"><div class="kpi-value" style="color:#ff9900">' + amberCount + '</div><div class="kpi-label">Medium Risk</div></div>';
+  html += '<div class="exec-kpi"><div class="kpi-value" style="color:#1d8102">' + greenCount + '</div><div class="kpi-label">Best Practice</div></div>';
+  html += '<div class="exec-kpi"><div class="kpi-value" style="color:#5f6b7a">' + naCount + '</div><div class="kpi-label">Not Applicable</div></div>';
+  html += '</div>';
+  
+  // Top 3 priorities
+  if (priorities.length > 0) {
+    html += '<h3>Top Priority Recommendations</h3><ol style="font-size:14px;padding-left:20px;">';
+    for (var i = 0; i < Math.min(3, priorities.length); i++) {
+      html += '<li style="margin:8px 0;"><strong>' + priorities[i].q.id + ':</strong> ' + priorities[i].q.q + ' <span class="rag rag-' + (priorities[i].priority === 'High' ? 'red' : 'amber') + '">' + priorities[i].priority + '</span></li>';
+    }
+    html += '</ol>';
+  }
+  html += '</div>';
+  
+  // === SCORING OVERVIEW ===
+  html += '<div class="section"><h2>Scoring Overview</h2>';
+  html += '<div class="radar-wrap">' + radarSvg + '</div>';
+  html += '<table class="score-table"><thead><tr><th>Pillar</th><th>Score</th><th>RAG</th><th>Answered</th><th>Items Needing Attention</th></tr></thead><tbody>';
+  review.pillars.forEach(function(p, i) {
+    var s = getPillarScore(review, i);
+    var rag = s.answered > 0 ? getRag(s.pct) : 'grey';
+    var attentionCount = 0;
+    p.questions.forEach(function(q) { var a = review.answers[q.id]; if (a && (a.score === 'not' || a.score === 'partial')) attentionCount++; });
+    html += '<tr><td>' + p.name + '</td><td>' + s.pct + '%</td><td><span class="rag rag-' + rag + '">' + rag.toUpperCase() + '</span></td><td>' + s.answered + ' / ' + s.total + '</td><td>' + attentionCount + '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  
+  // === PILLAR-BY-PILLAR ANALYSIS ===
+  review.pillars.forEach(function(p, pi) {
+    var s = getPillarScore(review, pi);
+    var rag = s.answered > 0 ? getRag(s.pct) : 'grey';
+    html += '<div class="section"><h2>' + p.name + ' <span class="rag rag-' + rag + '">' + s.pct + '% - ' + rag.toUpperCase() + '</span></h2>';
+    
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id] || {};
+      var statusLabel = '';
+      var cardClass = '';
+      if (a.score === 'not') { statusLabel = 'Not Implemented'; cardClass = 'q-red'; }
+      else if (a.score === 'partial') { statusLabel = 'Partially Implemented'; cardClass = 'q-amber'; }
+      else if (a.score === 'fully') { statusLabel = 'Fully Implemented'; cardClass = 'q-green'; }
+      else if (a.score === 'na') { statusLabel = 'Not Applicable'; cardClass = 'q-na'; }
+      else { statusLabel = 'Not Assessed'; cardClass = ''; }
+      
+      var ragClass = a.score === 'not' ? 'rag-red' : a.score === 'partial' ? 'rag-amber' : a.score === 'fully' ? 'rag-green' : 'rag-grey';
+      
+      html += '<div class="q-card ' + cardClass + '">';
+      html += '<div class="q-id">' + q.id + '</div>';
+      html += '<div class="q-text">' + q.q + '</div>';
+      html += '<div class="q-status"><span class="rag ' + ragClass + '">' + statusLabel + '</span></div>';
+      
+      // Notes
+      if (a.notes) {
+        html += '<div class="q-notes"><strong>Observations:</strong> ' + a.notes + '</div>';
+      }
+      
+      // What good looks like (always show)
+      html += '<div class="q-best"><strong>Target State:</strong> ' + q.best + '</div>';
+      
+      // Gap analysis (only for non-green, non-NA)
+      if (a.score === 'not' || a.score === 'partial') {
+        html += '<div class="q-gap"><strong>To reach Green:</strong> ' + q.best + '</div>';
+      }
+      
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  
+  // === IMPROVEMENT PLAN ===
+  html += '<div class="section"><h2>Improvement Plan</h2>';
+  if (priorities.length > 0) {
+    html += '<p style="font-size:13px;color:#545b64;margin-bottom:16px;">The following items require attention, sorted by priority (High risk first).</p>';
+    html += '<table class="imp-table"><thead><tr><th>Priority</th><th>Pillar</th><th>ID</th><th>Finding</th><th>Recommended Action</th></tr></thead><tbody>';
+    priorities.forEach(function(item) {
+      var pClass = item.priority === 'High' ? 'priority-high' : 'priority-medium';
+      html += '<tr><td class="' + pClass + '">' + item.priority + '</td><td>' + item.pillar + '</td><td>' + item.q.id + '</td><td>' + item.q.q + '</td><td style="font-size:11px;">' + item.q.best + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<p style="color:#1d8102;font-weight:500;">All assessed items meet best practice standards. No improvement actions required.</p>';
+  }
+  html += '</div>';
+  
+  // === NEXT STEPS ===
+  html += '<div class="section"><h2>Next Steps</h2>';
+  html += '<div class="exec-summary">';
+  html += '<p>This review identifies areas for improvement in your Amazon WorkSpaces deployment. We recommend:</p>';
+  html += '<ol style="font-size:14px;padding-left:20px;margin:12px 0;">';
+  html += '<li style="margin:8px 0;">Prioritising the <strong>' + redCount + ' High-priority items</strong> for immediate remediation</li>';
+  html += '<li style="margin:8px 0;">Addressing <strong>' + amberCount + ' Medium-priority items</strong> within the next 30\u201360 days</li>';
+  html += '<li style="margin:8px 0;">Scheduling a follow-up review in <strong>90 days</strong> to track progress and reassess</li>';
+  html += '</ol>';
+  html += '<p><strong>Reviewer:</strong> ' + review.reviewer + '<br>';
+  html += '<strong>Next review target:</strong> ' + (function() { var d = new Date(review.date); d.setDate(d.getDate() + 90); return d.toISOString().split("T")[0]; })() + '</p>';
+  html += '</div></div>';
+  
+  // === APPENDIX ===
+  html += '<div class="section"><h2>Appendix: Scoring Methodology</h2>';
+  html += '<h3>Assessment Scoring</h3>';
+  html += '<table class="score-table"><thead><tr><th>Response</th><th>Score</th><th>Description</th></tr></thead><tbody>';
+  html += '<tr><td><span class="rag rag-green">Fully Implemented</span></td><td>100%</td><td>The practice is fully adopted and operating as described in the target state.</td></tr>';
+  html += '<tr><td><span class="rag rag-amber">Partially Implemented</span></td><td>50%</td><td>Some elements of the practice are in place but gaps remain.</td></tr>';
+  html += '<tr><td><span class="rag rag-red">Not Implemented</span></td><td>0%</td><td>The practice is not adopted or significant risk exists.</td></tr>';
+  html += '<tr><td><span class="rag rag-grey">Not Applicable</span></td><td>Excluded</td><td>The practice is not relevant to this deployment and is excluded from scoring.</td></tr>';
+  html += '</tbody></table>';
+  html += '<h3>RAG Threshold Definitions</h3>';
+  html += '<table class="score-table"><thead><tr><th>Rating</th><th>Threshold</th><th>Interpretation</th></tr></thead><tbody>';
+  html += '<tr><td><span class="rag rag-green">GREEN</span></td><td>&ge; 80%</td><td>Well-architected. Minor improvements may exist but no significant risk.</td></tr>';
+  html += '<tr><td><span class="rag rag-amber">AMBER</span></td><td>40% \u2013 79%</td><td>Improvement required. Some practices adopted but material gaps exist.</td></tr>';
+  html += '<tr><td><span class="rag rag-red">RED</span></td><td>&lt; 40%</td><td>Significant risk. Fundamental practices are not adopted and urgent attention is needed.</td></tr>';
+  html += '</tbody></table>';
+  html += '</div>';
+  
+  // Footer
+  html += '<div class="report-footer">Generated by AWS WorkSpaces WAFR Review Tool v4.0 | Report date: ' + new Date().toISOString().split('T')[0] + ' | Confidential</div>';
+  html += '</body></html>';
+  
+  var w = window.open('', '_blank'); w.document.write(html); w.document.close();
+}
+
+// === INIT ===
+document.addEventListener('DOMContentLoaded', function() { checkAuth(); });
+</script>
+</body>
+</html>
