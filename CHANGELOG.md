@@ -22,12 +22,23 @@ All notable changes to this project are documented in this file.
 ### Cloud Storage (AppSync + DynamoDB)
 - Created DynamoDB table `wafr-reviews` (PAY_PER_REQUEST)
 - Created DynamoDB table `wafr-templates` (PAY_PER_REQUEST)
+- Enabled Point-in-Time Recovery (PITR) on both tables
 - Created IAM role `appsync-dynamodb-role` for AppSync → DynamoDB access
 - Created AppSync GraphQL API `wafr-api` (`4up36qgqubd6tcuekx5cmexmii`)
 - Created schema with Template and Review types + CRUD operations
 - Created data sources: `TemplatesTable`, `ReviewsTable`
 - Created resolvers for all Query and Mutation fields
 - Fixed `createReview` resolver — replaced manual attribute mapping with `$util.dynamodb.toMapValuesJson`
+
+### AI Guidance (Bedrock via Lambda + API Gateway)
+- Created IAM role `lambda-bedrock-role` with Bedrock InvokeModel permissions
+- Created Lambda function `wafr-explain` (Python 3.12, 30s timeout)
+- Uses `eu.anthropic.claude-haiku-4-5-20251001-v1:0` (EU inference profile)
+- Prompt generates concise TAM review guidance (max 512 tokens)
+- Created API Gateway HTTP API `wafr-explain-api` (`6ylrfwa3d8`)
+- Route: `POST /explain` → Lambda integration
+- CORS enabled (all origins, POST/OPTIONS)
+- API endpoint: `https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/explain`
 
 ### App Fixes
 - Fixed multiline string syntax error on line 1045 (single quote → backtick)
@@ -42,9 +53,11 @@ All notable changes to this project are documented in this file.
 - Fixed sidebar pillar score alignment — `progress-text` now fixed-width and right-aligned
 - Added expandable question list per pillar in sidebar (▸ arrow expands question IDs)
 - Answered questions highlighted green in sidebar list
+- Added AI Guidance panel to the right of each question (auto-loads from Bedrock)
+- Panel minimise/expand button keeps panel width, only hides/shows content
 
 ### Documentation
-- Created `docs/ARCHITECTURE.md` with Mermaid diagrams
+- Created `docs/ARCHITECTURE.md` with Mermaid diagrams (updated with all services)
 - Created `docs/AMPLIFY-SETUP.md` (original Amplify deployment guide)
 - Created `CHANGELOG.md` (this file)
 - Updated `README.md` with changelog summary
@@ -64,4 +77,23 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
 
 - Amplify CI/CD via GitHub not functional — "Unable to assume specified IAM Role" even with service-linked role. Using manual deployment as workaround.
 - GitHub personal access token has limited scope — webhook permissions required for repo connection.
-- `test-final` test record was manually deleted from DynamoDB after testing.
+- Claude 3 Haiku/Sonnet base model IDs don't work on-demand — must use inference profile IDs (e.g. `eu.anthropic.claude-haiku-4-5-20251001-v1:0`).
+- `amplify-service-role` IAM role exists but is unused (Amplify CI/CD not working).
+
+## AWS Resources Summary
+
+| Resource | Identifier | Region |
+|----------|-----------|--------|
+| Amplify App | `d1p2543h8l2mfc` | eu-west-2 |
+| Cognito User Pool | `eu-west-2_Wy0eJHyN3` | eu-west-2 |
+| Cognito Client | `1kj98mt2cjbci4sa9okfg4o5dk` | eu-west-2 |
+| AppSync API | `4up36qgqubd6tcuekx5cmexmii` | eu-west-2 |
+| DynamoDB Table | `wafr-reviews` | eu-west-2 |
+| DynamoDB Table | `wafr-templates` | eu-west-2 |
+| Lambda Function | `wafr-explain` | eu-west-2 |
+| API Gateway | `6ylrfwa3d8` | eu-west-2 |
+| IAM Role | `github-actions-amplify-deploy` | global |
+| IAM Role | `appsync-dynamodb-role` | global |
+| IAM Role | `lambda-bedrock-role` | global |
+| IAM Role | `amplify-service-role` | global |
+| Bedrock Model | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | eu-west-2 |
