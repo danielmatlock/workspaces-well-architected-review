@@ -813,17 +813,14 @@ function renderQuestion() {
 
 var explainPanelVisible = true;
 function toggleExplainPanel() {
-  var panel = document.getElementById('explain-panel');
   var content = document.getElementById('explain-content');
-  var btn = panel.querySelector('.explain-toggle');
+  var btn = document.querySelector('.explain-toggle');
   explainPanelVisible = !explainPanelVisible;
   if (explainPanelVisible) {
     content.style.display = 'block';
-    panel.style.width = '380px';
     btn.textContent = '\u2212';
   } else {
     content.style.display = 'none';
-    panel.style.width = '40px';
     btn.textContent = '+';
   }
 }
