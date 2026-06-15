@@ -1042,7 +1042,7 @@ function exportReviewAsPrintHTML(id) {
   
   // Print rules
   html += '@media print { .no-print { display: none; } body { padding: 0; } .cover { padding: 80px 0 40px; } }';
-  html += '
+  html += `
 /* Auth Screen */
 .auth-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #232f3e; }
 .auth-box { background: #fff; border-radius: 8px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
@@ -1068,7 +1068,7 @@ function exportReviewAsPrintHTML(id) {
 .user-bar .logout-btn:hover { color: #ff9900; }
 .sync-indicator { font-size: 10px; color: #1d8102; padding: 2px 6px; border-radius: 3px; background: rgba(29,129,2,0.1); }
 
-</style></head><body>';
+</style></head><body>`;
   
   // Print button bar (hidden in print)
   html += '<div class="no-print"><button onclick="window.print()">Save as PDF (Cmd+P)</button><button onclick="window.close()">Close</button>';
