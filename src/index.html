@@ -409,12 +409,7 @@ async function loadFromCloud() {
           date: r.reviewDate, answers: answers, notes: notes,
           status: r.status, pillars: tmpl ? JSON.parse(JSON.stringify(tmpl.pillars)) : [] };
       });
-      var local = getReviews();
-      cloudReviews.forEach(function(cr) {
-        var existing = local.findIndex(function(lr) { return lr.id === cr.id; });
-        if (existing >= 0) { local[existing] = cr; } else { local.push(cr); }
-      });
-      localStorage.setItem('wafr-reviews', JSON.stringify(local));
+      localStorage.setItem('wafr-reviews', JSON.stringify(cloudReviews));
     }
   } catch(e) { console.log('Cloud load error:', e); }
 }
