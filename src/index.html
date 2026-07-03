@@ -626,6 +626,7 @@ function createReview() {
   var reviews = getReviews();
   reviews.unshift(review);
   saveReviews(reviews);
+  syncReviewToCloud(review);
   closeModal();
   openReview(review.id);
 }
@@ -1277,14 +1278,15 @@ function generateReportHTML(review, recommendations) {
       html += '<div class="q-text">' + q.q + '</div>';
       html += '<div class="q-status"><span class="rag ' + ragClass + '">' + statusLabel + '</span></div>';
       
-      // Notes
-      if (a.notes) {
-        html += '<div class="q-notes"><strong>Observations:</strong> ' + a.notes + '</div>';
+      // Notes / Observations
+      var obsText = (recommendations[q.id] && recommendations[q.id].observation) ? recommendations[q.id].observation : a.notes;
+      if (obsText) {
+        html += '<div class="q-notes"><strong>Observations:</strong> ' + obsText + '</div>';
       }
       
       // Tailored recommendation (if available)
-      if (recommendations[q.id]) {
-        html += '<div class="q-gap" style="background:#f0f4ff;border-left-color:#0073bb;"><strong>Tailored Recommendation:</strong> ' + recommendations[q.id].replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+      if (recommendations[q.id] && recommendations[q.id].recommendation) {
+        html += '<div class="q-gap" style="background:#f0f4ff;border-left-color:#0073bb;"><strong>Tailored Recommendation:</strong> ' + recommendations[q.id].recommendation.replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
       }
       
       // What good looks like (always show)
