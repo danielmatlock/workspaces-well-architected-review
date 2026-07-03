@@ -50,7 +50,7 @@ def generate_tailored_recommendations(questions_with_notes):
 
 def handler(event, context):
     try:
-        body = json.loads(event.get('body', '{}'))
+        body = json.loads(event['body']) if 'body' in event else event
         action = body.get('action', 'email')
         
         if action == 'generate':
