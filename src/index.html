@@ -309,7 +309,7 @@ async function gql(query, variables) {
     body: JSON.stringify({ query: query, variables: variables || {} })
   });
   var json = await res.json();
-  if (json.errors) { throw { message: json.errors[0] && json.errors[0].message || 'GraphQL error', errors: json.errors }; } }
+  if (json.errors) { throw { message: json.errors[0] && json.errors[0].message || 'GraphQL error', errors: json.errors }; }
   return json.data;
 }
 
