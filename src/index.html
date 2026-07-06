@@ -589,6 +589,9 @@ function showNewReviewModal() {
     '<div class="form-group"><label>Customer Name</label><input id="m-customer" placeholder="e.g. FCA"></div>' +
     '<div class="form-group"><label>Reviewer Name</label><input id="m-reviewer" placeholder="e.g. Daniel Matlock"></div>' +
     '<div class="form-group"><label>Date</label><input id="m-date" type="date" value="' + new Date().toISOString().split('T')[0] + '"></div>' +
+    '<div class="form-group"><label>Import from Spreadsheet <span style="font-size:11px;color:#5f6b7a;font-weight:400">(optional — CSV exported from Excel, columns: ID, Pillar, Question, Info from Customer, Best Practice)</span></label>' +
+    '<input type="file" id="m-csv" accept=".csv" style="font-size:13px;"></div>' +
+    '<div id="m-csv-status" style="font-size:12px;color:#1d8102;margin-top:-8px;"></div>' +
     '<div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn btn-primary" onclick="createReview()">Create</button></div></div></div>';
 }
@@ -599,36 +602,72 @@ function closeModal(e) {
   }
 }
 
+function parseCSVRow(row) {
+  var result = [], cur = '', inQuote = false;
+  for (var i = 0; i < row.length; i++) {
+    var c = row[i];
+    if (c === '"') { inQuote = !inQuote; }
+    else if (c === ',' && !inQuote) { result.push(cur.trim()); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function createReview() {
   var templateId = document.getElementById('m-template').value;
   var customer = document.getElementById('m-customer').value.trim();
   var reviewer = document.getElementById('m-reviewer').value.trim();
   var date = document.getElementById('m-date').value;
-  
+  var csvFile = document.getElementById('m-csv').files[0];
+
   if (!customer) { alert('Please enter a customer name'); return; }
-  
+
   var templates = getTemplates();
   var template = templates.find(function(t) { return t.id === templateId; });
   if (!template) return;
-  
-  var review = {
-    id: 'review-' + Date.now(),
-    customer: customer,
-    reviewer: reviewer,
-    date: date,
-    template: template.name,
-    templateId: template.id,
-    pillars: JSON.parse(JSON.stringify(template.pillars)),
-    answers: {},
-    createdAt: new Date().toISOString()
+
+  function buildAndSave(answers) {
+    var review = {
+      id: 'review-' + Date.now(),
+      customer: customer, reviewer: reviewer, date: date,
+      template: template.name, templateId: template.id,
+      pillars: JSON.parse(JSON.stringify(template.pillars)),
+      answers: answers || {}, createdAt: new Date().toISOString()
+    };
+    var reviews = getReviews();
+    reviews.unshift(review);
+    saveReviews(reviews);
+    syncReviewToCloud(review);
+    closeModal();
+    openReview(review.id);
+  }
+
+  if (!csvFile) { buildAndSave({}); return; }
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var lines = ev.target.result.split(/\r?\n/);
+    // Find header row — look for a row containing "ID"
+    var headerIdx = lines.findIndex(function(l) { return /^"?ID"?[,\t]/i.test(l.trim()); });
+    if (headerIdx < 0) { alert('Could not find header row with "ID" column. Please check the CSV.'); return; }
+    var headers = parseCSVRow(lines[headerIdx]).map(function(h) { return h.replace(/^"|"$/g, '').trim().toLowerCase(); });
+    var idCol = headers.indexOf('id');
+    var notesCol = headers.findIndex(function(h) { return h.includes('info from customer'); });
+    if (idCol < 0 || notesCol < 0) { alert('CSV must have "ID" and "Info from Customer" columns.'); return; }
+    var answers = {};
+    var imported = 0;
+    for (var i = headerIdx + 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      var cols = parseCSVRow(lines[i]);
+      var id = (cols[idCol] || '').replace(/^"|"$/g, '').trim();
+      var notes = (cols[notesCol] || '').replace(/^"|"$/g, '').trim();
+      if (id && notes) { answers[id] = { score: 'not', notes: notes }; imported++; }
+    }
+    buildAndSave(answers);
+    if (imported > 0) setTimeout(function() { alert(imported + ' questions imported from spreadsheet.'); }, 300);
   };
-  
-  var reviews = getReviews();
-  reviews.unshift(review);
-  saveReviews(reviews);
-  syncReviewToCloud(review);
-  closeModal();
-  openReview(review.id);
+  reader.readAsText(csvFile);
 }
 
 // === REVIEW VIEW ===
