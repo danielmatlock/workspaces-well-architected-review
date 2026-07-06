@@ -149,7 +149,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* Radar chart container */
 .radar-container { display: flex; justify-content: center; margin: 20px 0; }
 
-/* Print */
+/* Log panel */
+.log-panel { position: fixed; bottom: 0; left: 280px; right: 0; height: 220px; background: #16191f; border-top: 2px solid #ff9900; z-index: 150; display: none; flex-direction: column; }
+.log-panel.open { display: flex; }
+.log-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px; background: #232f3e; flex-shrink: 0; }
+.log-header span { font-size: 12px; font-weight: 600; color: #ff9900; text-transform: uppercase; letter-spacing: 0.5px; }
+.log-header button { background: none; border: 1px solid #5f6b7a; color: #aab7c4; padding: 2px 8px; border-radius: 3px; font-size: 11px; cursor: pointer; }
+.log-header button:hover { border-color: #ff9900; color: #ff9900; }
+.log-entries { flex: 1; overflow-y: auto; padding: 8px 16px; font-family: monospace; font-size: 11px; }
+.log-entry { padding: 2px 0; border-bottom: 1px solid #232f3e; line-height: 1.5; }
+.log-entry .log-time { color: #5f6b7a; margin-right: 8px; }
+.log-entry.info .log-msg { color: #aab7c4; }
+.log-entry.success .log-msg { color: #1d8102; }
+.log-entry.warn .log-msg { color: #ff9900; }
+.log-entry.error .log-msg { color: #d13212; }
 @media print {
   .sidebar, .topbar, .btn, .question-nav { display: none !important; }
   .main { margin-left: 0 !important; }
@@ -225,8 +238,44 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 </div>
 <div id="modal-root"></div>
+<div id="log-panel" class="log-panel">
+  <div class="log-header">
+    <span>Sync Log</span>
+    <div style="display:flex;gap:6px">
+      <button onclick="clearLog()">Clear</button>
+      <button onclick="toggleLog()">Close</button>
+    </div>
+  </div>
+  <div class="log-entries" id="log-entries"></div>
+</div>
 
 <script>
+
+// === LOGGING ===
+var logEntries = [];
+function appLog(msg, level) {
+  level = level || 'info';
+  var entry = { time: new Date().toLocaleTimeString(), msg: msg, level: level };
+  logEntries.unshift(entry);
+  if (logEntries.length > 100) logEntries.pop();
+  var el = document.getElementById('log-entries');
+  if (el) {
+    var div = document.createElement('div');
+    div.className = 'log-entry ' + level;
+    div.innerHTML = '<span class="log-time">' + entry.time + '</span><span class="log-msg">' + msg + '</span>';
+    el.insertBefore(div, el.firstChild);
+    if (el.children.length > 100) el.removeChild(el.lastChild);
+  }
+}
+function toggleLog() {
+  var p = document.getElementById('log-panel');
+  p.classList.toggle('open');
+}
+function clearLog() {
+  logEntries = [];
+  var el = document.getElementById('log-entries');
+  if (el) el.innerHTML = '';
+}
 
 // === CONFIGURATION ===
 var COGNITO_USER_POOL_ID = 'eu-west-2_Wy0eJHyN3';
@@ -260,7 +309,7 @@ async function gql(query, variables) {
     body: JSON.stringify({ query: query, variables: variables || {} })
   });
   var json = await res.json();
-  if (json.errors) { throw { message: json.errors[0] && json.errors[0].message || 'GraphQL error', errors: json.errors }; }
+  if (json.errors) { throw { message: json.errors[0] && json.errors[0].message || 'GraphQL error', errors: json.errors }; } }
   return json.data;
 }
 
@@ -390,16 +439,20 @@ async function syncReviewToCloud(review) {
   };
   try {
     await gql(`mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`, { input: input });
+    appLog('Saved to DynamoDB (create): ' + input.id, 'success');
   } catch(e) {
     if (e.message && (e.message.includes('ConditionalCheckFailed') || e.message.includes('already exists'))) {
-      try { await gql(`mutation M($input: UpdateReviewInput!) { updateReview(input: $input) { id } }`, { input: input }); }
-      catch(e2) { console.log('Cloud update error:', e2); }
-    } else { console.log('Cloud sync error:', e); }
+      try {
+        await gql(`mutation M($input: UpdateReviewInput!) { updateReview(input: $input) { id } }`, { input: input });
+        appLog('Saved to DynamoDB (update): ' + input.id, 'success');
+      } catch(e2) { appLog('DynamoDB update failed: ' + e2.message, 'error'); }
+    } else { appLog('DynamoDB sync error: ' + e.message, 'error'); }
   }
 }
 
 async function loadFromCloud() {
   if (!idToken) return;
+  appLog('Loading reviews from DynamoDB...', 'info');
   try {
     var data = await gql(`query Q { listReviews { id templateId templateName customerName reviewerName reviewDate answers notes status } }`);
     if (!data) return;
@@ -416,8 +469,9 @@ async function loadFromCloud() {
           status: r.status, pillars: tmpl ? JSON.parse(JSON.stringify(tmpl.pillars)) : [] };
       });
       localStorage.setItem('wafr-reviews', JSON.stringify(cloudReviews));
+      appLog('Loaded ' + cloudReviews.length + ' reviews from DynamoDB', 'success');
     }
-  } catch(e) { console.log('Cloud load error:', e); }
+  } catch(e) { appLog('Load from DynamoDB failed: ' + (e.message || e), 'error'); }
 }
 
 
@@ -671,7 +725,7 @@ function createReview() {
       if (id && notes) { answers[id] = { score: 'not', notes: notes }; imported++; }
     }
     buildAndSave(answers);
-    if (imported > 0) setTimeout(function() { alert(imported + ' questions imported from spreadsheet.'); }, 300);
+    if (imported > 0) { appLog('CSV import: ' + imported + ' questions loaded for ' + customer, 'success'); setTimeout(function() { alert(imported + ' questions imported from spreadsheet.'); }, 300); }
   };
   reader.readAsText(csvFile);
 }
@@ -716,7 +770,7 @@ function renderSidebar() {
     nav += '</div>';
   });
   
-  nav += '</div><div class="sidebar-footer"><button onclick="showHome()">Back to Home</button></div>';
+  nav += '</div><div class="sidebar-footer"><button onclick="showHome()">Back to Home</button><button onclick="toggleLog()" style="margin-top:6px;">Sync Log</button></div>';
   document.getElementById('sidebar').innerHTML = nav;
 }
 
