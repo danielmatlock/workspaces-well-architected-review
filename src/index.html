@@ -260,7 +260,7 @@ async function gql(query, variables) {
     body: JSON.stringify({ query: query, variables: variables || {} })
   });
   var json = await res.json();
-  if (json.errors) { console.log('GraphQL error:', json.errors); return null; }
+  if (json.errors) { throw { message: json.errors[0] && json.errors[0].message || 'GraphQL error', errors: json.errors }; }
   return json.data;
 }
 
@@ -379,7 +379,7 @@ function initApp() {
   showHome();
 }
 
-// Cloud sync (non-blocking) — uses putReview to upsert (create or overwrite)
+// Cloud sync (non-blocking) — upsert: try create, on conflict do update
 async function syncReviewToCloud(review) {
   if (!idToken) return;
   var input = {
@@ -389,12 +389,13 @@ async function syncReviewToCloud(review) {
     notes: JSON.stringify(review.notes || {}), status: review.status || 'in-progress'
   };
   try {
-    var result = await gql(`mutation M($input: UpdateReviewInput!) { updateReview(input: $input) { id } }`, { input: input });
-    if (!result) {
-      // Record may not exist yet — fall back to create
-      await gql(`mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`, { input: input });
-    }
-  } catch(e) { console.log('Cloud sync error:', e); }
+    await gql(`mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`, { input: input });
+  } catch(e) {
+    if (e.message && (e.message.includes('ConditionalCheckFailed') || e.message.includes('already exists'))) {
+      try { await gql(`mutation M($input: UpdateReviewInput!) { updateReview(input: $input) { id } }`, { input: input }); }
+      catch(e2) { console.log('Cloud update error:', e2); }
+    } else { console.log('Cloud sync error:', e); }
+  }
 }
 
 async function loadFromCloud() {
