@@ -39,4 +39,6 @@ To deploy: Actions tab → "Deploy WorkSpaces WAFR Amplify App" → Run workflow
 | 2025-07-02 | Print Report and Email Report buttons added to question view topbar |
 | 2025-07-02 | Professional Observations rewrite: Lambda sends reviewer notes to Bedrock Claude Haiku, returns `{observation, recommendation}` per question |
 | 2025-07-02 | Report rendering updated: Observations box shows Bedrock-rewritten prose; Tailored Recommendation box shows bullets + clickable Further Reading URLs (falls back to raw notes if Bedrock unavailable) |
-| 2025-07-02 | Fixed Lambda handler to support both direct invocation and API Gateway (body wrapper detection) |
+| 2025-07-06 | CSV import from Excel spreadsheet added to New Review modal (columns: ID, Pillar, Question, Info from Customer, Best Practice) |
+| 2025-07-06 | Fixed cloud sync: gql now throws on GraphQL errors; upsert logic tries createReview then falls back to updateReview on conflict |
+| 2025-07-06 | Added Sync Log panel: timestamped DynamoDB events (create/update/load/error) accessible via sidebar footer |
