@@ -379,16 +379,21 @@ function initApp() {
   showHome();
 }
 
-// Cloud sync (non-blocking)
+// Cloud sync (non-blocking) — uses putReview to upsert (create or overwrite)
 async function syncReviewToCloud(review) {
   if (!idToken) return;
+  var input = {
+    id: review.id, templateId: review.templateId || '', templateName: review.template || review.templateName || '',
+    customerName: review.customer || review.customerName || '', reviewerName: review.reviewer || review.reviewerName || '',
+    reviewDate: review.date || review.reviewDate || '', answers: JSON.stringify(review.answers || {}),
+    notes: JSON.stringify(review.notes || {}), status: review.status || 'in-progress'
+  };
   try {
-    await gql(`mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`, { input: {
-      id: review.id, templateId: review.templateId || '', templateName: review.template || review.templateName || '',
-      customerName: review.customer || review.customerName || '', reviewerName: review.reviewer || review.reviewerName || '',
-      reviewDate: review.date || review.reviewDate || '', answers: JSON.stringify(review.answers || {}),
-      notes: JSON.stringify(review.notes || {}), status: review.status || 'in-progress'
-    }});
+    var result = await gql(`mutation M($input: UpdateReviewInput!) { updateReview(input: $input) { id } }`, { input: input });
+    if (!result) {
+      // Record may not exist yet — fall back to create
+      await gql(`mutation M($input: CreateReviewInput!) { createReview(input: $input) { id } }`, { input: input });
+    }
   } catch(e) { console.log('Cloud sync error:', e); }
 }
 
