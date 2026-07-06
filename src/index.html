@@ -714,7 +714,16 @@ function createReview() {
     var headers = parseCSVRow(lines[headerIdx]).map(function(h) { return h.replace(/^"|"$/g, '').trim().toLowerCase(); });
     var idCol = headers.indexOf('id');
     var notesCol = headers.findIndex(function(h) { return h.includes('info from customer'); });
+    var scoreCol = headers.findIndex(function(h) { return h.includes('assessment'); });
     if (idCol < 0 || notesCol < 0) { alert('CSV must have "ID" and "Info from Customer" columns.'); return; }
+    function mapScore(val) {
+      val = (val || '').toLowerCase().trim();
+      if (val.includes('fully') || val === 'full' || val === 'yes') return 'fully';
+      if (val.includes('partial')) return 'partial';
+      if (val.includes('n/a') || val.includes('not applicable') || val === 'na') return 'na';
+      if (val.includes('not') || val === 'no') return 'not';
+      return 'not';
+    }
     var answers = {};
     var imported = 0;
     for (var i = headerIdx + 1; i < lines.length; i++) {
@@ -722,7 +731,8 @@ function createReview() {
       var cols = parseCSVRow(lines[i]);
       var id = (cols[idCol] || '').replace(/^"|"$/g, '').trim();
       var notes = (cols[notesCol] || '').replace(/^"|"$/g, '').trim();
-      if (id && notes) { answers[id] = { score: 'not', notes: notes }; imported++; }
+      var scoreRaw = scoreCol >= 0 ? (cols[scoreCol] || '').replace(/^"|"$/g, '').trim() : '';
+      if (id && notes) { answers[id] = { score: mapScore(scoreRaw), notes: notes }; imported++; }
     }
     buildAndSave(answers);
     if (imported > 0) { appLog('CSV import: ' + imported + ' questions loaded for ' + customer, 'success'); setTimeout(function() { alert(imported + ' questions imported from spreadsheet.'); }, 300); }
