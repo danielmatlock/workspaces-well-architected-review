@@ -71,14 +71,16 @@ sequenceDiagram
     L-->>AG: JSON response
     AG-->>U: Display in AI Guidance panel
     Note over U: On report generation (Print/Email)
-    U->>AG: POST /email-report {action: generate, questions with notes}
-    AG->>L: Invoke Lambda (wafr-email-report, 90s timeout)
-    L->>L: Split questions into batches of 5
-    L->>B: InvokeModel × N batches (parallel via ThreadPoolExecutor)
-    B-->>L: JSON recommendations per batch
-    L->>L: Merge batch results
-    L-->>AG: {statusCode: 200, body: JSON string}
-    AG-->>U: Frontend parses body wrapper, renders report
+    U->>U: Split questions with notes into batches of 5
+    loop For each batch (sequential)
+        U->>AG: POST /email-report {action: generate, questions: [5 items]}
+        AG->>L: Invoke Lambda (wafr-email-report, 90s timeout)
+        L->>B: InvokeModel × N (parallel via ThreadPoolExecutor)
+        B-->>L: JSON recommendations per batch
+        L-->>AG: {statusCode: 200, body: JSON string}
+        AG-->>U: Parse body, merge into recommendations
+    end
+    U->>U: Build HTML report with all recommendations
     Note over U: On email report
     U->>AG: POST /email-report {action: email, htmlReport}
     AG->>L: Invoke Lambda (wafr-email-report)
@@ -177,33 +179,31 @@ User clicks "Print Report" or "Email Report"
 App collects all questions with notes/observations
     │
     ▼
-Browser sends POST to API Gateway
-    https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report
-    Body: { action: "generate", questions: [{id, question, score, notes, best}] }
+Frontend splits questions into batches of 5
     │
     ▼
-API Gateway → Lambda (wafr-email-report, 90s timeout, 256MB)
+For each batch (sequential):
+    Browser sends POST to API Gateway
+        https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report
+        Body: { action: "generate", questions: [5 items] }
+        │
+        ▼
+    API Gateway → Lambda (wafr-email-report, 90s timeout, 256MB)
+        │
+        ▼
+    Lambda splits batch into sub-batches of 5
+    ThreadPoolExecutor (4 workers) calls Bedrock in parallel
+        Model: eu.anthropic.claude-haiku-4-5-20251001-v1:0
+        Max tokens: 4096
+        │
+        ▼
+    Returns: { statusCode: 200, body: "{\"recommendations\": {...}}" }
+        │
+        ▼
+    Frontend parses body wrapper, merges into recommendations object
     │
     ▼
-Lambda splits questions into batches of 5
-    │
-    ▼
-ThreadPoolExecutor (4 workers) calls Bedrock in parallel per batch
-    Model: eu.anthropic.claude-haiku-4-5-20251001-v1:0
-    Max tokens: 4096 per batch
-    │
-    ▼
-Results merged into single JSON:
-    { "QUESTION-ID": { "observation": "...", "recommendation": "..." } }
-    │
-    ▼
-API Gateway returns: { statusCode: 200, body: "{\"recommendations\": {...}}" }
-    │
-    ▼
-Frontend parses body wrapper: JSON.parse(data.body)
-    │
-    ▼
-App builds HTML report:
+All batches complete → build HTML report:
     - Grey box: Bedrock-rewritten observation (polished prose)
     - Blue box: Tailored recommendation (bullets + clickable Further Reading URLs)
     │
