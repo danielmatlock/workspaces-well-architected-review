@@ -46,3 +46,5 @@ To deploy: Actions tab → "Deploy WorkSpaces WAFR Amplify App" → Run workflow
 | 2025-07-07 | Lambda parallelised: questions batched (5 per batch) with ThreadPoolExecutor to avoid API Gateway 29s timeout |
 | 2025-07-07 | Lambda config: timeout increased to 90s, memory to 256MB |
 | 2025-07-07 | Frontend batching: sends 5 questions per API call (sequential) to stay within API Gateway 29s limit |
+| 2025-07-07 | So What Report: focused executive report showing only Bedrock observations and recommendations with AWS doc links (no RAG colours or Target State sections) |
+| 2025-07-07 | So What Report: focused executive report showing only Bedrock observations and recommendations with AWS doc links (no RAG colours or Target State sections) |

@@ -81,6 +81,9 @@ sequenceDiagram
         AG-->>U: Parse body, merge into recommendations
     end
     U->>U: Build HTML report with all recommendations
+    Note over U: On So What Report
+    U->>U: Reuses recommendations from last report generation
+    U->>U: Builds focused executive report (observations + recommendations only)
     Note over U: On email report
     U->>AG: POST /email-report {action: email, htmlReport}
     AG->>L: Invoke Lambda (wafr-email-report)
@@ -208,6 +211,7 @@ All batches complete → build HTML report:
     - Blue box: Tailored recommendation (bullets + clickable Further Reading URLs)
     │
     ├── Print Report: opens in new browser window
+    ├── So What Report: focused executive view (observations + recommendations only, no RAG/Target State)
     └── Email Report: sends HTML attachment via SES
 ```
 
