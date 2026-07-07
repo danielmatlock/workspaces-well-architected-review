@@ -1482,7 +1482,8 @@ async function generateTailoredReport(review) {
         body: JSON.stringify({ action: 'generate', questions: questionsWithNotes })
       });
       var data = await res.json();
-      if (data.recommendations) recommendations = data.recommendations;
+      var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+      if (payload.recommendations) recommendations = payload.recommendations;
     } catch(e) { console.log('Tailored generation error:', e); }
   }
   return generateReportHTML(review, recommendations);
