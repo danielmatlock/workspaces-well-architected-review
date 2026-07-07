@@ -1475,16 +1475,20 @@ async function generateTailoredReport(review) {
   });
   var recommendations = {};
   if (questionsWithNotes.length > 0) {
-    try {
-      var res = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate', questions: questionsWithNotes })
-      });
-      var data = await res.json();
-      var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
-      if (payload.recommendations) recommendations = payload.recommendations;
-    } catch(e) { console.log('Tailored generation error:', e); }
+    var BATCH_SIZE = 5;
+    for (var i = 0; i < questionsWithNotes.length; i += BATCH_SIZE) {
+      var batch = questionsWithNotes.slice(i, i + BATCH_SIZE);
+      try {
+        var res = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'generate', questions: batch })
+        });
+        var data = await res.json();
+        var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+        if (payload.recommendations) Object.assign(recommendations, payload.recommendations);
+      } catch(e) { console.log('Tailored generation error (batch ' + (i/BATCH_SIZE+1) + '):', e); }
+    }
   }
   return generateReportHTML(review, recommendations);
 }

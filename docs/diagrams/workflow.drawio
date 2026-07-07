@@ -1,0 +1,150 @@
+<mxfile host="app.diagrams.net" modified="2026-07-02T18:00:00.000Z" agent="draw.io" type="device">
+  <diagram id="workflow" name="User Workflow">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="AWS WorkSpaces WAFR Tool — User Workflow" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="500" y="20" width="450" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 1: Login -->
+        <mxCell id="step1" value="1. Sign In&#xa;&#xa;Email + Password&#xa;via Cognito" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#232F3E;fontColor=#FFFFFF;strokeColor=#232F3E;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="80" y="120" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 2: Home -->
+        <mxCell id="step2" value="2. Home Dashboard&#xa;&#xa;View existing reviews&#xa;Create new review" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;fontColor=#FFFFFF;strokeColor=#FF9900;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="320" y="120" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 3: Create Review -->
+        <mxCell id="step3" value="3. Create Review&#xa;&#xa;Select template&#xa;Enter customer name&#xa;Set date + reviewer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;fontColor=#FFFFFF;strokeColor=#FF9900;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="560" y="120" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 4: Review Dashboard -->
+        <mxCell id="step4" value="4. Review Dashboard&#xa;&#xa;Overall score + RAG&#xa;Radar chart&#xa;Pillar breakdown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1D8102;fontColor=#FFFFFF;strokeColor=#1D8102;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="800" y="120" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 5: Answer Questions -->
+        <mxCell id="step5" value="5. Answer Questions&#xa;&#xa;Score each question&#xa;(Not / Partial / Fully / N/A)&#xa;Add observations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0073BB;fontColor=#FFFFFF;strokeColor=#0073BB;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="800" y="320" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 5b: AI Guidance -->
+        <mxCell id="step5b" value="AI Guidance Panel&#xa;&#xa;Bedrock generates&#xa;context-aware guidance&#xa;for each question" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#01A88D;fontColor=#FFFFFF;strokeColor=#01A88D;fontSize=11;verticalAlign=middle;align=center;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="320" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 6: Generate Report -->
+        <mxCell id="step6" value="6. Generate Report&#xa;&#xa;Bedrock creates tailored&#xa;recommendations based&#xa;on observations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#01A88D;fontColor=#FFFFFF;strokeColor=#01A88D;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="560" y="320" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 7a: Print -->
+        <mxCell id="step7a" value="7a. Print Report&#xa;&#xa;Opens HTML report&#xa;in new window&#xa;(Save as PDF)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C4FFF;fontColor=#FFFFFF;strokeColor=#8C4FFF;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="320" y="520" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 7b: Email -->
+        <mxCell id="step7b" value="7b. Email Report&#xa;&#xa;Enter recipient email&#xa;SES sends HTML&#xa;report as attachment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C4FFF;fontColor=#FFFFFF;strokeColor=#8C4FFF;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="560" y="520" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 8: Improvement Plan -->
+        <mxCell id="step8" value="8. Improvement Plan&#xa;&#xa;Auto-generated list of&#xa;red/amber items with&#xa;recommended actions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D13212;fontColor=#FFFFFF;strokeColor=#D13212;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="800" y="520" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows -->
+        <mxCell id="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#232F3E;strokeWidth=2;" edge="1" source="step1" target="step2" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#232F3E;strokeWidth=2;" edge="1" source="step2" target="step3" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#232F3E;strokeWidth=2;" edge="1" source="step3" target="step4" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeColor=#232F3E;strokeWidth=2;" edge="1" source="step4" target="step5" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeColor=#01A88D;strokeWidth=1;dashed=1;" edge="1" source="step5" target="step5b" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a5-label" value="Auto-loads" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#5F6B7A;" vertex="1" connectable="0" parent="a5">
+          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        
+        <mxCell id="a6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;strokeColor=#232F3E;strokeWidth=2;" edge="1" source="step5" target="step6" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a6-label" value="Print / Email&#xa;Report" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#5F6B7A;" vertex="1" connectable="0" parent="a6">
+          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset" /></mxGeometry>
+        </mxCell>
+        
+        <mxCell id="a7a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.25;exitY=1;entryX=0.5;entryY=0;strokeColor=#232F3E;strokeWidth=2;" edge="1" source="step6" target="step7a" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a7b" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.75;exitY=1;entryX=0.5;entryY=0;strokeColor=#232F3E;strokeWidth=2;" edge="1" source="step6" target="step7b" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeColor=#232F3E;strokeWidth=2;" edge="1" source="step5" target="step8" parent="1">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="880" y="470" /><mxPoint x="880" y="470" /></Array></mxGeometry>
+        </mxCell>
+        
+        <!-- Legend -->
+        <mxCell id="legend-title" value="Legend" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=12;fontStyle=1;fontColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="80" y="700" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=#232F3E;" vertex="1" parent="1">
+          <mxGeometry x="80" y="730" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1t" value="Authentication" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="110" y="730" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;strokeColor=#FF9900;" vertex="1" parent="1">
+          <mxGeometry x="80" y="755" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2t" value="Navigation / Setup" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="110" y="755" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0073BB;strokeColor=#0073BB;" vertex="1" parent="1">
+          <mxGeometry x="250" y="730" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3t" value="Core Review Activity" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="730" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#01A88D;strokeColor=#01A88D;" vertex="1" parent="1">
+          <mxGeometry x="250" y="755" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4t" value="AI-Powered (Bedrock)" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="755" width="130" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C4FFF;strokeColor=#8C4FFF;" vertex="1" parent="1">
+          <mxGeometry x="430" y="730" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5t" value="Output / Delivery" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="460" y="730" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D13212;strokeColor=#D13212;" vertex="1" parent="1">
+          <mxGeometry x="430" y="755" width="20" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6t" value="Remediation" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="460" y="755" width="100" height="20" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

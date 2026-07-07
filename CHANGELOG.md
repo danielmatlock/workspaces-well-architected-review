@@ -90,10 +90,12 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
 | AppSync API | `4up36qgqubd6tcuekx5cmexmii` | eu-west-2 |
 | DynamoDB Table | `wafr-reviews` | eu-west-2 |
 | DynamoDB Table | `wafr-templates` | eu-west-2 |
-| Lambda Function | `wafr-explain` | eu-west-2 |
+| Lambda Function | `wafr-explain` (30s, 128MB) | eu-west-2 |
+| Lambda Function | `wafr-email-report` (90s, 256MB) | eu-west-2 |
 | API Gateway | `6ylrfwa3d8` | eu-west-2 |
 | IAM Role | `github-actions-amplify-deploy` | global |
 | IAM Role | `appsync-dynamodb-role` | global |
 | IAM Role | `lambda-bedrock-role` | global |
+| IAM Role | `lambda-ses-email-role` | global |
 | IAM Role | `amplify-service-role` | global |
 | Bedrock Model | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | eu-west-2 |

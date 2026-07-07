@@ -11,10 +11,14 @@ flowchart TD
     Browser -->|Auth via Cognito Identity JS SDK| Cognito[Amazon Cognito User Pool]
     Browser -->|GraphQL via fetch| AppSync[AWS AppSync API]
     Browser -->|POST /explain| APIGW[API Gateway HTTP API]
+    Browser -->|POST /email-report| APIGW
     AppSync --> DDBReviews[DynamoDB - wafr-reviews]
     AppSync --> DDBTemplates[DynamoDB - wafr-templates]
     APIGW --> Lambda[Lambda - wafr-explain]
+    APIGW --> LambdaEmail[Lambda - wafr-email-report]
     Lambda --> Bedrock[Bedrock - Claude Haiku 4.5]
+    LambdaEmail --> Bedrock
+    LambdaEmail --> SES[Amazon SES]
     Browser -->|Fallback| LS[localStorage]
 
     subgraph AWS Account 590183747733 — eu-west-2
@@ -26,7 +30,9 @@ flowchart TD
         DDBTemplates
         APIGW
         Lambda
+        LambdaEmail
         Bedrock
+        SES
     end
 ```
 
@@ -48,11 +54,15 @@ sequenceDiagram
     A->>D: Scan wafr-reviews
     D-->>A: Review items
     A-->>U: JSON response
-    U->>U: Merge with localStorage
+    U->>U: Replace localStorage with cloud data
     Note over U: On answer/save
     U->>U: Save to localStorage (instant)
     U->>A: createReview mutation
     A->>D: PutItem
+    Note over U: On delete
+    U->>U: Remove from localStorage
+    U->>A: deleteReview mutation
+    A->>D: DeleteItem
     Note over U: On question view
     U->>AG: POST /explain (question + best practice)
     AG->>L: Invoke Lambda
@@ -60,6 +70,21 @@ sequenceDiagram
     B-->>L: AI explanation
     L-->>AG: JSON response
     AG-->>U: Display in AI Guidance panel
+    Note over U: On report generation (Print/Email)
+    U->>AG: POST /email-report {action: generate, questions with notes}
+    AG->>L: Invoke Lambda (wafr-email-report, 90s timeout)
+    L->>L: Split questions into batches of 5
+    L->>B: InvokeModel × N batches (parallel via ThreadPoolExecutor)
+    B-->>L: JSON recommendations per batch
+    L->>L: Merge batch results
+    L-->>AG: {statusCode: 200, body: JSON string}
+    AG-->>U: Frontend parses body wrapper, renders report
+    Note over U: On email report
+    U->>AG: POST /email-report {action: email, htmlReport}
+    AG->>L: Invoke Lambda (wafr-email-report)
+    L->>L: Build email with HTML attachment
+    L-->>AG: SES send
+    AG-->>U: Success confirmation
 ```
 
 ## Deployment Pipeline
@@ -87,12 +112,15 @@ flowchart LR
 | AppSync | API: `4up36qgqubd6tcuekx5cmexmii` | GraphQL API | ✅ Configured | Git (schema) |
 | DynamoDB | Table: `wafr-reviews` | Review storage | ✅ Active | ✅ PITR enabled |
 | DynamoDB | Table: `wafr-templates` | Template storage | ✅ Active | ✅ PITR enabled |
-| API Gateway | API: `6ylrfwa3d8` | HTTP API for AI explain | ✅ Active | Git (Lambda code) |
+| API Gateway | API: `6ylrfwa3d8` | HTTP API for AI explain + email report | ✅ Active | Git (Lambda code) |
 | Lambda | Function: `wafr-explain` | Calls Bedrock for AI guidance | ✅ Active | Git |
-| Bedrock | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | AI explanation generation | ✅ Active | N/A |
+| Lambda | Function: `wafr-email-report` | Generates tailored reports + sends via SES (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
+| Bedrock | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | AI explanation + tailored recommendations | ✅ Active | N/A |
+| SES | Verified sender: `danmmat@amazon.co.uk` | Email delivery for reports | ✅ Active (sandbox) | N/A |
 | IAM | Role: `github-actions-amplify-deploy` | GitHub OIDC deploy | ✅ Configured | N/A |
 | IAM | Role: `appsync-dynamodb-role` | AppSync → DynamoDB | ✅ Configured | N/A |
-| IAM | Role: `lambda-bedrock-role` | Lambda → Bedrock | ✅ Configured | N/A |
+| IAM | Role: `lambda-bedrock-role` | Lambda (wafr-explain) → Bedrock | ✅ Configured | N/A |
+| IAM | Role: `lambda-ses-email-role` | Lambda (wafr-email-report) → SES + Bedrock | ✅ Configured | N/A |
 | IAM | Role: `amplify-service-role` | Amplify service (unused) | ⚠️ Not working | N/A |
 
 ## Authentication Flow
@@ -137,6 +165,76 @@ Lambda → Bedrock (eu.anthropic.claude-haiku-4-5-20251001-v1:0)
     ▼
 Response displayed in AI Guidance panel (right side)
     Panel can be minimised/expanded with − / + button
+    "What to ask the customer" is replaced with "Questions to think about" client-side
+```
+
+## Tailored Report Generation Flow
+
+```
+User clicks "Print Report" or "Email Report"
+    │
+    ▼
+App collects all questions with notes/observations
+    │
+    ▼
+Browser sends POST to API Gateway
+    https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report
+    Body: { action: "generate", questions: [{id, question, score, notes, best}] }
+    │
+    ▼
+API Gateway → Lambda (wafr-email-report, 90s timeout, 256MB)
+    │
+    ▼
+Lambda splits questions into batches of 5
+    │
+    ▼
+ThreadPoolExecutor (4 workers) calls Bedrock in parallel per batch
+    Model: eu.anthropic.claude-haiku-4-5-20251001-v1:0
+    Max tokens: 4096 per batch
+    │
+    ▼
+Results merged into single JSON:
+    { "QUESTION-ID": { "observation": "...", "recommendation": "..." } }
+    │
+    ▼
+API Gateway returns: { statusCode: 200, body: "{\"recommendations\": {...}}" }
+    │
+    ▼
+Frontend parses body wrapper: JSON.parse(data.body)
+    │
+    ▼
+App builds HTML report:
+    - Grey box: Bedrock-rewritten observation (polished prose)
+    - Blue box: Tailored recommendation (bullets + clickable Further Reading URLs)
+    │
+    ├── Print Report: opens in new browser window
+    └── Email Report: sends HTML attachment via SES
+```
+
+## Email Report Flow
+
+```
+User clicks "Email Report" → enters recipient email
+    │
+    ▼
+App generates tailored report (as above)
+    │
+    ▼
+Browser sends POST to API Gateway
+    https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report
+    Body: { action: "email", recipient, htmlReport, customerName, reviewDate }
+    │
+    ▼
+API Gateway → Lambda (wafr-email-report)
+    │
+    ▼
+Lambda builds MIME email with HTML attachment
+    │
+    ▼
+SES sends email from danmmat@amazon.co.uk
+    │
+    ▼
+Note: SES is in sandbox mode — can only send to verified addresses
 ```
 
 ## Network Endpoints
@@ -146,6 +244,7 @@ Response displayed in AI Guidance panel (right side)
 | `https://main.d1p2543h8l2mfc.amplifyapp.com` | App URL |
 | `https://zernxhslmvhe3o7ucljc55dmjq.appsync-api.eu-west-2.amazonaws.com/graphql` | GraphQL API |
 | `https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/explain` | AI Explain API |
+| `https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report` | Email Report + Tailored Recommendations API |
 | `https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js` | Cognito SDK (CDN) |
 
 ## Cost Estimate (Monthly)
@@ -158,6 +257,8 @@ Response displayed in AI Guidance panel (right side)
 | AppSync | <250K queries | Free tier |
 | Cognito | 1-2 users | Free tier |
 | API Gateway | <100 requests/month | Free tier |
-| Lambda | <100 invocations | Free tier |
-| Bedrock (Haiku 4.5) | ~50 calls/month, 512 tokens each | ~$0.05 |
+| Lambda | <100 invocations (explain) | Free tier |
+| Lambda | <50 invocations (email-report) | Free tier |
+| SES | <50 emails/month | Free tier |
+| Bedrock (Haiku 4.5) | ~100 calls/month (explain + reports), 512-4096 tokens | ~$0.15 |
 | **Total** | | **<$1/month** |
