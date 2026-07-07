@@ -792,7 +792,8 @@ function showReviewDashboard() {
   
   document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
     '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
-    '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">Generate Report</button></div>';
+    '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">Generate Report</button>' +
+    '<button class="btn btn-sm" onclick="exportSoWhat(\'' + review.id + '\')">So What?</button></div>';
   
   var overall = getOverallScore(review);
   var html = '<div class="overall-score"><div class="big">' + overall + '%</div><div class="label">Overall Score</div>' +
