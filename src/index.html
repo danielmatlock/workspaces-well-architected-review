@@ -1849,7 +1849,7 @@ function saveReportToCloud(reviewId, reportType, content, contentType, extension
 
 function showSavedReports(id) {
   document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
-    '<div class="modal" onclick="event.stopPropagation()" style="max-width:600px;"><h3>Saved Reports</h3>' +
+    '<div class="modal" onclick="event.stopPropagation()" style="width:750px;max-width:90vw;"><h3>Saved Reports</h3>' +
     '<div id="saved-reports-list"><p style="color:#5f6b7a;">Loading...</p></div>' +
     '<div style="margin-top:16px;text-align:right;"><button class="btn" onclick="closeModal()">Close</button></div></div></div>';
   fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
