@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WorkSpaces WAFR Tool</title>
 <script src="https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgenjs.bundle.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f1f3f5; color: #16191f; min-height: 100vh; }
@@ -793,7 +794,8 @@ function showReviewDashboard() {
   document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
     '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
     '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">Generate Report</button>' +
-    '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button></div>';
+    '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
+    '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button></div>';
   
   var overall = getOverallScore(review);
   var html = '<div class="overall-score"><div class="big">' + overall + '%</div><div class="label">Overall Score</div>' +
@@ -881,6 +883,7 @@ function renderQuestion() {
     '<div class="topbar-actions"><span style="font-size:13px;color:#5f6b7a">Question ' + (state.activeQuestion + 1) + ' of ' + pillar.questions.length + '</span>' +
     '<button class="btn btn-sm" onclick="exportReviewAsPrintHTML(\'' + state.activeReview + '\')">Print Report</button>' +
     '<button class="btn btn-primary" onclick="exportSoWhat(\'' + state.activeReview + '\')">So What Report</button>' +
+    '<button class="btn btn-primary btn-sm" onclick="exportCLevelDeck(\'' + state.activeReview + '\')">C-Level Deck</button>' +
     '<button class="btn btn-sm" onclick="showEmailModal(\'' + state.activeReview + '\')">Email Report</button></div>';
   
   var scoreClass = '';
@@ -1538,6 +1541,205 @@ function exportSoWhat(id) {
     var html = generateSoWhatHTML(review, window._lastRecommendations || {});
     var w = window.open('', '_blank'); w.document.write(html); w.document.close();
   });
+}
+
+// === C-LEVEL DECK ===
+function exportCLevelDeck(id) {
+  var review = getReview(id); if (!review) return;
+  showGeneratingOverlay();
+  generateTailoredReport(review).then(function() {
+    hideGeneratingOverlay();
+    buildCLevelPptx(review, window._lastRecommendations || {});
+  });
+}
+
+function buildCLevelPptx(review, recommendations) {
+  var pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE';
+  pptx.author = 'AWS WorkSpaces WAFR Tool';
+  pptx.subject = 'Well-Architected Review - C-Level Briefing';
+
+  var SQUID = '232F3E';
+  var ORANGE = 'FF9900';
+  var WHITE = 'FFFFFF';
+  var LIGHT_BG = 'F8F9FA';
+  var RED = 'D13212';
+  var AMBER = 'FF9900';
+  var GREEN = '1D8102';
+  var GREY = '5F6B7A';
+  var customer = review.customer || 'Customer';
+  var today = review.date || new Date().toISOString().split('T')[0];
+  var overall = getOverallScore(review);
+
+  // Tier findings
+  var must = [], should = [], could = [];
+  review.pillars.forEach(function(p) {
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id];
+      if (!a || !a.score || a.score === 'na') return;
+      var rec = recommendations[q.id];
+      var item = { id: q.id, question: q.q, pillar: p.name, score: a.score, notes: a.notes || '', rec: rec };
+      if (a.score === 'not') must.push(item);
+      else if (a.score === 'partial') should.push(item);
+      else if (a.score === 'fully' && a.notes && a.notes.trim()) could.push(item);
+    });
+  });
+
+  // Helper: add slide with dark header bar
+  function addTitleSlide(title, subtitle) {
+    var slide = pptx.addSlide();
+    slide.background = { color: SQUID };
+    slide.addText(title, { x: 0.8, y: 2.5, w: 11, fontSize: 36, bold: true, color: WHITE, fontFace: 'Calibri' });
+    if (subtitle) slide.addText(subtitle, { x: 0.8, y: 3.4, w: 11, fontSize: 18, color: ORANGE, fontFace: 'Calibri' });
+    slide.addText('AWS Well-Architected Review', { x: 0.8, y: 0.4, fontSize: 12, color: GREY, fontFace: 'Calibri' });
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 7.0, w: 13.33, h: 0.08, fill: { color: ORANGE } });
+    return slide;
+  }
+
+  function addContentSlide(title) {
+    var slide = pptx.addSlide();
+    slide.background = { color: WHITE };
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: SQUID } });
+    slide.addText(title, { x: 0.5, y: 0.15, w: 12, fontSize: 20, bold: true, color: WHITE, fontFace: 'Calibri' });
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0.9, w: 13.33, h: 0.05, fill: { color: ORANGE } });
+    return slide;
+  }
+
+  function ragColor(score) { return score >= 80 ? GREEN : score >= 40 ? AMBER : RED; }
+  function ragLabel(score) { return score >= 80 ? 'GREEN' : score >= 40 ? 'AMBER' : 'RED'; }
+  function truncate(str, max) { return str && str.length > max ? str.substring(0, max - 3) + '...' : (str || ''); }
+
+  // SLIDE 1: Cover
+  var s1 = addTitleSlide(customer + '\nWorkSpaces Well-Architected Review', 'C-Level Executive Briefing | ' + today);
+
+  // SLIDE 2: How to Read This Deck
+  var s2 = addContentSlide('How to Read This Deck');
+  s2.addText('Findings are organised as a Must / Should / Could conversation:', { x: 0.5, y: 1.2, w: 12, fontSize: 14, color: SQUID, fontFace: 'Calibri' });
+  var howRows = [
+    [{ text: 'MUST', options: { bold: true, color: WHITE } }, { text: 'Urgent — highest assurance, often least effort. Address immediately.' }],
+    [{ text: 'SHOULD', options: { bold: true, color: SQUID } }, { text: 'High value — plan this quarter. Meaningful risk reduction.' }],
+    [{ text: 'COULD', options: { bold: true, color: SQUID } }, { text: 'Strategic improvements — more effort, longer-term benefit.' }]
+  ];
+  s2.addTable(howRows, { x: 0.5, y: 1.8, w: 12, fontSize: 14, fontFace: 'Calibri', border: { type: 'solid', pt: 0.5, color: 'E1E4E8' }, rowH: [0.6, 0.6, 0.6], colW: [1.5, 10.5], color: SQUID, fill: { color: LIGHT_BG } });
+  s2.addText('Flow: Most impactful / least effort → Impactful / more effort', { x: 0.5, y: 3.8, w: 12, fontSize: 12, italic: true, color: GREY, fontFace: 'Calibri' });
+
+  // SLIDE 3: Executive Summary
+  var s3 = addContentSlide('Executive Summary');
+  s3.addText(overall + '%', { x: 5.5, y: 1.5, w: 2.5, fontSize: 60, bold: true, color: ragColor(overall), align: 'center', fontFace: 'Calibri' });
+  s3.addText('Overall Score — ' + ragLabel(overall), { x: 4, y: 3.0, w: 5.5, fontSize: 16, align: 'center', color: SQUID, fontFace: 'Calibri' });
+  var statsText = must.length + ' Critical (Must)  |  ' + should.length + ' Improvements (Should)  |  ' + could.length + ' Strategic (Could)';
+  s3.addText(statsText, { x: 1, y: 3.8, w: 11, fontSize: 14, align: 'center', color: GREY, fontFace: 'Calibri' });
+  var answered = 0, total = 0;
+  review.pillars.forEach(function(p) { p.questions.forEach(function(q) { total++; if (review.answers[q.id] && review.answers[q.id].score) answered++; }); });
+  s3.addText(answered + ' of ' + total + ' questions assessed', { x: 1, y: 4.4, w: 11, fontSize: 12, align: 'center', color: GREY, fontFace: 'Calibri' });
+
+  // SLIDE 4: Six-Pillar Scorecard
+  var s4 = addContentSlide('Six-Pillar Scorecard');
+  var pillarRows = [[
+    { text: 'Pillar', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
+    { text: 'Score', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
+    { text: 'RAG', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
+    { text: 'Gaps', options: { bold: true, color: WHITE, fill: { color: SQUID } } }
+  ]];
+  review.pillars.forEach(function(p) {
+    var ps = getPillarScore(review, p);
+    var gaps = 0;
+    p.questions.forEach(function(q) { var a = review.answers[q.id]; if (a && (a.score === 'not' || a.score === 'partial')) gaps++; });
+    pillarRows.push([
+      { text: p.name },
+      { text: ps + '%', options: { align: 'center' } },
+      { text: ragLabel(ps), options: { color: ragColor(ps), bold: true, align: 'center' } },
+      { text: gaps.toString(), options: { align: 'center' } }
+    ]);
+  });
+  s4.addTable(pillarRows, { x: 0.5, y: 1.2, w: 12, fontSize: 13, fontFace: 'Calibri', border: { type: 'solid', pt: 0.5, color: 'E1E4E8' }, rowH: 0.5, colW: [4, 2, 2, 2], color: SQUID, autoPage: false });
+
+  // SLIDE 5: Critical Findings Overview
+  var s5 = addContentSlide('Critical Findings');
+  var critItems = must.slice(0, 5);
+  var critY = 1.2;
+  critItems.forEach(function(item) {
+    s5.addText('● ' + item.id + ' — ' + truncate(item.question, 90), { x: 0.5, y: critY, w: 12, fontSize: 13, color: RED, fontFace: 'Calibri' });
+    if (item.rec && item.rec.observation) s5.addText(truncate(item.rec.observation, 150), { x: 0.8, y: critY + 0.35, w: 11.5, fontSize: 11, color: GREY, fontFace: 'Calibri' });
+    critY += 0.9;
+  });
+
+  // SLIDE 6: Must/Should/Could Visual
+  var s6 = addContentSlide('Prioritisation Framework');
+  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: 1.3, w: 3.8, h: 5.0, fill: { color: 'FDF3F1' }, line: { color: RED, width: 1.5 }, rectRadius: 0.05 });
+  s6.addText('MUST\n(' + must.length + ' items)', { x: 0.5, y: 1.4, w: 3.8, fontSize: 16, bold: true, color: RED, align: 'center', fontFace: 'Calibri' });
+  s6.addText(must.slice(0, 4).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 0.7, y: 2.2, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+
+  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 4.7, y: 1.3, w: 3.8, h: 5.0, fill: { color: 'FFF8E6' }, line: { color: AMBER, width: 1.5 }, rectRadius: 0.05 });
+  s6.addText('SHOULD\n(' + should.length + ' items)', { x: 4.7, y: 1.4, w: 3.8, fontSize: 16, bold: true, color: AMBER, align: 'center', fontFace: 'Calibri' });
+  s6.addText(should.slice(0, 4).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 4.9, y: 2.2, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+
+  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 8.9, y: 1.3, w: 3.8, h: 5.0, fill: { color: 'F0FFF0' }, line: { color: GREEN, width: 1.5 }, rectRadius: 0.05 });
+  s6.addText('COULD\n(' + could.length + ' items)', { x: 8.9, y: 1.4, w: 3.8, fontSize: 16, bold: true, color: GREEN, align: 'center', fontFace: 'Calibri' });
+  s6.addText(could.slice(0, 4).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 9.1, y: 2.2, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+
+  s6.addText('← Highest assurance / least effort          Impactful / more effort →', { x: 1, y: 6.5, w: 11, fontSize: 11, italic: true, color: GREY, align: 'center', fontFace: 'Calibri' });
+
+  // SLIDE 7: MUST - Quick Wins
+  function buildTierSlide(title, items, tierColor, maxItems) {
+    var slide = addContentSlide(title);
+    var yPos = 1.2;
+    items.slice(0, maxItems || 5).forEach(function(item) {
+      slide.addText(item.id + ' — ' + truncate(item.question, 80), { x: 0.5, y: yPos, w: 12, fontSize: 13, bold: true, color: tierColor, fontFace: 'Calibri' });
+      var recText = '';
+      if (item.rec && item.rec.recommendation) recText = truncate(item.rec.recommendation.replace(/\n/g, ' '), 200);
+      else if (item.notes) recText = truncate(item.notes, 200);
+      if (recText) slide.addText(recText, { x: 0.8, y: yPos + 0.35, w: 11.5, fontSize: 11, color: GREY, fontFace: 'Calibri' });
+      yPos += 1.0;
+    });
+    return slide;
+  }
+
+  buildTierSlide('MUST — Immediate Actions', must.slice(0, 5), RED, 5);
+
+  // SLIDE 8: MUST continued (if >5)
+  if (must.length > 5) buildTierSlide('MUST — Immediate Actions (cont.)', must.slice(5, 10), RED, 5);
+
+  // SLIDE 9: SHOULD
+  buildTierSlide('SHOULD — Plan This Quarter', should.slice(0, 5), '8B6914', 5);
+  if (should.length > 5) buildTierSlide('SHOULD — Plan This Quarter (cont.)', should.slice(5, 10), '8B6914', 5);
+
+  // SLIDE 10: COULD
+  buildTierSlide('COULD — Strategic Improvements', could.slice(0, 5), GREEN, 5);
+
+  // SLIDE 11: Cost Optimisation (if cost pillar has findings)
+  var costFindings = must.concat(should).concat(could).filter(function(f) { return f.pillar === 'Cost Optimisation'; });
+  if (costFindings.length > 0) {
+    var sCost = addContentSlide('Cost Optimisation Opportunities');
+    var costY = 1.2;
+    costFindings.slice(0, 5).forEach(function(item) {
+      sCost.addText('• ' + item.id + ' — ' + truncate(item.question, 85), { x: 0.5, y: costY, w: 12, fontSize: 13, color: SQUID, fontFace: 'Calibri' });
+      var note = (item.rec && item.rec.recommendation) ? truncate(item.rec.recommendation.replace(/\n/g, ' '), 180) : truncate(item.notes, 180);
+      if (note) sCost.addText(note, { x: 0.8, y: costY + 0.3, w: 11.5, fontSize: 11, color: GREY, fontFace: 'Calibri' });
+      costY += 0.85;
+    });
+  }
+
+  // SLIDE 12: 90-Day Roadmap
+  var sRoad = addContentSlide('90-Day Roadmap');
+  var roadRows = [[
+    { text: 'Timeframe', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
+    { text: 'Actions', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
+    { text: 'Tier', options: { bold: true, color: WHITE, fill: { color: SQUID } } }
+  ]];
+  roadRows.push([{ text: 'Week 1–2' }, { text: must.slice(0, 3).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'MUST', options: { color: RED, bold: true } }]);
+  roadRows.push([{ text: 'Week 3–6' }, { text: must.slice(3).concat(should.slice(0, 2)).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'MUST/SHOULD', options: { color: AMBER, bold: true } }]);
+  roadRows.push([{ text: 'Week 7–12' }, { text: should.slice(2, 5).concat(could.slice(0, 2)).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'SHOULD/COULD', options: { color: GREEN, bold: true } }]);
+  sRoad.addTable(roadRows, { x: 0.5, y: 1.3, w: 12, fontSize: 13, fontFace: 'Calibri', border: { type: 'solid', pt: 0.5, color: 'E1E4E8' }, rowH: 0.7, colW: [2.5, 7.5, 2], color: SQUID });
+  sRoad.addText('Note: Timelines are indicative. Detailed effort estimates require fleet inventory and billing data.', { x: 0.5, y: 4.5, w: 12, fontSize: 11, italic: true, color: GREY, fontFace: 'Calibri' });
+
+  // SLIDE 13: Closing
+  var sClose = addTitleSlide('Discussion & Next Steps', customer + ' | ' + today);
+  sClose.addText('Thank you', { x: 0.8, y: 4.5, w: 11, fontSize: 14, color: GREY, fontFace: 'Calibri' });
+
+  // Download
+  var filename = 'WAFR_Executive_Briefing_' + customer.replace(/[^a-zA-Z0-9]/g, '_') + '_' + today + '.pptx';
+  pptx.writeFile({ fileName: filename });
 }
 
 // === INIT ===
