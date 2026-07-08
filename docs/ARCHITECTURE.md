@@ -20,6 +20,8 @@ flowchart TD
     LambdaEmail --> Bedrock
     LambdaEmail --> SES[Amazon SES]
     LambdaEmail --> S3Reports[S3 - wafr-reports-danmmat-9219112]
+    Browser -->|pptxgenjs CDN| PPTX[Client-side PPTX Generation]
+    PPTX -->|saveReport| LambdaEmail
     Browser -->|Fallback| LS[localStorage]
 
     subgraph AWS Account 590183747733 — eu-west-2
@@ -86,12 +88,18 @@ sequenceDiagram
     Note over U: On So What Report
     U->>U: Reuses recommendations from last report generation
     U->>U: Builds focused executive report (observations + recommendations only)
-    Note over U: On report auto-save
+    Note over U: On report auto-save (Standard/So What/C-Level Deck)
     U->>AG: POST /email-report {action: saveReport, reviewId, reportType, content}
     AG->>L: Invoke Lambda (wafr-email-report)
     L->>L: Write to S3 (wafr-reports-danmmat-9219112)
     L-->>AG: {key, timestamp}
     AG-->>U: Saved confirmation
+    Note over U: On delete saved report
+    U->>AG: POST /email-report {action: deleteReport, key}
+    AG->>L: Invoke Lambda (wafr-email-report)
+    L->>L: Delete object from S3
+    L-->>AG: {deleted: true}
+    AG-->>U: Report removed from list
     Note over U: On C-Level Deck (grounding from S3)
     U->>AG: POST /email-report {action: listReports, reviewId}
     AG->>L: List S3 objects for review
@@ -135,7 +143,7 @@ flowchart LR
 | DynamoDB | Table: `wafr-templates` | Template storage | ✅ Active | ✅ PITR enabled |
 | API Gateway | API: `6ylrfwa3d8` | HTTP API for AI explain + email report | ✅ Active | Git (Lambda code) |
 | Lambda | Function: `wafr-explain` | Calls Bedrock for AI guidance | ✅ Active | Git |
-| Lambda | Function: `wafr-email-report` | Generates tailored reports + sends via SES (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
+| Lambda | Function: `wafr-email-report` | Generates tailored reports, sends via SES, manages S3 reports (save/list/get/delete) (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
 | Bedrock | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | AI explanation + tailored recommendations | ✅ Active | N/A |
 | S3 | Bucket: `wafr-reports-danmmat-9219112` | Auto-saved report storage | ✅ Active | N/A |
 | SES | Verified sender: `danmmat@amazon.co.uk` | Email delivery for reports | ✅ Active (sandbox) | N/A |
@@ -283,6 +291,9 @@ Text passed as grounding context to Bedrock (reduces hallucinations)
     │
     ▼
 C-Level PowerPoint generated with grounded AI recommendations
+    │
+    ▼
+PPTX saved to S3 only (no local download) → user accesses via Saved Reports modal
 ```
 
 ## Email Report Flow

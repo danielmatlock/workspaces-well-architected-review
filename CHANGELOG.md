@@ -119,16 +119,27 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
 ### Saved Reports (S3 Auto-Save)
 - All three report types (Standard, So What, C-Level Deck) now auto-save to S3 after generation
 - Created S3 bucket `wafr-reports-danmmat-9219112` (eu-west-2)
-- Lambda actions added: `saveReport`, `listReports`, `getReport` (presigned URLs, 5 min expiry)
+- Lambda actions added: `saveReport`, `listReports`, `getReport`, `deleteReport` (presigned URLs, 5 min expiry)
 - Added IAM inline policy `wafr-reports-s3` to `lambda-ses-email-role`
 - "Saved Reports" button on home page review cards and review dashboard topbar
-- Modal shows table with report type, timestamp, Preview (HTML) and Download buttons
+- Modal shows table with report type, timestamp, Preview (HTML), Download, and Delete buttons
 
-### C-Level Deck: S3 Grounding (replaces local PDF upload)
-- Modal now shows dropdowns populated from saved reports in S3 (So What + Standard)
+### C-Level Deck: S3 Grounding & S3-Only Save
+- Modal now shows dropdowns populated from saved reports in S3 (So What + WAFR reports)
 - Selected reports fetched via presigned URL, HTML stripped to text, passed as AI grounding context
 - Removed PDF.js library dependency (no longer needed)
 - Reduces hallucinations by grounding Bedrock recommendations in actual report content
+- PPTX saves to S3 only (no local file download) — user accesses via Saved Reports modal
+
+### Delete Saved Reports
+- Added Delete button (red) to Saved Reports modal for each report
+- Confirm dialog before deletion to prevent accidental removal
+- Lambda `deleteReport` action removes object from S3
+- Modal refreshes automatically after deletion
+
+### Rename: Standard Report → WAFR Report
+- Display label in Saved Reports modal changed from "Standard Report" to "WAFR Report"
+- Internal `reportType` key remains `'standard'` for backward compatibility
 
 ### Report Generation Fixes
 - Fixed API Gateway body wrapper parsing (`data.body` is a JSON string)
