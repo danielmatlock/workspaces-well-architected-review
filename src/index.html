@@ -808,7 +808,8 @@ function showReviewDashboard() {
     '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
     '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">Generate Report</button>' +
     '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
-    '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button></div>';
+    '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
+    '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
   
   var overall = getOverallScore(review);
   var html = '<div class="overall-score"><div class="big">' + overall + '%</div><div class="label">Overall Score</div>' +
@@ -1545,6 +1546,7 @@ function exportReviewAsPrintHTML(id) {
   generateTailoredReport(review).then(function(html) {
     hideGeneratingOverlay();
     var w = window.open('', '_blank'); w.document.write(html); w.document.close();
+    saveReportToCloud(review.id, 'standard', html, 'text/html', 'html', review.customer);
   });
 }
 
@@ -1555,6 +1557,7 @@ function exportSoWhat(id) {
     hideGeneratingOverlay();
     var html = generateSoWhatHTML(review, window._lastRecommendations || {});
     var w = window.open('', '_blank'); w.document.write(html); w.document.close();
+    saveReportToCloud(review.id, 'sowhat', html, 'text/html', 'html', review.customer);
   });
 }
 
@@ -1814,12 +1817,79 @@ function buildCLevelPptx(review, recommendations) {
   var sClose = addTitleSlide('Discussion & Next Steps', customer + ' | ' + today);
   sClose.addText('Thank you', { x: 0.8, y: 4.5, w: 11, fontSize: 14, color: GREY, fontFace: 'Calibri' });
 
-  // Download
+  // Download and save to cloud
   var filename = 'WAFR_Executive_Briefing_' + customer.replace(/[^a-zA-Z0-9]/g, '_') + '_' + today + '.pptx';
   pptx.writeFile({ fileName: filename }).catch(function(err) {
     console.error('PPTX write error:', err);
     alert('Error saving PowerPoint file: ' + err.message);
   });
+  // Save to S3 as base64
+  pptx.write('base64').then(function(base64) {
+    saveReportToCloud(review.id, 'clevel', base64, 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx', review.customer);
+  }).catch(function(e) { console.log('Cloud save error:', e); });
+}
+
+// === SAVED REPORTS ===
+function saveReportToCloud(reviewId, reportType, content, contentType, extension, customer) {
+  fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'saveReport', reviewId: reviewId, reportType: reportType, content: content, contentType: contentType, extension: extension, customer: customer || 'review' })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    console.log('Report saved to cloud:', payload.key || payload.message);
+  }).catch(function(e) { console.log('Save report error:', e); });
+}
+
+function showSavedReports(id) {
+  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="max-width:600px;"><h3>Saved Reports</h3>' +
+    '<div id="saved-reports-list"><p style="color:#5f6b7a;">Loading...</p></div>' +
+    '<div style="margin-top:16px;text-align:right;"><button class="btn" onclick="closeModal()">Close</button></div></div></div>';
+  fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'listReports', reviewId: id })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    var reports = payload.reports || [];
+    var el = document.getElementById('saved-reports-list');
+    if (reports.length === 0) { el.innerHTML = '<p style="color:#5f6b7a;">No saved reports yet. Generate a report and it will automatically save here.</p>'; return; }
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+      '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">Type</th><th style="text-align:left;padding:8px;">Date</th><th style="padding:8px;">Actions</th></tr>';
+    reports.forEach(function(r) {
+      var typeLabel = r.reportType === 'standard' ? 'Standard Report' : r.reportType === 'sowhat' ? 'So What Report' : 'C-Level Deck';
+      var ts = r.timestamp.replace('T', ' ').replace(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2})(\d{2})$/, '$1 $2:$3:$4');
+      html += '<tr style="border-bottom:1px solid #eee;"><td style="padding:8px;">' + typeLabel + '</td><td style="padding:8px;">' + ts + '</td>' +
+        '<td style="padding:8px;text-align:center;">';
+      if (r.extension === 'html') html += '<button class="btn btn-sm" onclick="previewSavedReport(\'' + r.key + '\')">Preview</button> ';
+      html += '<button class="btn btn-sm btn-primary" onclick="downloadSavedReport(\'' + r.key + '\')">Download</button></td></tr>';
+    });
+    html += '</table>';
+    el.innerHTML = html;
+  }).catch(function(e) { document.getElementById('saved-reports-list').innerHTML = '<p style="color:#d13212;">Error loading reports.</p>'; });
+}
+
+function previewSavedReport(key) {
+  fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'getReport', key: key })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    var w = window.open(payload.url, '_blank');
+  }).catch(function(e) { alert('Error loading report preview.'); });
+}
+
+function downloadSavedReport(key) {
+  fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'getReport', key: key })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    var a = document.createElement('a'); a.href = payload.url; a.download = key.split('/').pop(); a.click();
+  }).catch(function(e) { alert('Error downloading report.'); });
 }
 
 // === INIT ===

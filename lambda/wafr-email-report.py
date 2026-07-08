@@ -7,8 +7,10 @@ from email.mime.application import MIMEApplication
 
 ses = boto3.client('ses', region_name='eu-west-2')
 bedrock = boto3.client('bedrock-runtime', region_name='eu-west-2')
+s3 = boto3.client('s3', region_name='eu-west-2')
 SENDER = 'danmmat@amazon.co.uk'
 MODEL_ID = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0'
+REPORTS_BUCKET = 'wafr-reports-danmmat-9219112'
 
 def generate_tailored_recommendations(questions_with_notes, reference_context=''):
     if not questions_with_notes:
@@ -63,6 +65,60 @@ def handler(event, context):
         body = json.loads(event['body']) if 'body' in event else event
         action = body.get('action', 'email')
         
+        if action == 'saveReport':
+            review_id = body['reviewId']
+            report_type = body['reportType']  # 'standard', 'sowhat', 'clevel'
+            content = body['content']  # base64 for pptx, raw html for others
+            content_type = body.get('contentType', 'text/html')
+            extension = body.get('extension', 'html')
+            customer = body.get('customer', 'review')
+            from datetime import datetime
+            timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H%M%S')
+            key = f"{review_id}/{report_type}_{timestamp}.{extension}"
+            import base64
+            file_bytes = base64.b64decode(content) if extension == 'pptx' else content.encode('utf-8')
+            s3.put_object(
+                Bucket=REPORTS_BUCKET, Key=key, Body=file_bytes,
+                ContentType=content_type,
+                Metadata={'customer': customer, 'reportType': report_type, 'timestamp': timestamp}
+            )
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'message': 'Report saved', 'key': key})
+            }
+
+        if action == 'listReports':
+            review_id = body['reviewId']
+            prefix = f"{review_id}/"
+            response = s3.list_objects_v2(Bucket=REPORTS_BUCKET, Prefix=prefix)
+            reports = []
+            for obj in response.get('Contents', []):
+                key = obj['Key']
+                filename = key.split('/')[-1]
+                parts = filename.rsplit('.', 1)
+                name_part = parts[0]  # e.g. 'standard_2025-06-15T143200'
+                ext = parts[1] if len(parts) > 1 else ''
+                type_and_time = name_part.split('_', 1)
+                report_type = type_and_time[0]
+                timestamp = type_and_time[1] if len(type_and_time) > 1 else ''
+                reports.append({'key': key, 'reportType': report_type, 'timestamp': timestamp, 'extension': ext, 'size': obj['Size']})
+            reports.sort(key=lambda r: r['timestamp'], reverse=True)
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'reports': reports})
+            }
+
+        if action == 'getReport':
+            key = body['key']
+            url = s3.generate_presigned_url('get_object', Params={'Bucket': REPORTS_BUCKET, 'Key': key}, ExpiresIn=300)
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'url': url})
+            }
+
         if action == 'generate':
             questions_with_notes = body.get('questions', [])
             reference_context = body.get('referenceContext', '')
