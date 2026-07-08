@@ -1899,10 +1899,11 @@ function downloadSavedReport(key) {
     body: JSON.stringify({ action: 'getReport', key: key })
   }).then(function(r) { return r.json(); }).then(function(d) {
     var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    if (payload.error) { alert('Lambda error: ' + payload.error); return; }
     var bytes = Uint8Array.from(atob(payload.data), function(c) { return c.charCodeAt(0); });
     var blob = new Blob([bytes], { type: payload.contentType });
     var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = payload.filename; a.click();
-  }).catch(function(e) { alert('Error downloading report.'); });
+  }).catch(function(e) { alert('Download error: ' + e.message); });
 }
 
 function deleteSavedReport(key, reviewId) {
