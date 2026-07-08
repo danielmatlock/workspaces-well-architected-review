@@ -9,7 +9,7 @@ from botocore.config import Config
 
 ses = boto3.client('ses', region_name='eu-west-2')
 bedrock = boto3.client('bedrock-runtime', region_name='eu-west-2')
-s3 = boto3.client('s3', region_name='eu-west-2', config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}))
+s3 = boto3.client('s3', region_name='eu-west-2', endpoint_url='https://s3.eu-west-2.amazonaws.com', config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}))
 SENDER = 'danmmat@amazon.co.uk'
 MODEL_ID = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0'
 REPORTS_BUCKET = 'wafr-reports-danmmat-9219112'
@@ -113,12 +113,16 @@ def handler(event, context):
             }
 
         if action == 'getReport':
+            import base64
             key = body['key']
-            url = s3.generate_presigned_url('get_object', Params={'Bucket': REPORTS_BUCKET, 'Key': key}, ExpiresIn=300)
+            obj = s3.get_object(Bucket=REPORTS_BUCKET, Key=key)
+            content = obj['Body'].read()
+            content_type = obj.get('ContentType', 'application/octet-stream')
+            b64 = base64.b64encode(content).decode('utf-8')
             return {
                 'statusCode': 200,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-                'body': json.dumps({'url': url})
+                'body': json.dumps({'data': b64, 'contentType': content_type, 'filename': key.split('/')[-1]})
             }
 
         if action == 'deleteReport':
