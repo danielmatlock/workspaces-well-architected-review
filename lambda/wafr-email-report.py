@@ -119,6 +119,15 @@ def handler(event, context):
                 'body': json.dumps({'url': url})
             }
 
+        if action == 'deleteReport':
+            key = body['key']
+            s3.delete_object(Bucket=REPORTS_BUCKET, Key=key)
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'deleted': key})
+            }
+
         if action == 'generate':
             questions_with_notes = body.get('questions', [])
             reference_context = body.get('referenceContext', '')
