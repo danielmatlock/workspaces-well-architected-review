@@ -1699,8 +1699,8 @@ function buildCLevelPptx(review, recommendations) {
     q = q.replace(/^How do you\s+/i, '').replace(/\?$/, '');
     // Capitalise first letter
     q = q.charAt(0).toUpperCase() + q.slice(1);
-    // Allow enough text to be meaningful (will wrap in the box)
-    return item.id + ' — ' + truncate(q, 55);
+    // No truncation — let pptxgenjs wrap text within the box
+    return item.id + ' — ' + q;
   }
 
   // SLIDE 1: Cover
@@ -1821,9 +1821,9 @@ function buildCLevelPptx(review, recommendations) {
     { text: 'Actions', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
     { text: 'Tier', options: { bold: true, color: WHITE, fill: { color: SQUID } } }
   ]];
-  roadRows.push([{ text: 'Week 1–2' }, { text: must.slice(0, 3).map(function(m) { return shortLabel(m); }).join(', ') || 'N/A' }, { text: 'MUST', options: { color: RED, bold: true } }]);
-  roadRows.push([{ text: 'Week 3–6' }, { text: must.slice(3).concat(should.slice(0, 2)).map(function(m) { return shortLabel(m); }).join(', ') || 'N/A' }, { text: 'MUST/SHOULD', options: { color: AMBER, bold: true } }]);
-  roadRows.push([{ text: 'Week 7–12' }, { text: should.slice(2, 5).concat(could.slice(0, 2)).map(function(m) { return shortLabel(m); }).join(', ') || 'N/A' }, { text: 'SHOULD/COULD', options: { color: GREEN, bold: true } }]);
+  roadRows.push([{ text: 'Week 1–2' }, { text: must.slice(0, 3).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'MUST', options: { color: RED, bold: true } }]);
+  roadRows.push([{ text: 'Week 3–6' }, { text: must.slice(3).concat(should.slice(0, 2)).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'MUST/SHOULD', options: { color: AMBER, bold: true } }]);
+  roadRows.push([{ text: 'Week 7–12' }, { text: should.slice(2, 5).concat(could.slice(0, 2)).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'SHOULD/COULD', options: { color: GREEN, bold: true } }]);
   sRoad.addTable(roadRows, { x: 0.5, y: 1.3, w: 12, fontSize: 13, fontFace: 'Calibri', border: { type: 'solid', pt: 0.5, color: 'E1E4E8' }, rowH: 0.7, colW: [2.5, 7.5, 2], color: SQUID });
   sRoad.addText('Note: Timelines are indicative. Detailed effort estimates require fleet inventory and billing data.', { x: 0.5, y: 4.5, w: 12, fontSize: 11, italic: true, color: GREY, fontFace: 'Calibri' });
 
