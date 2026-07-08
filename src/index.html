@@ -634,7 +634,8 @@ function showHome() {
         '<button class="btn btn-sm" onclick="event.stopPropagation();exportReview(\'' + r.id + '\')">Export JSON</button>' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();exportReviewAsPrintHTML(\'' + r.id + '\')">Print Report</button>' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();showEmailModal(\'' + r.id + '\')">Email Report</button>' +
-        '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteReview(\'' + r.id + '\')">Delete</button></div></div>';
+        '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteReview(\'' + r.id + '\')">Delete</button>' +
+        '<button class="btn btn-sm" onclick="event.stopPropagation();showSavedReports(\'' + r.id + '\')">Saved Reports</button></div></div>';
     });
   }
   html += '</div><div class="home-section"><h3>Templates (' + templates.length + ')</h3>';
