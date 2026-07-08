@@ -1743,17 +1743,17 @@ function buildCLevelPptx(review, recommendations) {
 
   // SLIDE 6: Must/Should/Could Visual
   var s6 = addContentSlide('Prioritisation Framework');
-  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: 1.3, w: 3.8, h: 5.0, fill: { color: 'FDF3F1' }, line: { color: RED, width: 1.5 }, rectRadius: 0.05 });
-  s6.addText('MUST\n(' + must.length + ' items)', { x: 0.5, y: 1.4, w: 3.8, fontSize: 16, bold: true, color: RED, align: 'center', fontFace: 'Calibri' });
-  s6.addText(must.slice(0, 4).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 0.7, y: 2.2, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+  s6.addText('MUST (' + must.length + ' items)', { x: 0.5, y: 1.2, w: 3.8, fontSize: 16, bold: true, color: RED, align: 'center', fontFace: 'Calibri' });
+  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: 1.8, w: 3.8, h: 4.5, fill: { color: 'FDF3F1' }, line: { color: RED, width: 1.5 }, rectRadius: 0.05 });
+  s6.addText(must.slice(0, 6).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 0.7, y: 2.0, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
 
-  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 4.7, y: 1.3, w: 3.8, h: 5.0, fill: { color: 'FFF8E6' }, line: { color: AMBER, width: 1.5 }, rectRadius: 0.05 });
-  s6.addText('SHOULD\n(' + should.length + ' items)', { x: 4.7, y: 1.4, w: 3.8, fontSize: 16, bold: true, color: AMBER, align: 'center', fontFace: 'Calibri' });
-  s6.addText(should.slice(0, 4).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 4.9, y: 2.2, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+  s6.addText('SHOULD (' + should.length + ' items)', { x: 4.7, y: 1.2, w: 3.8, fontSize: 16, bold: true, color: AMBER, align: 'center', fontFace: 'Calibri' });
+  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 4.7, y: 1.8, w: 3.8, h: 4.5, fill: { color: 'FFF8E6' }, line: { color: AMBER, width: 1.5 }, rectRadius: 0.05 });
+  s6.addText(should.slice(0, 6).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 4.9, y: 2.0, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
 
-  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 8.9, y: 1.3, w: 3.8, h: 5.0, fill: { color: 'F0FFF0' }, line: { color: GREEN, width: 1.5 }, rectRadius: 0.05 });
-  s6.addText('COULD\n(' + could.length + ' items)', { x: 8.9, y: 1.4, w: 3.8, fontSize: 16, bold: true, color: GREEN, align: 'center', fontFace: 'Calibri' });
-  s6.addText(could.slice(0, 4).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 9.1, y: 2.2, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+  s6.addText('COULD (' + could.length + ' items)', { x: 8.9, y: 1.2, w: 3.8, fontSize: 16, bold: true, color: GREEN, align: 'center', fontFace: 'Calibri' });
+  s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 8.9, y: 1.8, w: 3.8, h: 4.5, fill: { color: 'F0FFF0' }, line: { color: GREEN, width: 1.5 }, rectRadius: 0.05 });
+  s6.addText(could.slice(0, 6).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 9.1, y: 2.0, w: 3.4, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
 
   s6.addText('← Highest assurance / least effort          Impactful / more effort →', { x: 1, y: 6.5, w: 11, fontSize: 11, italic: true, color: GREY, align: 'center', fontFace: 'Calibri' });
 
