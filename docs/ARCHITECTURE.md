@@ -19,6 +19,7 @@ flowchart TD
     Lambda --> Bedrock[Bedrock - Claude Haiku 4.5]
     LambdaEmail --> Bedrock
     LambdaEmail --> SES[Amazon SES]
+    LambdaEmail --> S3Reports[S3 - wafr-reports-danmmat-9219112]
     Browser -->|Fallback| LS[localStorage]
 
     subgraph AWS Account 590183747733 — eu-west-2
@@ -33,6 +34,7 @@ flowchart TD
         LambdaEmail
         Bedrock
         SES
+        S3Reports
     end
 ```
 
@@ -84,6 +86,20 @@ sequenceDiagram
     Note over U: On So What Report
     U->>U: Reuses recommendations from last report generation
     U->>U: Builds focused executive report (observations + recommendations only)
+    Note over U: On report auto-save
+    U->>AG: POST /email-report {action: saveReport, reviewId, reportType, content}
+    AG->>L: Invoke Lambda (wafr-email-report)
+    L->>L: Write to S3 (wafr-reports-danmmat-9219112)
+    L-->>AG: {key, timestamp}
+    AG-->>U: Saved confirmation
+    Note over U: On C-Level Deck (grounding from S3)
+    U->>AG: POST /email-report {action: listReports, reviewId}
+    AG->>L: List S3 objects for review
+    L-->>U: [{reportType, timestamp, key}]
+    U->>AG: POST /email-report {action: getReport, key}
+    AG->>L: Generate presigned URL (5 min)
+    L-->>U: {url: presigned S3 URL}
+    U->>U: Fetch HTML report via presigned URL, strip tags for AI context
     Note over U: On email report
     U->>AG: POST /email-report {action: email, htmlReport}
     AG->>L: Invoke Lambda (wafr-email-report)
@@ -121,11 +137,12 @@ flowchart LR
 | Lambda | Function: `wafr-explain` | Calls Bedrock for AI guidance | ✅ Active | Git |
 | Lambda | Function: `wafr-email-report` | Generates tailored reports + sends via SES (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
 | Bedrock | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | AI explanation + tailored recommendations | ✅ Active | N/A |
+| S3 | Bucket: `wafr-reports-danmmat-9219112` | Auto-saved report storage | ✅ Active | N/A |
 | SES | Verified sender: `danmmat@amazon.co.uk` | Email delivery for reports | ✅ Active (sandbox) | N/A |
 | IAM | Role: `github-actions-amplify-deploy` | GitHub OIDC deploy | ✅ Configured | N/A |
 | IAM | Role: `appsync-dynamodb-role` | AppSync → DynamoDB | ✅ Configured | N/A |
 | IAM | Role: `lambda-bedrock-role` | Lambda (wafr-explain) → Bedrock | ✅ Configured | N/A |
-| IAM | Role: `lambda-ses-email-role` | Lambda (wafr-email-report) → SES + Bedrock | ✅ Configured | N/A |
+| IAM | Role: `lambda-ses-email-role` | Lambda (wafr-email-report) → SES + Bedrock + S3 | ✅ Configured | N/A |
 | IAM | Role: `amplify-service-role` | Amplify service (unused) | ⚠️ Not working | N/A |
 
 ## Authentication Flow
@@ -237,6 +254,37 @@ generateSoWhatHTML() builds focused executive report:
 Opens in new browser tab → user can Save as PDF via Cmd+P
 ```
 
+## Saved Reports & C-Level Deck Grounding Flow
+
+```
+All reports (Standard, So What, C-Level Deck) auto-save to S3 after generation
+    │
+    ▼
+Lambda action: saveReport
+    Writes to s3://wafr-reports-danmmat-9219112/{reviewId}/{reportType}_{timestamp}.{ext}
+    │
+    ▼
+User clicks "C-Level Deck" → modal shows dropdowns populated from S3
+    │
+    ▼
+Lambda action: listReports → returns saved So What + Standard reports for that review
+    │
+    ▼
+User selects reports → clicks Generate
+    │
+    ▼
+Lambda action: getReport → returns presigned S3 URL (5 min expiry)
+    │
+    ▼
+Browser fetches HTML via presigned URL, strips HTML tags
+    │
+    ▼
+Text passed as grounding context to Bedrock (reduces hallucinations)
+    │
+    ▼
+C-Level PowerPoint generated with grounded AI recommendations
+```
+
 ## Email Report Flow
 
 ```
@@ -272,6 +320,7 @@ Note: SES is in sandbox mode — can only send to verified addresses
 | `https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/explain` | AI Explain API |
 | `https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report` | Email Report + Tailored Recommendations API |
 | `https://cdn.jsdelivr.net/npm/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js` | Cognito SDK (CDN) |
+| `https://cdn.jsdelivr.net/npm/pptxgenjs@4.0.1/dist/pptxgen.bundle.js` | PowerPoint generation (CDN) |
 
 ## Cost Estimate (Monthly)
 
@@ -287,4 +336,5 @@ Note: SES is in sandbox mode — can only send to verified addresses
 | Lambda | <50 invocations (email-report) | Free tier |
 | SES | <50 emails/month | Free tier |
 | Bedrock (Haiku 4.5) | ~100 calls/month (explain + reports), 512-4096 tokens | ~$0.15 |
+| S3 (Reports) | <1GB stored, <100 requests | ~$0.03 |
 | **Total** | | **<$1/month** |

@@ -8,7 +8,9 @@ Custom app for conducting AWS WorkSpaces Well-Architected Framework Reviews.
 - **Auth:** Amazon Cognito
 - **API:** AWS AppSync (GraphQL)
 - **Database:** DynamoDB
-- **Storage:** S3 (exported reports)
+- **Storage:** S3 (auto-saved reports, presigned URL access)
+- **AI:** Amazon Bedrock (Claude Haiku 4.5) + pptxgenjs (client-side PowerPoint)
+- **Email:** Amazon SES
 - **Hosting:** AWS Amplify
 - **Account:** 590183747733
 - **Region:** eu-west-2

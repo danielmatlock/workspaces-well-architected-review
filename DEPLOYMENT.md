@@ -6,6 +6,8 @@
 - **Region:** `eu-west-2`
 - **URL:** https://main.d1p2543h8l2mfc.amplifyapp.com
 - **Lambda Function:** `wafr-email-report` (eu-west-2)
+- **S3 Bucket:** `wafr-reports-danmmat-9219112` (eu-west-2) — auto-saved reports
+- **Lambda Role:** `lambda-ses-email-role` (inline policy `wafr-reports-s3` for S3 access)
 
 ## Prerequisites
 - AWS CloudShell (open in **eu-west-2** region)

@@ -114,6 +114,22 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
 
 ## 2025-07-07
 
+## 2025-07-07
+
+### Saved Reports (S3 Auto-Save)
+- All three report types (Standard, So What, C-Level Deck) now auto-save to S3 after generation
+- Created S3 bucket `wafr-reports-danmmat-9219112` (eu-west-2)
+- Lambda actions added: `saveReport`, `listReports`, `getReport` (presigned URLs, 5 min expiry)
+- Added IAM inline policy `wafr-reports-s3` to `lambda-ses-email-role`
+- "Saved Reports" button on home page review cards and review dashboard topbar
+- Modal shows table with report type, timestamp, Preview (HTML) and Download buttons
+
+### C-Level Deck: S3 Grounding (replaces local PDF upload)
+- Modal now shows dropdowns populated from saved reports in S3 (So What + Standard)
+- Selected reports fetched via presigned URL, HTML stripped to text, passed as AI grounding context
+- Removed PDF.js library dependency (no longer needed)
+- Reduces hallucinations by grounding Bedrock recommendations in actual report content
+
 ### Report Generation Fixes
 - Fixed API Gateway body wrapper parsing (`data.body` is a JSON string)
 - Lambda parallelised: questions batched (5 per batch) with ThreadPoolExecutor (4 workers)
@@ -147,6 +163,7 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
 | DynamoDB Table | `wafr-templates` | eu-west-2 |
 | Lambda Function | `wafr-explain` (30s, 128MB) | eu-west-2 |
 | Lambda Function | `wafr-email-report` (90s, 256MB) | eu-west-2 |
+| S3 Bucket | `wafr-reports-danmmat-9219112` | eu-west-2 |
 | API Gateway | `6ylrfwa3d8` | eu-west-2 |
 | IAM Role | `github-actions-amplify-deploy` | global |
 | IAM Role | `appsync-dynamodb-role` | global |
