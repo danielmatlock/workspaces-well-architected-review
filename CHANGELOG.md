@@ -120,7 +120,7 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
 - All three report types (Standard, So What, C-Level Deck) now auto-save to S3 after generation
 - Created S3 bucket `wafr-reports-danmmat-9219112` (eu-west-2)
 - Lambda actions added: `saveReport`, `listReports`, `getReport`, `deleteReport` (presigned URLs, 5 min expiry)
-- Added IAM inline policy `wafr-reports-s3` to `lambda-ses-email-role`
+- Added IAM inline policy `wafr-reports-s3` to `lambda-ses-email-role` (PutObject, GetObject, ListBucket, DeleteObject)
 - "Saved Reports" button on home page review cards and review dashboard topbar
 - Modal shows table with report type, timestamp, Preview (HTML), Download, and Delete buttons
 

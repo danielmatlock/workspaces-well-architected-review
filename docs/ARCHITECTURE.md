@@ -150,7 +150,7 @@ flowchart LR
 | IAM | Role: `github-actions-amplify-deploy` | GitHub OIDC deploy | ✅ Configured | N/A |
 | IAM | Role: `appsync-dynamodb-role` | AppSync → DynamoDB | ✅ Configured | N/A |
 | IAM | Role: `lambda-bedrock-role` | Lambda (wafr-explain) → Bedrock | ✅ Configured | N/A |
-| IAM | Role: `lambda-ses-email-role` | Lambda (wafr-email-report) → SES + Bedrock + S3 | ✅ Configured | N/A |
+| IAM | Role: `lambda-ses-email-role` | Lambda (wafr-email-report) → SES + Bedrock + S3 (PutObject, GetObject, ListBucket, DeleteObject) | ✅ Configured | N/A |
 | IAM | Role: `amplify-service-role` | Amplify service (unused) | ⚠️ Not working | N/A |
 
 ## Authentication Flow
