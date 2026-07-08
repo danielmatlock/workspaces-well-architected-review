@@ -1699,8 +1699,8 @@ function buildCLevelPptx(review, recommendations) {
     q = q.replace(/^How do you\s+/i, '').replace(/\?$/, '');
     // Capitalise first letter
     q = q.charAt(0).toUpperCase() + q.slice(1);
-    // Truncate to fit in the box
-    return item.id + ' — ' + truncate(q, 30);
+    // Allow enough text to be meaningful (will wrap in the box)
+    return item.id + ' — ' + truncate(q, 55);
   }
 
   // SLIDE 1: Cover
