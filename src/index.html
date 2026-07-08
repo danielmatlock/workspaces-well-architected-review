@@ -1868,9 +1868,10 @@ function showSavedReports(id) {
       var ts = r.timestamp.replace('T', ' ').replace(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2})(\d{2})$/, '$1 $2:$3:$4');
       html += '<tr style="border-bottom:1px solid #eee;"><td style="padding:8px;">' + typeLabel + '</td><td style="padding:8px;">' + ts + '</td>' +
         '<td style="padding:8px;text-align:center;white-space:nowrap;">';
-      if (r.extension === 'html') html += '<button class="btn btn-sm" onclick="previewSavedReport(\'' + r.key + '\')">Preview</button> ';
-      html += '<button class="btn btn-sm btn-primary" onclick="downloadSavedReport(\'' + r.key + '\')">Download</button> ';
-      html += '<button class="btn btn-sm" style="color:#d13212;border-color:#d13212;" onclick="deleteSavedReport(\'' + r.key + '\',\'' + id + '\')">Delete</button></td></tr>';
+      if (r.extension === 'html') { html += '<button class="btn btn-sm" style="width:70px;" onclick="previewSavedReport(\'' + r.key + '\')">Preview</button> '; }
+      else { html += '<button class="btn btn-sm" style="width:70px;visibility:hidden;">Preview</button> '; }
+      html += '<button class="btn btn-sm btn-primary" style="width:80px;" onclick="downloadSavedReport(\'' + r.key + '\')">Download</button> ';
+      html += '<button class="btn btn-sm" style="width:62px;color:#d13212;border-color:#d13212;" onclick="deleteSavedReport(\'' + r.key + '\',\'' + id + '\')">Delete</button></td></tr>';
     });
     html += '</table>';
     el.innerHTML = html;
