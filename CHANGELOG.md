@@ -73,6 +73,61 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
 5. From Mac: `curl -T /tmp/wafr-deploy.zip '<PRESIGNED_URL>'`
 6. In CloudShell: `aws amplify start-deployment --app-id d1p2543h8l2mfc --branch-name main --job-id <JOB_ID> --region eu-west-2`
 
+## 2025-06-29
+
+### Template Updates
+- Removed AWS Systems Manager Distributor from OPS-WS-09 best practice
+- AI Guidance panel: "What to ask the customer" renamed to "Questions to think about" in responses
+
+### Email Report Feature
+- Created IAM role `lambda-ses-email-role` with SES + Bedrock permissions
+- Created Lambda function `wafr-email-report` (Python 3.12, 90s timeout, 256MB)
+- Added SES email sending (sender: danmmat@amazon.co.uk, sandbox mode)
+- Added Email Report button to question view topbar
+
+## 2025-07-02
+
+### Professional Observations Rewrite
+- Lambda sends reviewer notes to Bedrock Claude Haiku, returns `{observation, recommendation}` per question
+- Report rendering: grey Observations box shows Bedrock-rewritten prose
+- Report rendering: blue Tailored Recommendation box shows bullets + clickable Further Reading URLs
+- Falls back to raw notes if Bedrock unavailable
+
+### UI Updates
+- Print Report and Email Report buttons added to question view topbar
+- Cognito user added: Andrew Wood (anwod@amazon.co.uk)
+
+## 2025-07-06
+
+### CSV Import
+- Added "Import from Spreadsheet" file picker to New Review modal
+- Parses CSV columns: ID, Pillar, Question, Assessment Status, Info from Customer, Best Practice
+- Maps Assessment Status to internal scores (fully/partial/not/na)
+
+### Cloud Sync Fixes
+- Fixed `gql` helper to throw on GraphQL errors
+- Fixed upsert logic: tries `createReview` first, falls back to `updateReview` on ConditionalCheckFailed
+
+### Sync Log Panel
+- Added floating log panel accessible via "Sync Log" button in sidebar footer
+- Shows timestamped DynamoDB events (create/update/load/error)
+
+## 2025-07-07
+
+### Report Generation Fixes
+- Fixed API Gateway body wrapper parsing (`data.body` is a JSON string)
+- Lambda parallelised: questions batched (5 per batch) with ThreadPoolExecutor (4 workers)
+- Lambda config: timeout increased to 90s, memory to 256MB
+- Frontend batching: sends 5 questions per API call (sequential) to stay within API Gateway 29s limit
+
+### So What Report
+- Added "So What Report" button (orange, btn-primary) to review summary page and question view topbar
+- Generates focused executive report: only Bedrock observations ("What we found") and recommendations ("What to do")
+- No RAG colours, Target State, or To Reach Green sections
+- Includes clickable AWS documentation links
+- Print/Close buttons at top (hidden when printing via @media print)
+- Reuses cached `window._lastRecommendations` from last report generation
+
 ## Known Issues
 
 - Amplify CI/CD via GitHub not functional — "Unable to assume specified IAM Role" even with service-linked role. Using manual deployment as workaround.

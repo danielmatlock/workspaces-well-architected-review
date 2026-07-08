@@ -215,6 +215,28 @@ All batches complete → build HTML report:
     └── Email Report: sends HTML attachment via SES
 ```
 
+## So What Report Flow
+
+```
+User clicks "So What Report" (review summary or question view topbar)
+    │
+    ▼
+App calls generateTailoredReport() — same batched Bedrock flow as Print Report
+    │
+    ▼
+Recommendations cached in window._lastRecommendations
+    │
+    ▼
+generateSoWhatHTML() builds focused executive report:
+    - No RAG colours, Target State, or To Reach Green sections
+    - Per question: "What we found" (observation) + "What to do" (recommendation)
+    - AWS documentation URLs rendered as clickable links
+    - Print/Close buttons (hidden in print via @media print)
+    │
+    ▼
+Opens in new browser tab → user can Save as PDF via Cmd+P
+```
+
 ## Email Report Flow
 
 ```

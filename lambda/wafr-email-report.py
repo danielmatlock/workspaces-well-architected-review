@@ -10,22 +10,32 @@ bedrock = boto3.client('bedrock-runtime', region_name='eu-west-2')
 SENDER = 'danmmat@amazon.co.uk'
 MODEL_ID = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0'
 
-def generate_tailored_recommendations(questions_with_notes):
+def generate_tailored_recommendations(questions_with_notes, reference_context=''):
     if not questions_with_notes:
         return {}
     prompt_items = []
     for item in questions_with_notes:
         prompt_items.append("ID: " + item['id'] + "\nQuestion: " + item['question'] + "\nScore: " + item['score'] + "\nCustomer Notes: " + item['notes'] + "\nBest Practice: " + item['best'])
     joined = "\n\n".join(prompt_items)
+    
+    grounding = ''
+    if reference_context:
+        grounding = ("\n\nIMPORTANT REFERENCE DATA:\n"
+                     "The following is extracted from existing reports for this customer. "
+                     "Use this as your primary source of truth. Do NOT invent findings not present in this data. "
+                     "Cross-reference your recommendations against these reports to ensure accuracy and reduce hallucinations.\n\n"
+                     + reference_context + "\n\n--- END REFERENCE DATA ---\n\n")
+    
     prompt = ("You are an AWS Solutions Architect writing a formal Well-Architected Review report. "
                "For each question below, produce two things:\n"
                "1. 'observation': Rewrite the raw customer notes as polished, professional prose. "
                "Fix spelling and grammar, write in full sentences, maintain all factual content, use third-person formal tone (e.g. 'The customer currently manages...'). "
                "Keep it concise (2-4 sentences).\n"
                "2. 'recommendation': Structured as: a brief acknowledgement of current state (1-2 sentences), "
-               "then 2-3 next-step bullet points starting with '• ', "
+               "then 2-3 next-step bullet points starting with '\u2022 ', "
                "then a 'Further Reading:' line with 1-2 real https://docs.aws.amazon.com URLs. "
                "IMPORTANT: You MUST include the Further Reading line for EVERY question. Never omit it.\n"
+               + grounding +
                "Format as JSON: {\"QUESTION-ID\": {\"observation\": \"...\", \"recommendation\": \"...\"}}. "
                "Respond with ONLY valid JSON, no markdown fences.\n\nQuestions:\n" + joined)
 
@@ -55,7 +65,8 @@ def handler(event, context):
         
         if action == 'generate':
             questions_with_notes = body.get('questions', [])
-            recommendations = generate_tailored_recommendations(questions_with_notes)
+            reference_context = body.get('referenceContext', '')
+            recommendations = generate_tailored_recommendations(questions_with_notes, reference_context)
             return {
                 'statusCode': 200,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
