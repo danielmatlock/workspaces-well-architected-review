@@ -462,17 +462,28 @@ async function loadFromCloud() {
     var items = data.listReviews;
     if (items && items.length > 0) {
       var templates = getTemplates();
+      var localReviews = getReviews();
       var cloudReviews = items.map(function(r) {
-        var answers = typeof r.answers === 'string' ? JSON.parse(r.answers || '{}') : (r.answers || {});
+        var cloudAnswers = typeof r.answers === 'string' ? JSON.parse(r.answers || '{}') : (r.answers || {});
         var notes = typeof r.notes === 'string' ? JSON.parse(r.notes || '{}') : (r.notes || {});
         var tmpl = templates.find(function(t) { return t.id === r.templateId; });
+        // Merge: local answers take priority over cloud (prevents race condition overwrite)
+        var localReview = localReviews.find(function(lr) { return lr.id === r.id; });
+        var mergedAnswers = cloudAnswers;
+        if (localReview && localReview.answers) {
+          mergedAnswers = Object.assign({}, cloudAnswers, localReview.answers);
+        }
         return { id: r.id, templateId: r.templateId, template: r.templateName,
           customer: r.customerName, reviewer: r.reviewerName,
-          date: r.reviewDate, answers: answers, notes: notes,
+          date: r.reviewDate, answers: mergedAnswers, notes: notes,
           status: r.status, pillars: tmpl ? JSON.parse(JSON.stringify(tmpl.pillars)) : [] };
       });
+      // Also keep any local-only reviews not yet in cloud
+      localReviews.forEach(function(lr) {
+        if (!cloudReviews.find(function(cr) { return cr.id === lr.id; })) cloudReviews.push(lr);
+      });
       localStorage.setItem('wafr-reviews', JSON.stringify(cloudReviews));
-      appLog('Loaded ' + cloudReviews.length + ' reviews from DynamoDB', 'success');
+      appLog('Loaded ' + cloudReviews.length + ' reviews from DynamoDB (merged with local)', 'success');
     }
   } catch(e) { appLog('Load from DynamoDB failed: ' + (e.message || e), 'error'); }
 }
