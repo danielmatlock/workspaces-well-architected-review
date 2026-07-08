@@ -1867,7 +1867,7 @@ function showSavedReports(id) {
       var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : 'C-Level Deck';
       var ts = r.timestamp.replace('T', ' ').replace(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2})(\d{2})$/, '$1 $2:$3:$4');
       html += '<tr style="border-bottom:1px solid #eee;"><td style="padding:8px;">' + typeLabel + '</td><td style="padding:8px;">' + ts + '</td>' +
-        '<td style="padding:8px;text-align:center;">';
+        '<td style="padding:8px;text-align:center;white-space:nowrap;">';
       if (r.extension === 'html') html += '<button class="btn btn-sm" onclick="previewSavedReport(\'' + r.key + '\')">Preview</button> ';
       html += '<button class="btn btn-sm btn-primary" onclick="downloadSavedReport(\'' + r.key + '\')">Download</button> ';
       html += '<button class="btn btn-sm" style="color:#d13212;border-color:#d13212;" onclick="deleteSavedReport(\'' + r.key + '\',\'' + id + '\')">Delete</button></td></tr>';
