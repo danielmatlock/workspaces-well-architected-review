@@ -1693,6 +1693,15 @@ function buildCLevelPptx(review, recommendations) {
   function ragColor(score) { return score >= 80 ? GREEN : score >= 40 ? AMBER : RED; }
   function ragLabel(score) { return score >= 80 ? 'GREEN' : score >= 40 ? 'AMBER' : 'RED'; }
   function truncate(str, max) { return str && str.length > max ? str.substring(0, max - 3) + '...' : (str || ''); }
+  function shortLabel(item) {
+    var q = item.question || '';
+    // Strip "How do you " prefix to get the meaningful part
+    q = q.replace(/^How do you\s+/i, '').replace(/\?$/, '');
+    // Capitalise first letter
+    q = q.charAt(0).toUpperCase() + q.slice(1);
+    // Truncate to fit in the box
+    return item.id + ' — ' + truncate(q, 30);
+  }
 
   // SLIDE 1: Cover
   var s1 = addTitleSlide(customer + '\nWorkSpaces Well-Architected Review', 'C-Level Executive Briefing | ' + today);
@@ -1753,15 +1762,15 @@ function buildCLevelPptx(review, recommendations) {
   var s6 = addContentSlide('Prioritisation Framework');
   s6.addText('MUST (' + must.length + ' items)', { x: 0.5, y: 1.15, w: 3.8, fontSize: 16, bold: true, color: RED, align: 'center', fontFace: 'Calibri' });
   s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: 1.55, w: 3.8, h: 5.0, fill: { color: 'FDF3F1' }, line: { color: RED, width: 1.5 }, rectRadius: 0.05 });
-  s6.addText(must.slice(0, 6).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 0.7, y: 1.75, w: 3.4, h: 4.6, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top' });
+  s6.addText(must.slice(0, 6).map(function(m) { return '• ' + shortLabel(m); }).join('\n'), { x: 0.7, y: 1.75, w: 3.4, h: 4.6, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top' });
 
   s6.addText('SHOULD (' + should.length + ' items)', { x: 4.7, y: 1.15, w: 3.8, fontSize: 16, bold: true, color: AMBER, align: 'center', fontFace: 'Calibri' });
   s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 4.7, y: 1.55, w: 3.8, h: 5.0, fill: { color: 'FFF8E6' }, line: { color: AMBER, width: 1.5 }, rectRadius: 0.05 });
-  s6.addText(should.slice(0, 6).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 4.9, y: 1.75, w: 3.4, h: 4.6, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top' });
+  s6.addText(should.slice(0, 6).map(function(m) { return '• ' + shortLabel(m); }).join('\n'), { x: 4.9, y: 1.75, w: 3.4, h: 4.6, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top' });
 
   s6.addText('COULD (' + could.length + ' items)', { x: 8.9, y: 1.15, w: 3.8, fontSize: 16, bold: true, color: GREEN, align: 'center', fontFace: 'Calibri' });
   s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 8.9, y: 1.55, w: 3.8, h: 5.0, fill: { color: 'F0FFF0' }, line: { color: GREEN, width: 1.5 }, rectRadius: 0.05 });
-  s6.addText(could.slice(0, 6).map(function(m) { return '• ' + m.id; }).join('\n'), { x: 9.1, y: 1.75, w: 3.4, h: 4.6, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top' });
+  s6.addText(could.slice(0, 6).map(function(m) { return '• ' + shortLabel(m); }).join('\n'), { x: 9.1, y: 1.75, w: 3.4, h: 4.6, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top' });
 
   s6.addText('← Highest assurance / least effort          Impactful / more effort →', { x: 1, y: 6.8, w: 11, fontSize: 11, italic: true, color: GREY, align: 'center', fontFace: 'Calibri' });
 
@@ -1812,9 +1821,9 @@ function buildCLevelPptx(review, recommendations) {
     { text: 'Actions', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
     { text: 'Tier', options: { bold: true, color: WHITE, fill: { color: SQUID } } }
   ]];
-  roadRows.push([{ text: 'Week 1–2' }, { text: must.slice(0, 3).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'MUST', options: { color: RED, bold: true } }]);
-  roadRows.push([{ text: 'Week 3–6' }, { text: must.slice(3).concat(should.slice(0, 2)).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'MUST/SHOULD', options: { color: AMBER, bold: true } }]);
-  roadRows.push([{ text: 'Week 7–12' }, { text: should.slice(2, 5).concat(could.slice(0, 2)).map(function(m) { return m.id; }).join(', ') || 'N/A' }, { text: 'SHOULD/COULD', options: { color: GREEN, bold: true } }]);
+  roadRows.push([{ text: 'Week 1–2' }, { text: must.slice(0, 3).map(function(m) { return shortLabel(m); }).join(', ') || 'N/A' }, { text: 'MUST', options: { color: RED, bold: true } }]);
+  roadRows.push([{ text: 'Week 3–6' }, { text: must.slice(3).concat(should.slice(0, 2)).map(function(m) { return shortLabel(m); }).join(', ') || 'N/A' }, { text: 'MUST/SHOULD', options: { color: AMBER, bold: true } }]);
+  roadRows.push([{ text: 'Week 7–12' }, { text: should.slice(2, 5).concat(could.slice(0, 2)).map(function(m) { return shortLabel(m); }).join(', ') || 'N/A' }, { text: 'SHOULD/COULD', options: { color: GREEN, bold: true } }]);
   sRoad.addTable(roadRows, { x: 0.5, y: 1.3, w: 12, fontSize: 13, fontFace: 'Calibri', border: { type: 'solid', pt: 0.5, color: 'E1E4E8' }, rowH: 0.7, colW: [2.5, 7.5, 2], color: SQUID });
   sRoad.addText('Note: Timelines are indicative. Detailed effort estimates require fleet inventory and billing data.', { x: 0.5, y: 4.5, w: 12, fontSize: 11, italic: true, color: GREY, fontFace: 'Calibri' });
 
