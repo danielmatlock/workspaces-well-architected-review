@@ -9,7 +9,7 @@ from botocore.config import Config
 
 ses = boto3.client('ses', region_name='eu-west-2')
 bedrock = boto3.client('bedrock-runtime', region_name='eu-west-2')
-s3 = boto3.client('s3', region_name='eu-west-2', config=Config(signature_version='s3v4'))
+s3 = boto3.client('s3', region_name='eu-west-2', config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}))
 SENDER = 'danmmat@amazon.co.uk'
 MODEL_ID = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0'
 REPORTS_BUCKET = 'wafr-reports-danmmat-9219112'
