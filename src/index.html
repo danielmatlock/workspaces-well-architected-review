@@ -1614,8 +1614,8 @@ async function startCLevelDeck(id) {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
     console.error('C-Level Deck generation error:', err);
-    alert('AI recommendations failed — generating deck with notes only.');
     buildCLevelPptx(review, {});
+    alert('Note: AI recommendations were unavailable — deck was generated using your notes only. Check your Downloads folder.');
   });
 }
 
