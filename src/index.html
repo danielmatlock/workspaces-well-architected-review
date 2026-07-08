@@ -1718,8 +1718,8 @@ function buildCLevelPptx(review, recommendations) {
     { text: 'RAG', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
     { text: 'Gaps', options: { bold: true, color: WHITE, fill: { color: SQUID } } }
   ]];
-  review.pillars.forEach(function(p) {
-    var ps = getPillarScore(review, p);
+  review.pillars.forEach(function(p, i) {
+    var ps = getPillarScore(review, i).pct;
     var gaps = 0;
     p.questions.forEach(function(q) { var a = review.answers[q.id]; if (a && (a.score === 'not' || a.score === 'partial')) gaps++; });
     pillarRows.push([
