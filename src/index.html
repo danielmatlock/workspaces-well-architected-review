@@ -1610,6 +1610,12 @@ async function startCLevelDeck(id) {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
     buildCLevelPptx(review, window._lastRecommendations || {});
+  }).catch(function(err) {
+    hideGeneratingOverlay();
+    window._pdfReferenceContext = '';
+    console.error('C-Level Deck generation error:', err);
+    alert('AI recommendations failed — generating deck with notes only.');
+    buildCLevelPptx(review, {});
   });
 }
 
@@ -1799,7 +1805,10 @@ function buildCLevelPptx(review, recommendations) {
 
   // Download
   var filename = 'WAFR_Executive_Briefing_' + customer.replace(/[^a-zA-Z0-9]/g, '_') + '_' + today + '.pptx';
-  pptx.writeFile({ fileName: filename });
+  pptx.writeFile({ fileName: filename }).catch(function(err) {
+    console.error('PPTX write error:', err);
+    alert('Error saving PowerPoint file: ' + err.message);
+  });
 }
 
 // === INIT ===
