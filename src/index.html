@@ -1871,7 +1871,7 @@ function showSavedReports(id) {
       if (r.extension === 'html') { html += '<button class="btn btn-sm" style="width:70px;" onclick="previewSavedReport(\'' + r.key + '\')">Preview</button> '; }
       else { html += '<button class="btn btn-sm" style="width:70px;visibility:hidden;">Preview</button> '; }
       html += '<button class="btn btn-sm btn-primary" style="width:80px;" onclick="downloadSavedReport(\'' + r.key + '\')">Download</button> ';
-      html += '<button class="btn btn-sm" style="width:62px;color:#d13212;border-color:#d13212;" onclick="deleteSavedReport(\'' + r.key + '\',\'' + id + '\')">Delete</button></td></tr>';
+      html += '<button class="btn btn-sm" style="width:62px;color:#d13212;border-color:#d13212;" onclick="deleteSavedReport(this.dataset.key,\'' + id + '\')" data-key="' + r.key + '">Delete</button></td></tr>';
     });
     html += '</table>';
     el.innerHTML = html;
@@ -1901,14 +1901,16 @@ function downloadSavedReport(key) {
 }
 
 function deleteSavedReport(key, reviewId) {
-  if (!confirm('Are you sure you want to delete this report? This cannot be undone.')) return;
+  if (!confirm('Delete this report?')) return;
   fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'deleteReport', key: key })
-  }).then(function(r) { return r.json(); }).then(function() {
-    showSavedReports(reviewId);
-  }).catch(function(e) { alert('Error deleting report.'); });
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    if (payload.deleted) { showSavedReports(reviewId); }
+    else { alert('Delete failed: ' + JSON.stringify(payload)); }
+  }).catch(function(e) { alert('Error deleting report: ' + e.message); });
 }
 
 // === INIT ===
