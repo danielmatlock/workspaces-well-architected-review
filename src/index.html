@@ -476,12 +476,9 @@ async function loadFromCloud() {
           date: r.reviewDate, answers: mergedAnswers, notes: notes,
           status: r.status, pillars: tmpl ? JSON.parse(JSON.stringify(tmpl.pillars)) : [] };
       });
-      // Also keep any local-only reviews not yet in cloud
-      localReviews.forEach(function(lr) {
-        if (!cloudReviews.find(function(cr) { return cr.id === lr.id; })) cloudReviews.push(lr);
-      });
+      // Cloud is source of truth — replace local cache entirely
       localStorage.setItem('wafr-reviews', JSON.stringify(cloudReviews));
-      appLog('Loaded ' + cloudReviews.length + ' reviews from DynamoDB (merged with local)', 'success');
+      appLog('Loaded ' + cloudReviews.length + ' reviews from DynamoDB (cloud is source of truth)', 'success');
     }
   } catch(e) { appLog('Load from DynamoDB failed: ' + (e.message || e), 'error'); }
 }
@@ -1067,12 +1064,18 @@ function exportReview(id) {
   URL.revokeObjectURL(url);
 }
 
-function deleteReview(id) {
+async function deleteReview(id) {
   if (!confirm('Are you sure you want to delete this review? This cannot be undone.')) return;
   var reviews = getReviews().filter(function(r) { return r.id !== id; });
   localStorage.setItem('wafr-reviews', JSON.stringify(reviews));
   if (idToken) {
-    gql('mutation M($id: ID!) { deleteReview(id: $id) { id } }', { id: id });
+    try {
+      await gql('mutation M($id: ID!) { deleteReview(id: $id) { id } }', { id: id });
+      appLog('Deleted review from DynamoDB: ' + id, 'success');
+    } catch(e) {
+      appLog('DynamoDB delete failed: ' + (e.message || e) + ' — review may reappear on sync', 'error');
+      alert('Warning: Review removed locally but cloud delete failed. It may reappear for other users until the issue is resolved.');
+    }
   }
   showHome();
 }
@@ -1535,7 +1538,7 @@ function generateSoWhatHTML(review, recommendations) {
 }
 
 function showGeneratingOverlay() {
-  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay"><div class="modal" style="text-align:center;padding:40px;"><h3>Generating Report...</h3><p style="color:#5f6b7a;margin-top:12px;">Creating tailored recommendations based on your observations. This may take 1-2 minutes.</p></div></div>';
+  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay"><div class="modal" style="text-align:center;padding:40px;"><h3>Generating Report...</h3><p style="color:#5f6b7a;margin-top:12px;">Creating tailored recommendations based on your observations. This may take some time depending on the number of questions assessed.</p></div></div>';
 }
 function hideGeneratingOverlay() { document.getElementById('modal-root').innerHTML = ''; }
 
