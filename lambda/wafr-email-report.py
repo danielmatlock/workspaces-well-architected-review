@@ -172,6 +172,24 @@ def handler(event, context):
                 'body': json.dumps({'message': 'Report sent successfully'})
             }
         
+        if action == 'notify':
+            recipient = body['recipient']
+            subject = body['subject']
+            html_body = body['htmlBody']
+            ses.send_email(
+                Source=SENDER,
+                Destination={'ToAddresses': [recipient]},
+                Message={
+                    'Subject': {'Data': subject},
+                    'Body': {'Html': {'Data': '<html><body>' + html_body + '<br><p style="color:#5f6b7a;font-size:12px;">— AWS WorkSpaces WAFR Tool</p></body></html>'}}
+                }
+            )
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'message': 'Notification sent'})
+            }
+
         return {
             'statusCode': 400,
             'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},

@@ -1573,6 +1573,8 @@ function exportCLevelDeck(id) {
     '<select id="deck-sowhat-select" style="width:100%;padding:6px;font-size:13px;"><option value="">None</option></select></div>' +
     '<div class="form-group"><label>WAFR Report <span style="font-size:11px;color:#5f6b7a;font-weight:400">— optional</span></label>' +
     '<select id="deck-wafr-select" style="width:100%;padding:6px;font-size:13px;"><option value="">None</option></select></div>' +
+    '<div class="form-group"><label>Notification Email <span style="font-size:11px;color:#5f6b7a;font-weight:400">— optional, receive alert when complete</span></label>' +
+    '<input id="deck-notify-email" type="email" placeholder="you@example.com" style="width:100%;padding:6px;font-size:13px;border:1px solid #e1e4e8;border-radius:4px;"></div>' +
     '<div id="deck-status" style="font-size:12px;margin-top:8px;"></div>' +
     '<div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn btn-primary" onclick="startCLevelDeck(\'' + id + '\')">Generate Deck</button></div></div></div>';
@@ -1597,6 +1599,7 @@ async function startCLevelDeck(id) {
   var review = getReview(id); if (!review) return;
   var sowhatKey = document.getElementById('deck-sowhat-select').value;
   var wafrKey = document.getElementById('deck-wafr-select').value;
+  var notifyEmail = (document.getElementById('deck-notify-email').value || '').trim();
   var statusEl = document.getElementById('deck-status');
   statusEl.innerHTML = '<span style="color:#ff9900">Fetching report content...</span>';
   var refContext = '';
@@ -1617,14 +1620,17 @@ async function startCLevelDeck(id) {
   closeModal();
   showGeneratingOverlay();
   window._pdfReferenceContext = refContext || '';
+  var deckFilename = 'WAFR_Executive_Briefing_' + (review.customer || 'Customer').replace(/[^a-zA-Z0-9]/g, '_') + '_' + (review.date || new Date().toISOString().split('T')[0]) + '.pptx';
   generateTailoredReport(review).then(function() {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
     try {
       buildCLevelPptx(review, window._lastRecommendations || {});
+      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, true, '');
     } catch(e) {
       console.error('PPTX build error:', e);
       alert('Error building PowerPoint: ' + e.message);
+      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, false, e.message);
     }
   }).catch(function(err) {
     hideGeneratingOverlay();
@@ -1632,13 +1638,27 @@ async function startCLevelDeck(id) {
     console.error('C-Level Deck generation error:', err);
     try {
       buildCLevelPptx(review, {});
+      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, true, 'AI recommendations were unavailable — deck generated using notes only.');
     } catch(e) {
       console.error('PPTX build error (fallback):', e);
       alert('Error building PowerPoint: ' + e.message);
+      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, false, e.message);
       return;
     }
-    alert('Note: AI recommendations were unavailable — deck was generated using your notes only. Check your Downloads folder.');
+    alert('Note: AI recommendations were unavailable — deck was generated using your notes only. Check Saved Reports.');
   });
+}
+
+function sendDeckNotification(recipient, customerName, filename, success, detail) {
+  var subject = success ? 'C-Level Deck Generated Successfully — ' + customerName : 'C-Level Deck Generation Failed — ' + customerName;
+  var bodyHtml = success
+    ? '<p>The C-Level Executive Briefing for <strong>' + customerName + '</strong> was generated successfully.</p><p><strong>File:</strong> ' + filename + '</p>' + (detail ? '<p><strong>Note:</strong> ' + detail + '</p>' : '') + '<p>Access the deck from Saved Reports in the WAFR Tool.</p>'
+    : '<p>The C-Level Executive Briefing for <strong>' + customerName + '</strong> failed to generate.</p><p><strong>Error:</strong> ' + detail + '</p><p>Please try again or check the browser console for more details.</p>';
+  fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'notify', recipient: recipient, subject: subject, htmlBody: bodyHtml })
+  }).catch(function(e) { console.log('Notification email error:', e); });
 }
 
 function buildCLevelPptx(review, recommendations) {
