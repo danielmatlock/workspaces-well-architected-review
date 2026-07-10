@@ -2041,14 +2041,14 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   (curated.criticalFindings || []).slice(0, 4).forEach(function(cf) {
     var cardColor = cf.rag === 'green' ? GREEN : cf.rag === 'amber' ? AMBER : RED;
     // Coloured left spine
-    s5.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: cfY, w: 0.1, h: 1.2, fill: { color: cardColor } });
+    s5.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: cfY, w: 0.1, h: 1.35, fill: { color: cardColor } });
     // Card background
-    s5.addShape(pptx.shapes.RECTANGLE, { x: 0.6, y: cfY, w: 12.2, h: 1.2, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+    s5.addShape(pptx.shapes.RECTANGLE, { x: 0.6, y: cfY, w: 12.2, h: 1.35, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
     // Headline
-    s5.addText(cf.id + '  —  ' + cf.headline, { x: 0.9, y: cfY + 0.1, w: 11.5, fontSize: 14, bold: true, color: cardColor, fontFace: 'Calibri' });
+    s5.addText(cf.id + '  —  ' + cf.headline, { x: 0.9, y: cfY + 0.1, w: 11.5, h: 0.4, fontSize: 13, bold: true, color: cardColor, fontFace: 'Calibri', valign: 'top' });
     // Consequence
-    s5.addText(cf.consequence, { x: 0.9, y: cfY + 0.5, w: 11.5, fontSize: 11, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3 });
-    cfY += 1.4;
+    s5.addText(cf.consequence, { x: 0.9, y: cfY + 0.55, w: 11.5, h: 0.7, fontSize: 10, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3, valign: 'top' });
+    cfY += 1.5;
   });
 
   // ═══════════════════════════════════════════════════════════
