@@ -810,7 +810,7 @@ function renderSidebar() {
     p.questions.forEach(function(q, qi) {
       var hasAnswer = review.answers[q.id] && review.answers[q.id].score;
       var isActiveQ = isActive && state.activeQuestion === qi;
-      nav += '<div class="q-item' + (hasAnswer ? ' answered' : '') + (isActiveQ ? ' active' : '') + '" onclick="showPillar(' + i + ');state.activeQuestion=' + qi + ';showQuestions();">' + q.id + '</div>';
+      nav += '<div class="q-item' + (hasAnswer ? ' answered' : '') + (isActiveQ ? ' active' : '') + '" onclick="jumpToQuestion(' + i + ',' + qi + ')">' + q.id + '</div>';
     });
     nav += '</div>';
   });
@@ -905,6 +905,13 @@ function showPillar(idx) {
   state.view = 'questions';
   state.activePillar = idx;
   state.activeQuestion = 0;
+  renderQuestion();
+}
+
+function jumpToQuestion(pillarIdx, questionIdx) {
+  state.view = 'questions';
+  state.activePillar = pillarIdx;
+  state.activeQuestion = questionIdx;
   renderQuestion();
 }
 
