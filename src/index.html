@@ -2003,11 +2003,11 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   // SLIDE 3: Executive Summary
   // ═══════════════════════════════════════════════════════════
   var s3 = addContentSlide('Executive Summary');
-  s3.addText(overallScore + '%', { x: 5.5, y: 1.1, w: 2.5, fontSize: 48, bold: true, color: ragColor(getRag(overallScore)), align: 'center', fontFace: 'Calibri' });
-  s3.addText('Overall Score — ' + getRag(overallScore).toUpperCase(), { x: 4, y: 2.0, w: 5.5, fontSize: 14, align: 'center', color: SQUID, fontFace: 'Calibri' });
+  s3.addText(overallScore + '%', { x: 5.5, y: 1.4, w: 2.5, fontSize: 48, bold: true, color: ragColor(getRag(overallScore)), align: 'center', fontFace: 'Calibri' });
+  s3.addText('Overall Score — ' + getRag(overallScore).toUpperCase(), { x: 4, y: 2.3, w: 5.5, fontSize: 14, align: 'center', color: SQUID, fontFace: 'Calibri' });
   // Executive summary text from Bedrock
   if (curated.executiveSummary) {
-    s3.addText(curated.executiveSummary, { x: 0.8, y: 2.6, w: 11.5, h: 3.5, fontSize: 12, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.4, valign: 'top' });
+    s3.addText(curated.executiveSummary, { x: 0.8, y: 2.9, w: 11.5, h: 3.2, fontSize: 12, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.4, valign: 'top' });
   }
   // Stats bar
   var mustCount = (curated.must || []).length;
@@ -2076,14 +2076,14 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   var mustCrises = (curated.must || []).filter(function(m) { return !m.isQuickWin; });
   if (mustQuickWins.length > 0) {
     var s7 = addContentSlide('MUST — Quick Wins');
-    var qwY = 1.2;
+    var qwY = 1.4;
     mustQuickWins.slice(0, 5).forEach(function(item) {
-      s7.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: qwY, w: 0.08, h: 0.9, fill: { color: RED } });
-      s7.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: qwY, w: 12.2, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-      s7.addText(item.headline, { x: 0.9, y: qwY + 0.05, w: 9.5, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
-      s7.addText(item.action, { x: 0.9, y: qwY + 0.4, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-      s7.addText(effortBadge(item.effort), { x: 10.6, y: qwY + 0.2, w: 2.0, fontSize: 10, color: GREEN, fontFace: 'Calibri', align: 'center' });
-      qwY += 1.05;
+      s7.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: qwY, w: 0.08, h: 1.0, fill: { color: RED } });
+      s7.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: qwY, w: 12.2, h: 1.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+      s7.addText(item.headline, { x: 0.9, y: qwY + 0.12, w: 9.5, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
+      s7.addText(item.action, { x: 0.9, y: qwY + 0.5, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+      s7.addText(effortBadge(item.effort), { x: 10.6, y: qwY + 0.3, w: 2.0, fontSize: 10, color: GREEN, fontFace: 'Calibri', align: 'center' });
+      qwY += 1.15;
     });
   }
 
@@ -2092,26 +2092,26 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   // ═══════════════════════════════════════════════════════════
   if (mustCrises.length > 0) {
     var s8 = addContentSlide('MUST — Avoidable Crises');
-    var acY = 1.2;
+    var acY = 1.4;
     mustCrises.slice(0, 5).forEach(function(item) {
-      s8.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: acY, w: 0.08, h: 0.9, fill: { color: RED } });
-      s8.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: acY, w: 12.2, h: 0.9, fill: { color: 'FDF3F1' }, line: { color: RED, width: 0.5 } });
-      s8.addText(item.headline, { x: 0.9, y: acY + 0.05, w: 10, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
-      s8.addText(item.action, { x: 0.9, y: acY + 0.4, w: 10, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-      s8.addText(effortBadge(item.effort), { x: 10.6, y: acY + 0.2, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
-      acY += 1.05;
+      s8.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: acY, w: 0.08, h: 1.0, fill: { color: RED } });
+      s8.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: acY, w: 12.2, h: 1.0, fill: { color: 'FDF3F1' }, line: { color: RED, width: 0.5 } });
+      s8.addText(item.headline, { x: 0.9, y: acY + 0.12, w: 10, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
+      s8.addText(item.action, { x: 0.9, y: acY + 0.5, w: 10, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+      s8.addText(effortBadge(item.effort), { x: 10.6, y: acY + 0.3, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
+      acY += 1.15;
     });
   } else if (mustQuickWins.length === 0) {
     // If no quick wins were split out, show all MUSTs on one slide
     var s7b = addContentSlide('MUST — Immediate Actions');
-    var maY = 1.2;
+    var maY = 1.4;
     (curated.must || []).slice(0, 6).forEach(function(item) {
-      s7b.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: maY, w: 0.08, h: 0.9, fill: { color: RED } });
-      s7b.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: maY, w: 12.2, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-      s7b.addText(item.headline, { x: 0.9, y: maY + 0.05, w: 9.5, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
-      s7b.addText(item.action, { x: 0.9, y: maY + 0.4, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-      s7b.addText(effortBadge(item.effort), { x: 10.6, y: maY + 0.2, w: 2.0, fontSize: 10, color: GREEN, fontFace: 'Calibri', align: 'center' });
-      maY += 1.05;
+      s7b.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: maY, w: 0.08, h: 1.0, fill: { color: RED } });
+      s7b.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: maY, w: 12.2, h: 1.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+      s7b.addText(item.headline, { x: 0.9, y: maY + 0.12, w: 9.5, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
+      s7b.addText(item.action, { x: 0.9, y: maY + 0.5, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+      s7b.addText(effortBadge(item.effort), { x: 10.6, y: maY + 0.3, w: 2.0, fontSize: 10, color: GREEN, fontFace: 'Calibri', align: 'center' });
+      maY += 1.15;
     });
   }
 
@@ -2119,28 +2119,28 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   // SLIDE 9: SHOULD — Plan This Quarter
   // ═══════════════════════════════════════════════════════════
   var s9 = addContentSlide('SHOULD — Plan This Quarter');
-  var shY = 1.2;
-  (curated.should || []).slice(0, 6).forEach(function(item) {
-    s9.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: shY, w: 0.08, h: 0.9, fill: { color: AMBER } });
-    s9.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: shY, w: 12.2, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-    s9.addText(item.headline, { x: 0.9, y: shY + 0.05, w: 9.5, fontSize: 13, bold: true, color: '8B6914', fontFace: 'Calibri' });
-    s9.addText(item.action, { x: 0.9, y: shY + 0.4, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-    s9.addText(effortBadge(item.effort), { x: 10.6, y: shY + 0.2, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
-    shY += 1.05;
+  var shY = 1.4;
+  (curated.should || []).slice(0, 5).forEach(function(item) {
+    s9.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: shY, w: 0.08, h: 1.0, fill: { color: AMBER } });
+    s9.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: shY, w: 12.2, h: 1.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+    s9.addText(item.headline, { x: 0.9, y: shY + 0.12, w: 9.5, fontSize: 13, bold: true, color: '8B6914', fontFace: 'Calibri' });
+    s9.addText(item.action, { x: 0.9, y: shY + 0.5, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+    s9.addText(effortBadge(item.effort), { x: 10.6, y: shY + 0.3, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
+    shY += 1.15;
   });
 
   // ═══════════════════════════════════════════════════════════
   // SLIDE 10: COULD — Strategic Improvements
   // ═══════════════════════════════════════════════════════════
   var s10 = addContentSlide('COULD — Strategic Improvements');
-  var coY = 1.2;
-  (curated.could || []).slice(0, 6).forEach(function(item) {
-    s10.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: coY, w: 0.08, h: 0.9, fill: { color: GREEN } });
-    s10.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: coY, w: 12.2, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-    s10.addText(item.headline, { x: 0.9, y: coY + 0.05, w: 9.5, fontSize: 13, bold: true, color: GREEN, fontFace: 'Calibri' });
-    s10.addText(item.action, { x: 0.9, y: coY + 0.4, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-    s10.addText(effortBadge(item.effort), { x: 10.6, y: coY + 0.2, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
-    coY += 1.05;
+  var coY = 1.4;
+  (curated.could || []).slice(0, 5).forEach(function(item) {
+    s10.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: coY, w: 0.08, h: 1.0, fill: { color: GREEN } });
+    s10.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: coY, w: 12.2, h: 1.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+    s10.addText(item.headline, { x: 0.9, y: coY + 0.12, w: 9.5, fontSize: 13, bold: true, color: GREEN, fontFace: 'Calibri' });
+    s10.addText(item.action, { x: 0.9, y: coY + 0.5, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+    s10.addText(effortBadge(item.effort), { x: 10.6, y: coY + 0.3, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
+    coY += 1.15;
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -2160,7 +2160,7 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   });
   // "Needs more research" callout if no hard data
   if (!costData.hasData) {
-    var calloutY = Math.max(costY + 0.2, 6.0);
+    var calloutY = Math.min(costY + 0.2, 5.8);
     s11.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: calloutY, w: 12, h: 0.7, fill: { color: 'FFFBE6' }, line: { color: AMBER, width: 1, dashType: 'dash' }, rectRadius: 0.03 });
     s11.addText('Note: Precise cost savings require fleet inventory and billing data. Figures above are directional only.', { x: 0.8, y: calloutY + 0.15, w: 11.4, fontSize: 10, italic: true, color: '8B6914', fontFace: 'Calibri' });
   }
