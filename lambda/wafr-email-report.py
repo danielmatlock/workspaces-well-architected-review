@@ -190,6 +190,108 @@ def handler(event, context):
                 'body': json.dumps({'message': 'Notification sent'})
             }
 
+        if action == 'curateDeck':
+            findings = body.get('findings', [])
+            overall_score = body.get('overallScore', 0)
+            pillar_scores = body.get('pillarScores', [])
+            customer_name = body.get('customerName', 'Customer')
+            reference_context = body.get('referenceContext', '')
+
+            findings_text = []
+            for f in findings:
+                findings_text.append(
+                    f"ID: {f['id']}\nPillar: {f['pillar']}\nQuestion: {f['question']}\n"
+                    f"RAG: {f['score']}\nNotes: {f.get('notes', '')}\n"
+                    f"Observation: {f.get('observation', '')}\nRecommendation: {f.get('recommendation', '')}"
+                )
+            joined_findings = "\n\n---\n\n".join(findings_text)
+
+            pillar_summary = "\n".join([f"- {p['name']}: {p['score']}% ({p['rag']})" for p in pillar_scores])
+
+            grounding = ''
+            if reference_context:
+                grounding = (
+                    "\n\nREFERENCE DATA (use as primary source of truth, do NOT invent findings not present here):\n"
+                    + reference_context[:20000] + "\n--- END REFERENCE DATA ---\n\n"
+                )
+
+            curation_prompt = f"""You are an AWS Solutions Architect preparing a C-level executive briefing from a WorkSpaces Well-Architected Review.
+
+CUSTOMER: {customer_name}
+OVERALL SCORE: {overall_score}%
+PILLAR SCORES:
+{pillar_summary}
+{grounding}
+FINDINGS:
+{joined_findings}
+
+YOUR TASK: Curate these findings into a boardroom-ready narrative. Do NOT map mechanically (RED=MUST, AMBER=SHOULD, GREEN=COULD). Instead, curate intelligently:
+
+RULES:
+1. CRITICAL FINDINGS: Select exactly 4 board-level risks. For each, provide a business-framed headline (e.g. "PCoIP to DCV Protocol Migration" not "How do you manage the migration...") and a 2-3 sentence consequence explanation (e.g. compliance failure, security exposure, cost risk).
+2. MUST tier: Genuine board-level risks + true low-effort quick wins. Only items that create a preventable crisis or are simple to fix with high impact. Usually 3-5 items max.
+3. SHOULD tier: The 4-6 highest-value items to resource this quarter. Not every AMBER — only the ones that move the needle.
+4. COULD tier: Strategic, longer-term items. 4-6 items max.
+5. For each item in any tier, provide: the original ID, a business-framed headline (5-8 words, no "How do you..."), and a one-sentence action summary.
+6. NEVER present already-implemented items (scored "fully") as gaps or quick wins.
+7. Cost optimisation: Only quantify savings where the source data provides figures. Otherwise write "Requires fleet inventory and billing data to quantify."
+8. 90-Day Roadmap: Assign curated items to Week 1-2 (urgent MUST), Week 3-6 (remaining MUST + top SHOULD), Week 7-12 (SHOULD + COULD).
+
+Respond with ONLY valid JSON in this exact structure:
+{{
+  "criticalFindings": [
+    {{"id": "OPS-WS-11", "headline": "PCoIP to DCV Migration", "consequence": "2-3 sentence business consequence", "rag": "red"}}
+  ],
+  "must": [
+    {{"id": "OPS-WS-11", "headline": "Short business headline", "action": "One sentence action", "effort": "low|medium|high", "isQuickWin": true}}
+  ],
+  "should": [
+    {{"id": "...", "headline": "...", "action": "...", "effort": "low|medium|high"}}
+  ],
+  "could": [
+    {{"id": "...", "headline": "...", "action": "...", "effort": "medium|high"}}
+  ],
+  "costInsights": {{
+    "hasData": false,
+    "summary": "Overall cost assessment in 2-3 sentences",
+    "items": [{{"id": "COST-WS-01", "headline": "...", "insight": "..."}}]
+  }},
+  "roadmap": {{
+    "week1_2": [{{"id": "...", "headline": "..."}}],
+    "week3_6": [{{"id": "...", "headline": "..."}}],
+    "week7_12": [{{"id": "...", "headline": "..."}}]
+  }},
+  "executiveSummary": "A 3-4 sentence executive summary suitable for a board audience, stating the overall posture, key risks, and recommended focus areas."
+}}"""
+
+            try:
+                response = bedrock.invoke_model(
+                    modelId=MODEL_ID,
+                    contentType='application/json',
+                    accept='application/json',
+                    body=json.dumps({
+                        'anthropic_version': 'bedrock-2023-05-31',
+                        'max_tokens': 8192,
+                        'messages': [{'role': 'user', 'content': curation_prompt}]
+                    })
+                )
+                result = json.loads(response['body'].read())
+                text = result['content'][0]['text'].strip()
+                text = re.sub(r'^```(?:json)?\s*', '', text)
+                text = re.sub(r'\s*```$', '', text)
+                curated = json.loads(text)
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'curated': curated})
+                }
+            except Exception as e:
+                return {
+                    'statusCode': 500,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': 'Curation failed: ' + str(e)})
+                }
+
         return {
             'statusCode': 400,
             'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},

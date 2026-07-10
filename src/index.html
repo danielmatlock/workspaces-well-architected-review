@@ -1619,32 +1619,85 @@ async function startCLevelDeck(id) {
   } catch(e) { console.log('Report fetch error:', e); }
   closeModal();
   showGeneratingOverlay();
-  window._pdfReferenceContext = refContext || '';
   var deckFilename = 'WAFR_Executive_Briefing_' + (review.customer || 'Customer').replace(/[^a-zA-Z0-9]/g, '_') + '_' + (review.date || new Date().toISOString().split('T')[0]) + '.pptx';
-  generateTailoredReport(review).then(function() {
+
+  // Collect all findings for curation
+  var findings = [];
+  var pillarScores = [];
+  review.pillars.forEach(function(p, i) {
+    var ps = getPillarScore(review, i);
+    pillarScores.push({ name: p.name, score: ps.pct, rag: getRag(ps.pct) });
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id] || {};
+      if (!a.score) return;
+      var rec = (window._lastRecommendations && window._lastRecommendations[q.id]) || {};
+      findings.push({
+        id: q.id, pillar: p.name, question: q.q, score: a.score,
+        notes: a.notes || '', observation: rec.observation || '', recommendation: rec.recommendation || ''
+      });
+    });
+  });
+  var overall = getOverallScore(review);
+
+  // First generate tailored recommendations (reuses existing batched flow)
+  window._pdfReferenceContext = refContext || '';
+  try {
+    await generateTailoredReport(review);
+  } catch(e) { console.log('Tailored report generation error (non-fatal):', e); }
+  window._pdfReferenceContext = '';
+
+  // Re-collect findings with recommendations now available
+  findings = [];
+  review.pillars.forEach(function(p) {
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id] || {};
+      if (!a.score) return;
+      var rec = (window._lastRecommendations && window._lastRecommendations[q.id]) || {};
+      findings.push({
+        id: q.id, pillar: p.name, question: q.q, score: a.score,
+        notes: a.notes || '', observation: rec.observation || '', recommendation: rec.recommendation || ''
+      });
+    });
+  });
+
+  // Call curateDeck Lambda action
+  try {
+    var curationRes = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'curateDeck',
+        findings: findings,
+        overallScore: overall,
+        pillarScores: pillarScores,
+        customerName: review.customer || 'Customer',
+        referenceContext: refContext
+      })
+    });
+    var curationData = await curationRes.json();
+    var curationPayload = typeof curationData.body === 'string' ? JSON.parse(curationData.body) : curationData;
+
+    if (curationPayload.curated) {
+      hideGeneratingOverlay();
+      buildCuratedCLevelPptx(review, curationPayload.curated, pillarScores, overall, notifyEmail, deckFilename);
+    } else {
+      // Curation failed — fall back to mechanical build
+      console.error('Curation failed, falling back:', curationPayload.error);
+      hideGeneratingOverlay();
+      buildCLevelPptx(review, window._lastRecommendations || {}, notifyEmail);
+      alert('Note: AI curation was unavailable — deck was generated using the standard layout.');
+    }
+  } catch(e) {
+    console.error('Curation call failed:', e);
     hideGeneratingOverlay();
-    window._pdfReferenceContext = '';
     try {
       buildCLevelPptx(review, window._lastRecommendations || {}, notifyEmail);
-    } catch(e) {
-      console.error('PPTX build error:', e);
-      alert('Error building PowerPoint: ' + e.message);
-      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, false, e.message);
+      alert('Note: AI curation was unavailable — deck was generated using the standard layout.');
+    } catch(e2) {
+      alert('Error building PowerPoint: ' + e2.message);
+      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, false, e2.message);
     }
-  }).catch(function(err) {
-    hideGeneratingOverlay();
-    window._pdfReferenceContext = '';
-    console.error('C-Level Deck generation error:', err);
-    try {
-      buildCLevelPptx(review, {}, notifyEmail);
-    } catch(e) {
-      console.error('PPTX build error (fallback):', e);
-      alert('Error building PowerPoint: ' + e.message);
-      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, false, e.message);
-      return;
-    }
-    alert('Note: AI recommendations were unavailable — deck was generated using your notes only. Check Saved Reports.');
-  });
+  }
 }
 
 function sendDeckNotification(recipient, customerName, filename, success, detail) {
@@ -1865,6 +1918,279 @@ function buildCLevelPptx(review, recommendations, notifyEmail) {
   // Download and save to cloud
   var filename = 'WAFR_Executive_Briefing_' + customer.replace(/[^a-zA-Z0-9]/g, '_') + '_' + today + '.pptx';
   // Save to S3 only (no local download)
+  pptx.write('base64').then(function(base64) {
+    saveReportToCloud(review.id, 'clevel', base64, 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx', review.customer);
+    if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, filename, true, '');
+    alert('C-Level Deck saved. Access it from Saved Reports.');
+  }).catch(function(e) {
+    console.error('PPTX write error:', e);
+    if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, filename, false, e.message);
+    alert('Error saving PowerPoint: ' + e.message);
+  });
+}
+
+// === CURATED C-LEVEL DECK (Gold Standard) ===
+function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, notifyEmail, deckFilename) {
+  var pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE';
+  pptx.author = 'AWS WorkSpaces WAFR Tool';
+  pptx.subject = 'Well-Architected Review - C-Level Briefing';
+
+  // Theme constants
+  var SQUID = '232F3E';
+  var ORANGE = 'FF9900';
+  var WHITE = 'FFFFFF';
+  var LIGHT_BG = 'F8F9FA';
+  var RED = 'D13212';
+  var AMBER = 'FF9900';
+  var GREEN = '1D8102';
+  var GREY = '5F6B7A';
+  var BLUE = '0073BB';
+  var customer = review.customer || 'Customer';
+  var today = review.date || new Date().toISOString().split('T')[0];
+
+  // Helper: content slide with dark header bar + orange stripe
+  function addContentSlide(title) {
+    var slide = pptx.addSlide();
+    slide.background = { color: WHITE };
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: SQUID } });
+    slide.addText(title, { x: 0.5, y: 0.15, w: 12, fontSize: 20, bold: true, color: WHITE, fontFace: 'Calibri' });
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0.9, w: 13.33, h: 0.05, fill: { color: ORANGE } });
+    return slide;
+  }
+
+  // Helper: title slide (dark background)
+  function addTitleSlide(title, subtitle) {
+    var slide = pptx.addSlide();
+    slide.background = { color: SQUID };
+    slide.addText(title, { x: 0.8, y: 2.5, w: 11, fontSize: 36, bold: true, color: WHITE, fontFace: 'Calibri' });
+    if (subtitle) slide.addText(subtitle, { x: 0.8, y: 3.4, w: 11, fontSize: 18, color: ORANGE, fontFace: 'Calibri' });
+    slide.addText('AWS Well-Architected Review', { x: 0.8, y: 0.4, fontSize: 12, color: GREY, fontFace: 'Calibri' });
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 7.0, w: 13.33, h: 0.08, fill: { color: ORANGE } });
+    return slide;
+  }
+
+  function ragColor(rag) { return rag === 'green' ? GREEN : rag === 'amber' ? AMBER : RED; }
+  function effortBadge(effort) { return effort === 'low' ? '⚡ Low effort' : effort === 'medium' ? '⚙️ Medium effort' : '🏗️ High effort'; }
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 1: Cover
+  // ═══════════════════════════════════════════════════════════
+  addTitleSlide(customer + '\nWorkSpaces Well-Architected Review', 'C-Level Executive Briefing | ' + today);
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 2: How to Read This Deck
+  // ═══════════════════════════════════════════════════════════
+  var s2 = addContentSlide('How to Read This Deck');
+  s2.addText('Findings are organised as a Must / Should / Could conversation, flowing from most impactful (least effort) to impactful (more effort):', { x: 0.5, y: 1.2, w: 12, fontSize: 13, color: SQUID, fontFace: 'Calibri' });
+  // Tier cards with coloured left spines
+  var tierY = 1.8;
+  var tiers = [
+    { label: 'MUST', color: RED, desc: 'Urgent board-level risks and quick wins. Address immediately.' },
+    { label: 'SHOULD', color: AMBER, desc: 'High-value work to resource this quarter. Meaningful risk reduction.' },
+    { label: 'COULD', color: GREEN, desc: 'Strategic improvements. More effort, longer-term benefit.' }
+  ];
+  tiers.forEach(function(t) {
+    s2.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: tierY, w: 0.12, h: 0.9, fill: { color: t.color } });
+    s2.addShape(pptx.shapes.RECTANGLE, { x: 0.62, y: tierY, w: 11.8, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+    s2.addText(t.label, { x: 0.9, y: tierY + 0.15, w: 2, fontSize: 16, bold: true, color: t.color, fontFace: 'Calibri' });
+    s2.addText(t.desc, { x: 2.8, y: tierY + 0.2, w: 9.4, fontSize: 13, color: SQUID, fontFace: 'Calibri' });
+    tierY += 1.1;
+  });
+  s2.addText('Flow: Most impactful / least effort  →  Impactful / more effort', { x: 0.5, y: 5.2, w: 12, fontSize: 11, italic: true, color: GREY, fontFace: 'Calibri' });
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 3: Executive Summary
+  // ═══════════════════════════════════════════════════════════
+  var s3 = addContentSlide('Executive Summary');
+  s3.addText(overallScore + '%', { x: 5.5, y: 1.3, w: 2.5, fontSize: 60, bold: true, color: ragColor(getRag(overallScore)), align: 'center', fontFace: 'Calibri' });
+  s3.addText('Overall Score — ' + getRag(overallScore).toUpperCase(), { x: 4, y: 2.8, w: 5.5, fontSize: 16, align: 'center', color: SQUID, fontFace: 'Calibri' });
+  // Executive summary text from Bedrock
+  if (curated.executiveSummary) {
+    s3.addText(curated.executiveSummary, { x: 0.8, y: 3.6, w: 11.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.4 });
+  }
+  // Stats bar
+  var mustCount = (curated.must || []).length;
+  var shouldCount = (curated.should || []).length;
+  var couldCount = (curated.could || []).length;
+  s3.addText(mustCount + ' Critical (Must)  |  ' + shouldCount + ' Improvements (Should)  |  ' + couldCount + ' Strategic (Could)', { x: 1, y: 5.0, w: 11, fontSize: 13, align: 'center', color: GREY, fontFace: 'Calibri' });
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 4: Six-Pillar Scorecard with RAG bars
+  // ═══════════════════════════════════════════════════════════
+  var s4 = addContentSlide('Six-Pillar Scorecard');
+  var pillarY = 1.3;
+  pillarScores.forEach(function(p) {
+    var barWidth = 7.0 * p.score / 100;
+    s4.addText(p.name, { x: 0.5, y: pillarY, w: 3.8, fontSize: 13, color: SQUID, fontFace: 'Calibri', valign: 'middle' });
+    // Background bar
+    s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.05, w: 7.0, h: 0.4, fill: { color: 'E8E8E8' }, line: { type: 'none' } });
+    // Filled bar
+    if (barWidth > 0) {
+      s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.05, w: barWidth, h: 0.4, fill: { color: ragColor(p.rag) }, line: { type: 'none' } });
+    }
+    s4.addText(p.score + '%', { x: 11.7, y: pillarY, w: 1, fontSize: 13, bold: true, color: ragColor(p.rag), fontFace: 'Calibri', align: 'center', valign: 'middle' });
+    pillarY += 0.75;
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 5: Critical Findings (4 business-framed cards)
+  // ═══════════════════════════════════════════════════════════
+  var s5 = addContentSlide('Critical Findings');
+  var cfY = 1.2;
+  (curated.criticalFindings || []).slice(0, 4).forEach(function(cf) {
+    var cardColor = cf.rag === 'green' ? GREEN : cf.rag === 'amber' ? AMBER : RED;
+    // Coloured left spine
+    s5.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: cfY, w: 0.1, h: 1.2, fill: { color: cardColor } });
+    // Card background
+    s5.addShape(pptx.shapes.RECTANGLE, { x: 0.6, y: cfY, w: 12.2, h: 1.2, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+    // Headline
+    s5.addText(cf.id + '  —  ' + cf.headline, { x: 0.9, y: cfY + 0.1, w: 11.5, fontSize: 14, bold: true, color: cardColor, fontFace: 'Calibri' });
+    // Consequence
+    s5.addText(cf.consequence, { x: 0.9, y: cfY + 0.5, w: 11.5, fontSize: 11, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3 });
+    cfY += 1.4;
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 6: Prioritisation Framework (3 tier cards)
+  // ═══════════════════════════════════════════════════════════
+  var s6 = addContentSlide('Prioritisation Framework');
+  var colX = [0.5, 4.6, 8.7];
+  var colColors = [RED, AMBER, GREEN];
+  var colLabels = ['MUST (' + mustCount + ')', 'SHOULD (' + shouldCount + ')', 'COULD (' + couldCount + ')'];
+  var colItems = [curated.must || [], curated.should || [], curated.could || []];
+  for (var ci = 0; ci < 3; ci++) {
+    s6.addText(colLabels[ci], { x: colX[ci], y: 1.1, w: 3.9, fontSize: 14, bold: true, color: colColors[ci], align: 'center', fontFace: 'Calibri' });
+    // Coloured left spine + card
+    s6.addShape(pptx.shapes.RECTANGLE, { x: colX[ci], y: 1.5, w: 0.08, h: 5.0, fill: { color: colColors[ci] } });
+    s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: colX[ci] + 0.08, y: 1.5, w: 3.82, h: 5.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.03 });
+    var itemText = colItems[ci].slice(0, 6).map(function(item) { return '• ' + item.headline; }).join('\n');
+    s6.addText(itemText, { x: colX[ci] + 0.3, y: 1.7, w: 3.4, h: 4.6, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top', lineSpacingMultiple: 1.5 });
+  }
+  s6.addText('← Highest assurance / least effort          Impactful / more effort →', { x: 1, y: 6.8, w: 11, fontSize: 10, italic: true, color: GREY, align: 'center', fontFace: 'Calibri' });
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 7: MUST — Quick Wins
+  // ═══════════════════════════════════════════════════════════
+  var mustQuickWins = (curated.must || []).filter(function(m) { return m.isQuickWin; });
+  var mustCrises = (curated.must || []).filter(function(m) { return !m.isQuickWin; });
+  if (mustQuickWins.length > 0) {
+    var s7 = addContentSlide('MUST — Quick Wins');
+    var qwY = 1.2;
+    mustQuickWins.slice(0, 5).forEach(function(item) {
+      s7.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: qwY, w: 0.08, h: 0.9, fill: { color: RED } });
+      s7.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: qwY, w: 12.2, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+      s7.addText(item.headline, { x: 0.9, y: qwY + 0.05, w: 9.5, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
+      s7.addText(item.action, { x: 0.9, y: qwY + 0.4, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+      s7.addText(effortBadge(item.effort), { x: 10.6, y: qwY + 0.2, w: 2.0, fontSize: 10, color: GREEN, fontFace: 'Calibri', align: 'center' });
+      qwY += 1.05;
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 8: MUST — Avoidable Crises
+  // ═══════════════════════════════════════════════════════════
+  if (mustCrises.length > 0) {
+    var s8 = addContentSlide('MUST — Avoidable Crises');
+    var acY = 1.2;
+    mustCrises.slice(0, 5).forEach(function(item) {
+      s8.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: acY, w: 0.08, h: 0.9, fill: { color: RED } });
+      s8.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: acY, w: 12.2, h: 0.9, fill: { color: 'FDF3F1' }, line: { color: RED, width: 0.5 } });
+      s8.addText(item.headline, { x: 0.9, y: acY + 0.05, w: 10, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
+      s8.addText(item.action, { x: 0.9, y: acY + 0.4, w: 10, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+      s8.addText(effortBadge(item.effort), { x: 10.6, y: acY + 0.2, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
+      acY += 1.05;
+    });
+  } else if (mustQuickWins.length === 0) {
+    // If no quick wins were split out, show all MUSTs on one slide
+    var s7b = addContentSlide('MUST — Immediate Actions');
+    var maY = 1.2;
+    (curated.must || []).slice(0, 6).forEach(function(item) {
+      s7b.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: maY, w: 0.08, h: 0.9, fill: { color: RED } });
+      s7b.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: maY, w: 12.2, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+      s7b.addText(item.headline, { x: 0.9, y: maY + 0.05, w: 9.5, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
+      s7b.addText(item.action, { x: 0.9, y: maY + 0.4, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+      s7b.addText(effortBadge(item.effort), { x: 10.6, y: maY + 0.2, w: 2.0, fontSize: 10, color: GREEN, fontFace: 'Calibri', align: 'center' });
+      maY += 1.05;
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 9: SHOULD — Plan This Quarter
+  // ═══════════════════════════════════════════════════════════
+  var s9 = addContentSlide('SHOULD — Plan This Quarter');
+  var shY = 1.2;
+  (curated.should || []).slice(0, 6).forEach(function(item) {
+    s9.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: shY, w: 0.08, h: 0.9, fill: { color: AMBER } });
+    s9.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: shY, w: 12.2, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+    s9.addText(item.headline, { x: 0.9, y: shY + 0.05, w: 9.5, fontSize: 13, bold: true, color: '8B6914', fontFace: 'Calibri' });
+    s9.addText(item.action, { x: 0.9, y: shY + 0.4, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+    s9.addText(effortBadge(item.effort), { x: 10.6, y: shY + 0.2, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
+    shY += 1.05;
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 10: COULD — Strategic Improvements
+  // ═══════════════════════════════════════════════════════════
+  var s10 = addContentSlide('COULD — Strategic Improvements');
+  var coY = 1.2;
+  (curated.could || []).slice(0, 6).forEach(function(item) {
+    s10.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: coY, w: 0.08, h: 0.9, fill: { color: GREEN } });
+    s10.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: coY, w: 12.2, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+    s10.addText(item.headline, { x: 0.9, y: coY + 0.05, w: 9.5, fontSize: 13, bold: true, color: GREEN, fontFace: 'Calibri' });
+    s10.addText(item.action, { x: 0.9, y: coY + 0.4, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
+    s10.addText(effortBadge(item.effort), { x: 10.6, y: coY + 0.2, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
+    coY += 1.05;
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 11: Cost Optimisation Opportunities
+  // ═══════════════════════════════════════════════════════════
+  var s11 = addContentSlide('Cost Optimisation Opportunities');
+  var costData = curated.costInsights || {};
+  if (costData.summary) {
+    s11.addText(costData.summary, { x: 0.5, y: 1.2, w: 12, fontSize: 13, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.4 });
+  }
+  var costItems = costData.items || [];
+  var costY = 2.2;
+  costItems.slice(0, 5).forEach(function(item) {
+    s11.addText('• ' + item.headline, { x: 0.5, y: costY, w: 12, fontSize: 13, bold: true, color: SQUID, fontFace: 'Calibri' });
+    s11.addText(item.insight, { x: 0.8, y: costY + 0.35, w: 11.5, fontSize: 11, color: GREY, fontFace: 'Calibri' });
+    costY += 0.85;
+  });
+  // "Needs more research" callout if no hard data
+  if (!costData.hasData) {
+    s11.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: costY + 0.3, w: 12, h: 0.8, fill: { color: 'FFFBE6' }, line: { color: AMBER, width: 1, dashType: 'dash' }, rectRadius: 0.03 });
+    s11.addText('Note: Precise cost savings require fleet inventory and billing data. Figures above are directional only.', { x: 0.8, y: costY + 0.45, w: 11.4, fontSize: 11, italic: true, color: '8B6914', fontFace: 'Calibri' });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 12: 90-Day Roadmap
+  // ═══════════════════════════════════════════════════════════
+  var s12 = addContentSlide('90-Day Roadmap');
+  var roadmap = curated.roadmap || {};
+  var roadRows = [[
+    { text: 'Timeframe', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
+    { text: 'Actions', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
+    { text: 'Tier', options: { bold: true, color: WHITE, fill: { color: SQUID } } }
+  ]];
+  var w12 = (roadmap.week1_2 || []).map(function(r) { return r.headline; }).join('\n') || 'N/A';
+  var w36 = (roadmap.week3_6 || []).map(function(r) { return r.headline; }).join('\n') || 'N/A';
+  var w712 = (roadmap.week7_12 || []).map(function(r) { return r.headline; }).join('\n') || 'N/A';
+  roadRows.push([{ text: 'Week 1-2' }, { text: w12 }, { text: 'MUST', options: { color: RED, bold: true } }]);
+  roadRows.push([{ text: 'Week 3-6' }, { text: w36 }, { text: 'MUST/SHOULD', options: { color: AMBER, bold: true } }]);
+  roadRows.push([{ text: 'Week 7-12' }, { text: w712 }, { text: 'SHOULD/COULD', options: { color: GREEN, bold: true } }]);
+  s12.addTable(roadRows, { x: 0.5, y: 1.3, w: 12, fontSize: 11, fontFace: 'Calibri', border: { type: 'solid', pt: 0.5, color: 'E1E4E8' }, rowH: 1.5, colW: [1.8, 8.5, 2], color: SQUID, autoPage: true });
+  s12.addText('Note: Timelines are indicative. Detailed effort estimates require fleet inventory and billing data.', { x: 0.5, y: 6.5, w: 12, fontSize: 10, italic: true, color: GREY, fontFace: 'Calibri' });
+
+  // ═══════════════════════════════════════════════════════════
+  // SLIDE 13: Closing
+  // ═══════════════════════════════════════════════════════════
+  var sClose = addTitleSlide('Discussion & Next Steps', customer + ' | ' + today);
+  sClose.addText('Thank you', { x: 0.8, y: 4.5, w: 11, fontSize: 14, color: GREY, fontFace: 'Calibri' });
+
+  // Write and save
+  var filename = 'WAFR_Executive_Briefing_' + customer.replace(/[^a-zA-Z0-9]/g, '_') + '_' + today + '.pptx';
   pptx.write('base64').then(function(base64) {
     saveReportToCloud(review.id, 'clevel', base64, 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx', review.customer);
     if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, filename, true, '');
