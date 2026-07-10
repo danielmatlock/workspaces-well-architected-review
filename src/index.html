@@ -2159,18 +2159,18 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   var s11 = addContentSlide('Cost Optimisation Opportunities');
   var costData = curated.costInsights || {};
   if (costData.summary) {
-    s11.addText(costData.summary, { x: 0.5, y: 1.2, w: 12, h: 1.4, fontSize: 12, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.4, valign: 'top' });
+    s11.addText(costData.summary, { x: 0.5, y: 1.2, w: 12, h: 1.2, fontSize: 11, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3, valign: 'top' });
   }
   var costItems = costData.items || [];
-  var costY = 2.8;
-  costItems.slice(0, 4).forEach(function(item) {
+  var costY = 2.5;
+  costItems.slice(0, 3).forEach(function(item) {
     s11.addText('• ' + item.headline, { x: 0.5, y: costY, w: 12, fontSize: 12, bold: true, color: SQUID, fontFace: 'Calibri' });
-    s11.addText(item.insight, { x: 0.8, y: costY + 0.3, w: 11.5, h: 0.6, fontSize: 10, color: GREY, fontFace: 'Calibri', valign: 'top' });
-    costY += 1.0;
+    s11.addText(item.insight, { x: 0.8, y: costY + 0.3, w: 11.5, h: 0.55, fontSize: 10, color: GREY, fontFace: 'Calibri', valign: 'top' });
+    costY += 0.95;
   });
   // "Needs more research" callout if no hard data
   if (!costData.hasData) {
-    var calloutY = Math.min(costY + 0.2, 5.8);
+    var calloutY = costY + 0.3;
     s11.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: calloutY, w: 12, h: 0.7, fill: { color: 'FFFBE6' }, line: { color: AMBER, width: 1, dashType: 'dash' }, rectRadius: 0.03 });
     s11.addText('Note: Precise cost savings require fleet inventory and billing data. Figures above are directional only.', { x: 0.8, y: calloutY + 0.15, w: 11.4, fontSize: 10, italic: true, color: '8B6914', fontFace: 'Calibri' });
   }
