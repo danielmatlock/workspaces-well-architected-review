@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>C-Level Deck — Generation Logic Flow</title>
+<style>
+@page { size: A3 landscape; margin: 15mm; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #16191f; padding: 30px; max-width: 1400px; margin: 0 auto; background: #fff; }
+h1 { font-size: 22px; color: #232f3e; border-bottom: 3px solid #ff9900; padding-bottom: 8px; margin-bottom: 8px; }
+h2 { font-size: 16px; color: #232f3e; margin-top: 30px; margin-bottom: 12px; }
+.subtitle { font-size: 12px; color: #5f6b7a; margin-bottom: 24px; }
+.flow { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+.step { display: flex; align-items: stretch; gap: 0; }
+.step-num { width: 50px; background: #232f3e; color: #ff9900; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; border-radius: 6px 0 0 6px; flex-shrink: 0; }
+.step-body { flex: 1; background: #f8f9fa; border: 1px solid #e1e4e8; border-left: none; border-radius: 0 6px 6px 0; padding: 12px 16px; }
+.step-title { font-size: 13px; font-weight: 600; color: #232f3e; margin-bottom: 4px; }
+.step-detail { font-size: 11px; color: #5f6b7a; line-height: 1.5; }
+.step-tech { font-size: 10px; color: #0073bb; margin-top: 4px; }
+.connector { text-align: center; font-size: 16px; color: #ff9900; padding: 4px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 16px 0; }
+.card { background: #fff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 12px; border-left: 4px solid #ff9900; }
+.card-title { font-size: 12px; font-weight: 600; color: #232f3e; margin-bottom: 4px; }
+.card-detail { font-size: 10px; color: #5f6b7a; }
+.card.red { border-left-color: #d13212; }
+.card.amber { border-left-color: #ff9900; }
+.card.green { border-left-color: #1d8102; }
+.card.blue { border-left-color: #0073bb; }
+.slide-table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 16px 0; }
+.slide-table th { background: #232f3e; color: #fff; padding: 6px 10px; text-align: left; }
+.slide-table td { padding: 6px 10px; border-bottom: 1px solid #e1e4e8; }
+.slide-table tr:nth-child(even) { background: #f8f9fa; }
+.badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: 600; color: #fff; }
+.badge-red { background: #d13212; }
+.badge-amber { background: #ff9900; }
+.badge-green { background: #1d8102; }
+.badge-blue { background: #0073bb; }
+.rules-box { background: #fff8f0; border: 1px dashed #ff9900; border-radius: 6px; padding: 16px; margin: 16px 0; }
+.rules-box h3 { font-size: 13px; color: #ff9900; margin-bottom: 8px; }
+.rules-box ul { font-size: 11px; color: #545b64; padding-left: 20px; line-height: 1.8; }
+.note { font-size: 11px; color: #5f6b7a; font-style: italic; margin-top: 16px; }
+@media print { body { padding: 10px; } .no-print { display: none; } }
+</style>
+</head>
+<body>
+<div class="no-print" style="margin-bottom:16px;text-align:center;padding:12px;background:#232f3e;border-radius:6px;">
+  <button onclick="window.print()" style="padding:10px 24px;background:#ff9900;border:none;color:#fff;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;">Save as PDF (Cmd+P)</button>
+</div>
+
+<h1>C-Level Executive Briefing — Generation Logic</h1>
+<div class="subtitle">Gold-standard curated deck | 13 fixed slides | AI-powered curation via Bedrock Claude Haiku 4.5</div>
+
+<h2>Generation Pipeline</h2>
+<div class="flow">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body">
+      <div class="step-title">User Initiates</div>
+      <div class="step-detail">User clicks "C-Level Deck" → modal with optional grounding reports (So What + WAFR) and notification email</div>
+      <div class="step-tech">Frontend: exportCLevelDeck() → modal with dropdowns</div>
+    </div>
+  </div>
+  <div class="connector">▼</div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body">
+      <div class="step-title">Fetch Grounding Context</div>
+      <div class="step-detail">Download selected S3 reports, strip HTML tags, truncate to 15,000 chars per report. Provides factual basis to reduce AI hallucinations.</div>
+      <div class="step-tech">Lambda: getReport → base64 decode → HTML strip</div>
+    </div>
+  </div>
+  <div class="connector">▼</div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body">
+      <div class="step-title">Generate Tailored Recommendations</div>
+      <div class="step-detail">Batch all questions with notes into groups of 5. Send each batch to Bedrock for observation rewrite + recommendation generation. Sequential batching to stay within API Gateway 29s timeout.</div>
+      <div class="step-tech">Lambda: generate (×N batches) → Bedrock (4096 tokens each) → merge results</div>
+    </div>
+  </div>
+  <div class="connector">▼</div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body">
+      <div class="step-title">AI Curation (curateDeck)</div>
+      <div class="step-detail">Send ALL findings (IDs, pillars, scores, notes, observations, recommendations) + pillar scores + grounding context to Bedrock in a single call. AI curates into business-framed Must/Should/Could tiers — NOT a mechanical RAG mapping.</div>
+      <div class="step-tech">Lambda: curateDeck → Bedrock (8192 tokens) → structured JSON response</div>
+    </div>
+  </div>
+  <div class="connector">▼</div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body">
+      <div class="step-title">Build PowerPoint</div>
+      <div class="step-detail">buildCuratedCLevelPptx consumes the curated JSON and builds 13 fixed slides with visual design system (coloured spines, RAG bars, KPI cards, effort badges, callout boxes).</div>
+      <div class="step-tech">Frontend: pptxgenjs → base64 → S3 save via Lambda saveReport</div>
+    </div>
+  </div>
+  <div class="connector">▼</div>
+  <div class="step">
+    <div class="step-num">6</div>
+    <div class="step-body">
+      <div class="step-title">Notify & Complete</div>
+      <div class="step-detail">Send email notification (if email provided). Show success alert. Deck accessible via Saved Reports.</div>
+      <div class="step-tech">Lambda: notify → SES | Fallback: buildCLevelPptx (mechanical) if curation fails</div>
+    </div>
+  </div>
+</div>
+
+<h2>AI Curation Rules</h2>
+<div class="rules-box">
+  <h3>The AI is instructed to:</h3>
+  <ul>
+    <li><strong>NOT map mechanically</strong> — RAG is an input to tiering, not the tiering itself</li>
+    <li>Select exactly <strong>4 Critical Findings</strong> — board-level risks with business headlines + consequence text</li>
+    <li>Curate <strong>MUST</strong> (3-5 items) — genuine board-level risks + true quick wins</li>
+    <li>Curate <strong>SHOULD</strong> (4-6 items) — highest-value items to resource this quarter</li>
+    <li>Curate <strong>COULD</strong> (4-6 items) — strategic, longer-term items</li>
+    <li><strong>NEVER</strong> use "customer" / "the customer" / "Customer-1" in any text — use org name or "the estate / the fleet"</li>
+    <li><strong>NEVER</strong> present fully-implemented items as gaps or quick wins</li>
+    <li>Only quantify cost savings where source data provides figures — otherwise flag "needs more research"</li>
+    <li>Executive summary: exactly 3-4 short sentences (max 30 words each)</li>
+    <li>All headlines: 5-8 words, business-framed language</li>
+  </ul>
+</div>
+
+<h2>Curation Output Schema</h2>
+<div class="grid">
+  <div class="card red">
+    <div class="card-title">criticalFindings[4]</div>
+    <div class="card-detail">id, headline, consequence (2-3 sentences), rag</div>
+  </div>
+  <div class="card red">
+    <div class="card-title">must[3-5]</div>
+    <div class="card-detail">id, headline, action, effort (low/med/high), isQuickWin</div>
+  </div>
+  <div class="card amber">
+    <div class="card-title">should[4-6]</div>
+    <div class="card-detail">id, headline, action, effort</div>
+  </div>
+  <div class="card green">
+    <div class="card-title">could[4-6]</div>
+    <div class="card-detail">id, headline, action, effort</div>
+  </div>
+  <div class="card blue">
+    <div class="card-title">costInsights</div>
+    <div class="card-detail">hasData, summary, items[{id, headline, insight}]</div>
+  </div>
+  <div class="card blue">
+    <div class="card-title">roadmap</div>
+    <div class="card-detail">week1_2, week3_6, week7_12 [{id, headline}]</div>
+  </div>
+  <div class="card">
+    <div class="card-title">executiveSummary</div>
+    <div class="card-detail">3-4 sentence board-level posture statement</div>
+  </div>
+</div>
+
+<h2>13-Slide Structure</h2>
+<table class="slide-table">
+<thead><tr><th>#</th><th>Slide</th><th>Content Source</th><th>Visual Elements</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Cover</td><td>Review metadata</td><td>Dark background, orange stripe</td></tr>
+<tr><td>2</td><td>How to Read</td><td>Static</td><td>3 tier cards with coloured left spines</td></tr>
+<tr><td>3</td><td>Executive Summary</td><td>overallScore + executiveSummary</td><td>4 KPI stat cards + concise narrative</td></tr>
+<tr><td>4</td><td>Six-Pillar Scorecard</td><td>pillarScores[]</td><td>Horizontal RAG bars (filled rectangles)</td></tr>
+<tr><td>5</td><td>Critical Findings</td><td>criticalFindings[0-3]</td><td>4 cards with coloured spine + consequence</td></tr>
+<tr><td>6</td><td>Prioritisation Framework</td><td>must/should/could headlines</td><td>3 columns with coloured spines</td></tr>
+<tr><td>7</td><td>MUST — Quick Wins</td><td>must (isQuickWin=true)</td><td>Red spine cards + <span class="badge badge-green">Low effort</span> badges</td></tr>
+<tr><td>8</td><td>MUST — Avoidable Crises</td><td>must (isQuickWin=false)</td><td>Red spine cards + red background tint</td></tr>
+<tr><td>9</td><td>SHOULD — Plan This Quarter</td><td>should[0-5]</td><td>Amber spine cards + effort badges</td></tr>
+<tr><td>10</td><td>COULD — Strategic</td><td>could[0-5]</td><td>Green spine cards + effort badges</td></tr>
+<tr><td>11</td><td>Cost Optimisation</td><td>costInsights</td><td>Items + dashed "needs research" callout</td></tr>
+<tr><td>12</td><td>90-Day Roadmap</td><td>roadmap</td><td>Table (Timeframe / Actions / Tier)</td></tr>
+<tr><td>13</td><td>Discussion & Next Steps</td><td>Static + review metadata</td><td>4 numbered action items + follow-up date</td></tr>
+</tbody>
+</table>
+
+<h2>Visual Design System</h2>
+<div class="grid">
+  <div class="card"><div class="card-title">Theme</div><div class="card-detail">Squid Ink #232F3E + Orange #FF9900<br>Heading: Georgia | Body: Calibri<br>Layout: LAYOUT_WIDE (13.33" × 7.5")</div></div>
+  <div class="card red"><div class="card-title">MUST (Red)</div><div class="card-detail">#D13212<br>Board-level risks + quick wins<br>Red spine + red-tinted background</div></div>
+  <div class="card amber"><div class="card-title">SHOULD (Amber)</div><div class="card-detail">#FF9900<br>High-value quarterly work<br>Amber spine + grey background</div></div>
+  <div class="card green"><div class="card-title">COULD (Green)</div><div class="card-detail">#1D8102<br>Strategic improvements<br>Green spine + grey background</div></div>
+  <div class="card blue"><div class="card-title">Effort Badges</div><div class="card-detail">⚡ Low effort (green)<br>⚙️ Medium effort (grey)<br>🏗️ High effort (red)</div></div>
+  <div class="card"><div class="card-title">Callout Box</div><div class="card-detail">Rounded rect, dashed amber border<br>Yellow fill (#FFFBE6)<br>"Needs more research" pattern</div></div>
+</div>
+
+<h2>Performance & Cost</h2>
+<table class="slide-table">
+<thead><tr><th>Stage</th><th>Duration</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td>Grounding fetch</td><td>1-3s</td><td>—</td></tr>
+<tr><td>Tailored recommendations (batched)</td><td>30-90s</td><td>~$0.01</td></tr>
+<tr><td>AI Curation (single call)</td><td>5-15s</td><td>~$0.005</td></tr>
+<tr><td>PPTX build + S3 save</td><td>2-5s</td><td><$0.001</td></tr>
+<tr><td><strong>Total per deck</strong></td><td><strong>40-120s</strong></td><td><strong>~$0.02</strong></td></tr>
+</tbody>
+</table>
+
+<h2>Fallback Behaviour</h2>
+<div class="rules-box">
+  <h3>If curateDeck Lambda call fails:</h3>
+  <ul>
+    <li>Frontend logs error to console</li>
+    <li>Falls back to <strong>buildCLevelPptx</strong> (mechanical layout: RED→MUST, AMBER→SHOULD, GREEN→COULD)</li>
+    <li>Shows alert: "AI curation was unavailable — deck generated using standard layout"</li>
+    <li>Mechanical deck still saves to S3 and sends notification if email provided</li>
+  </ul>
+</div>
+
+<div class="note">Logic flow generated from docs/CLEVEL-DECK-LOGIC.md | Version: Gold-standard v1.3 | July 2026</div>
+</body>
+</html>

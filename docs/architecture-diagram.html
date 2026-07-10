@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WorkSpaces WAFR Tool — Architecture Diagram</title>
+<style>
+@page { size: A3 landscape; margin: 15mm; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #16191f; padding: 30px; max-width: 1400px; margin: 0 auto; background: #fff; }
+h1 { font-size: 22px; color: #232f3e; border-bottom: 3px solid #ff9900; padding-bottom: 8px; margin-bottom: 24px; }
+h2 { font-size: 16px; color: #232f3e; margin-top: 30px; margin-bottom: 12px; }
+.subtitle { font-size: 12px; color: #5f6b7a; margin-bottom: 24px; }
+.diagram { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin: 20px 0; }
+.layer { background: #f8f9fa; border: 1px solid #e1e4e8; border-radius: 8px; padding: 16px; width: 100%; }
+.layer-title { font-size: 13px; font-weight: 600; color: #ff9900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.services { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.svc { background: #fff; border: 2px solid #232f3e; border-radius: 6px; padding: 10px 14px; text-align: center; min-width: 130px; }
+.svc .svc-name { font-size: 11px; font-weight: 600; color: #232f3e; }
+.svc .svc-detail { font-size: 9px; color: #5f6b7a; margin-top: 4px; }
+.svc.highlight { border-color: #ff9900; background: #fff8f0; }
+.svc.ai { border-color: #0073bb; background: #f0f8ff; }
+.svc.storage { border-color: #1d8102; background: #f2f8f0; }
+.arrow { text-align: center; font-size: 20px; color: #5f6b7a; padding: 8px 0; }
+.flow-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }
+.flow-table th { background: #232f3e; color: #fff; padding: 8px 12px; text-align: left; }
+.flow-table td { padding: 8px 12px; border-bottom: 1px solid #e1e4e8; }
+.flow-table tr:nth-child(even) { background: #f8f9fa; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; color: #fff; }
+.badge-active { background: #1d8102; }
+.badge-region { background: #0073bb; }
+.note { font-size: 11px; color: #5f6b7a; font-style: italic; margin-top: 16px; }
+@media print { body { padding: 10px; } .no-print { display: none; } }
+</style>
+</head>
+<body>
+<div class="no-print" style="margin-bottom:16px;text-align:center;padding:12px;background:#232f3e;border-radius:6px;">
+  <button onclick="window.print()" style="padding:10px 24px;background:#ff9900;border:none;color:#fff;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;">Save as PDF (Cmd+P)</button>
+</div>
+
+<h1>WorkSpaces WAFR Tool — System Architecture</h1>
+<div class="subtitle">Account: 590183747733 | Region: eu-west-2 | Last updated: July 2026</div>
+
+<!-- User Layer -->
+<div class="layer">
+  <div class="layer-title">User Layer</div>
+  <div class="services">
+    <div class="svc"><div class="svc-name">TAM / Reviewer</div><div class="svc-detail">Browser (Chrome/Safari)</div></div>
+    <div class="svc"><div class="svc-name">pptxgenjs</div><div class="svc-detail">Client-side PPTX gen (CDN)</div></div>
+    <div class="svc"><div class="svc-name">Cognito JS SDK</div><div class="svc-detail">Auth (CDN)</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼ HTTPS</div>
+
+<!-- Hosting Layer -->
+<div class="layer">
+  <div class="layer-title">Hosting & Delivery</div>
+  <div class="services">
+    <div class="svc highlight"><div class="svc-name">AWS Amplify</div><div class="svc-detail">App: d1p2543h8l2mfc</div></div>
+    <div class="svc"><div class="svc-name">CloudFront</div><div class="svc-detail">CDN (auto via Amplify)</div></div>
+    <div class="svc"><div class="svc-name">S3</div><div class="svc-detail">Static assets (auto)</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼ HTTPS</div>
+
+<!-- Auth Layer -->
+<div class="layer">
+  <div class="layer-title">Authentication</div>
+  <div class="services">
+    <div class="svc highlight"><div class="svc-name">Amazon Cognito</div><div class="svc-detail">User Pool: eu-west-2_Wy0eJHyN3</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼ JWT Token</div>
+
+<!-- API Layer -->
+<div class="layer">
+  <div class="layer-title">API Layer</div>
+  <div class="services">
+    <div class="svc highlight"><div class="svc-name">AWS AppSync</div><div class="svc-detail">GraphQL API (Cognito auth)</div></div>
+    <div class="svc highlight"><div class="svc-name">API Gateway</div><div class="svc-detail">HTTP API: 6ylrfwa3d8</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- Compute Layer -->
+<div class="layer">
+  <div class="layer-title">Compute</div>
+  <div class="services">
+    <div class="svc"><div class="svc-name">Lambda: wafr-explain</div><div class="svc-detail">AI Guidance (512 tokens)</div></div>
+    <div class="svc highlight"><div class="svc-name">Lambda: wafr-email-report</div><div class="svc-detail">90s timeout, 256MB<br>Actions: generate, curateDeck, chat, email, notify, saveReport, listReports, getReport, deleteReport</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼</div>
+
+<!-- AI + Storage Layer -->
+<div class="layer">
+  <div class="layer-title">AI & Storage</div>
+  <div class="services">
+    <div class="svc ai"><div class="svc-name">Amazon Bedrock</div><div class="svc-detail">Claude Haiku 4.5 (EU)<br>eu.anthropic.claude-haiku-4-5</div></div>
+    <div class="svc storage"><div class="svc-name">DynamoDB</div><div class="svc-detail">wafr-reviews<br>wafr-templates<br>PITR enabled</div></div>
+    <div class="svc storage"><div class="svc-name">S3</div><div class="svc-detail">wafr-reports-danmmat-9219112<br>Saved reports (HTML/PPTX)</div></div>
+    <div class="svc"><div class="svc-name">Amazon SES</div><div class="svc-detail">Email delivery<br>Sender: danmmat@amazon.co.uk</div></div>
+  </div>
+</div>
+
+<h2>Data Flows</h2>
+<table class="flow-table">
+<thead><tr><th>Flow</th><th>Path</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>Auth</td><td>Browser → Cognito → JWT → AppSync/API GW</td><td>User authentication</td></tr>
+<tr><td>CRUD</td><td>Browser → AppSync → DynamoDB</td><td>Save/load reviews and templates</td></tr>
+<tr><td>AI Guidance</td><td>Browser → API GW → Lambda (explain) → Bedrock</td><td>Per-question guidance panel</td></tr>
+<tr><td>Report Gen</td><td>Browser → API GW → Lambda (generate) → Bedrock</td><td>Tailored observations/recommendations (batched)</td></tr>
+<tr><td>C-Level Curation</td><td>Browser → API GW → Lambda (curateDeck) → Bedrock</td><td>AI curation of findings into business narrative</td></tr>
+<tr><td>AI Chat</td><td>Browser → API GW → Lambda (chat) → Bedrock</td><td>Conversational Q&A grounded in review data</td></tr>
+<tr><td>Email</td><td>Browser → API GW → Lambda (email/notify) → SES</td><td>Send reports and notifications</td></tr>
+<tr><td>Report Storage</td><td>Browser → API GW → Lambda → S3</td><td>Save/list/get/delete generated reports</td></tr>
+<tr><td>PPTX Build</td><td>Browser (pptxgenjs) → S3 (via Lambda saveReport)</td><td>C-Level Deck generation + save</td></tr>
+</tbody>
+</table>
+
+<h2>Services Summary</h2>
+<table class="flow-table">
+<thead><tr><th>Service</th><th>Resource</th><th>Purpose</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Amplify</td><td>d1p2543h8l2mfc</td><td>Static site hosting + CDN</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr><td>Cognito</td><td>eu-west-2_Wy0eJHyN3</td><td>User authentication</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr><td>AppSync</td><td>GraphQL API</td><td>Review/template CRUD</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr><td>API Gateway</td><td>6ylrfwa3d8</td><td>HTTP API for Lambda</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr><td>Lambda</td><td>wafr-explain</td><td>AI guidance</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr><td>Lambda</td><td>wafr-email-report</td><td>Reports, email, chat, curation</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr><td>Bedrock</td><td>Claude Haiku 4.5</td><td>AI generation</td><td><span class="badge badge-region">eu-west-2</span></td></tr>
+<tr><td>DynamoDB</td><td>wafr-reviews, wafr-templates</td><td>Data storage (PITR)</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr><td>S3</td><td>wafr-reports-danmmat-9219112</td><td>Report storage</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr><td>SES</td><td>danmmat@amazon.co.uk</td><td>Email delivery</td><td><span class="badge badge-active">Active</span></td></tr>
+</tbody>
+</table>
+
+<h2>Deployment</h2>
+<table class="flow-table">
+<thead><tr><th>Component</th><th>Deploy Method</th><th>Trigger</th></tr></thead>
+<tbody>
+<tr><td>Frontend (index.html)</td><td>Amplify manual deployment (zip upload via CloudShell)</td><td>Manual after git push</td></tr>
+<tr><td>Lambda (wafr-email-report)</td><td>Lambda update-function-code (zip via CloudShell)</td><td>Manual after git push</td></tr>
+<tr><td>Source code</td><td>GitHub (private repo, SSH push from Kiro)</td><td>On code change</td></tr>
+</tbody>
+</table>
+
+<div class="note">Architecture generated from docs/ARCHITECTURE.md | Account 590183747733 | Region eu-west-2</div>
+</body>
+</html>
