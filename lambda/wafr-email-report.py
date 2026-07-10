@@ -237,6 +237,12 @@ RULES:
 7. Cost optimisation: Only quantify savings where the source data provides figures. Otherwise write "Requires fleet inventory and billing data to quantify."
 8. 90-Day Roadmap: Assign curated items to Week 1-2 (urgent MUST), Week 3-6 (remaining MUST + top SHOULD), Week 7-12 (SHOULD + COULD).
 
+WORDING RULES (CRITICAL - apply to ALL text you generate):
+9. NEVER use the words "customer", "the customer", or "Customer-1" in any output text. These are BANNED. Use the organisation name "{customer_name}", or "the estate", "the fleet", "your WorkSpaces environment", or address the subject directly.
+10. Rewrite "Customer recognizes the need to X" as "X is not yet in place" or "The fleet currently lacks X". State what IS and what it RISKS. Use executive voice.
+11. Keep all text concise — headlines 5-8 words, actions max 2 sentences, consequences max 3 sentences. This is a scannable exec deck, not a report.
+12. executiveSummary must be exactly 3-4 SHORT sentences (max 30 words each). State posture, key risks, and recommended focus. No paragraph walls.
+
 Respond with ONLY valid JSON in this exact structure:
 {{
   "criticalFindings": [

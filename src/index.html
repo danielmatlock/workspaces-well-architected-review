@@ -2002,18 +2002,28 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   // ═══════════════════════════════════════════════════════════
   // SLIDE 3: Executive Summary
   // ═══════════════════════════════════════════════════════════
-  var s3 = addContentSlide('Executive Summary');
-  s3.addText(overallScore + '%', { x: 5.5, y: 1.4, w: 2.5, fontSize: 48, bold: true, color: ragColor(getRag(overallScore)), align: 'center', fontFace: 'Calibri' });
-  s3.addText('Overall Score — ' + getRag(overallScore).toUpperCase(), { x: 4, y: 2.3, w: 5.5, fontSize: 14, align: 'center', color: SQUID, fontFace: 'Calibri' });
-  // Executive summary text from Bedrock
-  if (curated.executiveSummary) {
-    s3.addText(curated.executiveSummary, { x: 0.8, y: 2.9, w: 11.5, h: 3.2, fontSize: 12, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.4, valign: 'top' });
-  }
-  // Stats bar
   var mustCount = (curated.must || []).length;
   var shouldCount = (curated.should || []).length;
   var couldCount = (curated.could || []).length;
-  s3.addText(mustCount + ' Critical (Must)  |  ' + shouldCount + ' Improvements (Should)  |  ' + couldCount + ' Strategic (Could)', { x: 1, y: 6.5, w: 11, fontSize: 12, align: 'center', color: GREY, fontFace: 'Calibri' });
+  var s3 = addContentSlide('Executive Summary');
+  // KPI stat cards row
+  var kpiData = [
+    { value: overallScore + '%', label: 'Overall Score', color: ragColor(getRag(overallScore)) },
+    { value: String(mustCount), label: 'Must (Critical)', color: RED },
+    { value: String(shouldCount), label: 'Should (Quarter)', color: AMBER },
+    { value: String(couldCount), label: 'Could (Strategic)', color: GREEN }
+  ];
+  var kpiX = 0.5;
+  kpiData.forEach(function(kpi) {
+    s3.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: kpiX, y: 1.2, w: 3.0, h: 1.5, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.03 });
+    s3.addText(kpi.value, { x: kpiX, y: 1.35, w: 3.0, fontSize: 36, bold: true, color: kpi.color, align: 'center', fontFace: 'Calibri' });
+    s3.addText(kpi.label, { x: kpiX, y: 2.1, w: 3.0, fontSize: 11, color: GREY, align: 'center', fontFace: 'Calibri' });
+    kpiX += 3.2;
+  });
+  // Executive summary text (concise)
+  if (curated.executiveSummary) {
+    s3.addText(curated.executiveSummary, { x: 0.5, y: 3.1, w: 12.3, h: 2.8, fontSize: 13, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.5, valign: 'top' });
+  }
 
   // ═══════════════════════════════════════════════════════════
   // SLIDE 4: Six-Pillar Scorecard with RAG bars
