@@ -1625,8 +1625,7 @@ async function startCLevelDeck(id) {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
     try {
-      buildCLevelPptx(review, window._lastRecommendations || {});
-      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, true, '');
+      buildCLevelPptx(review, window._lastRecommendations || {}, notifyEmail);
     } catch(e) {
       console.error('PPTX build error:', e);
       alert('Error building PowerPoint: ' + e.message);
@@ -1637,8 +1636,7 @@ async function startCLevelDeck(id) {
     window._pdfReferenceContext = '';
     console.error('C-Level Deck generation error:', err);
     try {
-      buildCLevelPptx(review, {});
-      if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, true, 'AI recommendations were unavailable — deck generated using notes only.');
+      buildCLevelPptx(review, {}, notifyEmail);
     } catch(e) {
       console.error('PPTX build error (fallback):', e);
       alert('Error building PowerPoint: ' + e.message);
@@ -1650,18 +1648,21 @@ async function startCLevelDeck(id) {
 }
 
 function sendDeckNotification(recipient, customerName, filename, success, detail) {
-  var subject = success ? 'C-Level Deck Generated Successfully — ' + customerName : 'C-Level Deck Generation Failed — ' + customerName;
+  var subject = success ? 'C-Level Deck Generated Successfully - ' + customerName : 'C-Level Deck Generation Failed - ' + customerName;
   var bodyHtml = success
     ? '<p>The C-Level Executive Briefing for <strong>' + customerName + '</strong> was generated successfully.</p><p><strong>File:</strong> ' + filename + '</p>' + (detail ? '<p><strong>Note:</strong> ' + detail + '</p>' : '') + '<p>Access the deck from Saved Reports in the WAFR Tool.</p>'
     : '<p>The C-Level Executive Briefing for <strong>' + customerName + '</strong> failed to generate.</p><p><strong>Error:</strong> ' + detail + '</p><p>Please try again or check the browser console for more details.</p>';
+  console.log('Sending deck notification to:', recipient, 'success:', success);
   fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'notify', recipient: recipient, subject: subject, htmlBody: bodyHtml })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    console.log('Deck notification response:', d);
   }).catch(function(e) { console.log('Notification email error:', e); });
 }
 
-function buildCLevelPptx(review, recommendations) {
+function buildCLevelPptx(review, recommendations, notifyEmail) {
   var pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE';
   pptx.author = 'AWS WorkSpaces WAFR Tool';
@@ -1866,9 +1867,11 @@ function buildCLevelPptx(review, recommendations) {
   // Save to S3 only (no local download)
   pptx.write('base64').then(function(base64) {
     saveReportToCloud(review.id, 'clevel', base64, 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx', review.customer);
+    if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, filename, true, '');
     alert('C-Level Deck saved. Access it from Saved Reports.');
   }).catch(function(e) {
     console.error('PPTX write error:', e);
+    if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, filename, false, e.message);
     alert('Error saving PowerPoint: ' + e.message);
   });
 }
