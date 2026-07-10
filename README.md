@@ -60,3 +60,12 @@ To deploy: Actions tab → "Deploy WorkSpaces WAFR Amplify App" → Run workflow
 | 2026-07-08 | Fixed: cloud sync now treats DynamoDB as source of truth (deleted reviews stay deleted for all users) |
 | 2026-07-08 | Report generation overlay updated to remove specific time estimate |
 | 2026-07-10 | C-Level Deck: optional email notification on completion/failure (new `notify` Lambda action via SES) |
+| 2026-07-10 | C-Level Deck: Gold-standard rewrite — AI curation via new `curateDeck` Lambda action replaces mechanical RAG mapping |
+| 2026-07-10 | C-Level Deck: 13 fixed slides with business-framed headlines, coloured spines, RAG bars, effort badges, cost callouts |
+| 2026-07-10 | C-Level Deck: Critical Findings slide shows 4 board-level risks with consequence narrative |
+| 2026-07-10 | C-Level Deck: Prioritisation Framework uses curated tier headlines (not raw question IDs) |
+| 2026-07-10 | C-Level Deck: MUST tier split into Quick Wins vs Avoidable Crises |
+| 2026-07-10 | C-Level Deck: Cost Optimisation slide with "needs more research" callout where data unavailable |
+| 2026-07-10 | C-Level Deck: Discussion & Next Steps slide with 4 numbered action items and follow-up review date |
+| 2026-07-10 | C-Level Deck: Falls back to mechanical layout if AI curation call fails |
+| 2026-07-10 | Fixed: slide 3 exec summary text overlap, slide 11 cost text clipping, slide 12 roadmap overflow |

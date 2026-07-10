@@ -149,7 +149,7 @@ flowchart LR
 | DynamoDB | Table: `wafr-templates` | Template storage | ✅ Active | ✅ PITR enabled |
 | API Gateway | API: `6ylrfwa3d8` | HTTP API for AI explain + email report | ✅ Active | Git (Lambda code) |
 | Lambda | Function: `wafr-explain` | Calls Bedrock for AI guidance | ✅ Active | Git |
-| Lambda | Function: `wafr-email-report` | Generates tailored reports, sends via SES, manages S3 reports (save/list/get/delete), sends email notifications (notify action) (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
+| Lambda | Function: `wafr-email-report` | Generates tailored reports, sends via SES, manages S3 reports (save/list/get/delete), sends email notifications (notify), curates C-Level Deck findings (curateDeck) (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
 | Bedrock | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | AI explanation + tailored recommendations | ✅ Active | N/A |
 | S3 | Bucket: `wafr-reports-danmmat-9219112` | Auto-saved report storage | ✅ Active | N/A |
 | SES | Verified sender: `danmmat@amazon.co.uk` | Email delivery for reports | ✅ Active (sandbox) | N/A |
@@ -278,28 +278,58 @@ Lambda action: saveReport
     Writes to s3://wafr-reports-danmmat-9219112/{reviewId}/{reportType}_{timestamp}.{ext}
     │
     ▼
-User clicks "C-Level Deck" → modal shows dropdowns populated from S3
+User clicks "C-Level Deck" → modal shows:
+    - So What Report dropdown (optional grounding source)
+    - WAFR Report dropdown (optional grounding source)
+    - Notification Email field (optional alert on completion)
     │
     ▼
 Lambda action: listReports → returns saved So What + Standard reports for that review
     │
     ▼
-User selects reports → clicks Generate
+User selects reports + enters email → clicks Generate
     │
     ▼
-Lambda action: getReport → returns presigned S3 URL (5 min expiry)
+Lambda action: getReport → returns base64-encoded report content
     │
     ▼
-Browser fetches HTML via presigned URL, strips HTML tags
+Browser strips HTML tags from report content for grounding context
     │
     ▼
-Text passed as grounding context to Bedrock (reduces hallucinations)
+Step 1: Generate tailored recommendations (batched Bedrock calls, 5 questions per batch)
     │
     ▼
-C-Level PowerPoint generated with grounded AI recommendations
+Step 2: Call curateDeck Lambda action with ALL findings + scores + recommendations
     │
     ▼
-PPTX saved to S3 only (no local download) → user accesses via Saved Reports modal
+Lambda: Bedrock Claude Haiku 4.5 (8192 tokens) curates findings into:
+    - 4 Critical Findings (business headlines + consequences)
+    - Curated MUST / SHOULD / COULD tiers (NOT mechanical RAG mapping)
+    - Cost insights with data availability flag
+    - 90-Day Roadmap assignment
+    - Executive summary paragraph
+    │
+    ▼
+Step 3: buildCuratedCLevelPptx builds 13-slide fixed deck:
+    1. Cover
+    2. How to Read (tier cards with coloured spines)
+    3. Executive Summary (score + Bedrock narrative)
+    4. Six-Pillar Scorecard (RAG bars)
+    5. Critical Findings (4 business-framed cards)
+    6. Prioritisation Framework (3 columns)
+    7. MUST — Quick Wins (effort badges)
+    8. MUST — Avoidable Crises
+    9. SHOULD — Plan This Quarter
+    10. COULD — Strategic Improvements
+    11. Cost Optimisation (with "needs more research" callout)
+    12. 90-Day Roadmap
+    13. Discussion & Next Steps (4 action items + review date)
+    │
+    ▼
+PPTX saved to S3 → email notification sent (if email provided)
+    │
+    ▼
+Fallback: if curateDeck fails, uses mechanical buildCLevelPptx instead
 ```
 
 ## Email Report Flow
