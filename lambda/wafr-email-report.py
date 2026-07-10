@@ -172,6 +172,52 @@ def handler(event, context):
                 'body': json.dumps({'message': 'Report sent successfully'})
             }
         
+        if action == 'chat':
+            question = body['question']
+            context_text = body.get('context', '')
+            history = body.get('history', [])
+            customer_name = body.get('customerName', 'Customer')
+
+            messages = []
+            system_prompt = (
+                f"You are an AWS Solutions Architect assistant for {customer_name}'s WorkSpaces Well-Architected Review. "
+                "Answer questions concisely and accurately using ONLY the review data provided below. "
+                "If the answer is not in the context, say so. Use bullet points for lists. "
+                "Keep answers to 2-4 sentences unless more detail is specifically requested.\n\n"
+                "REVIEW CONTEXT:\n" + context_text[:25000]
+            )
+
+            # Add conversation history
+            for msg in history[-6:]:  # Keep last 6 messages for context
+                messages.append({'role': msg['role'], 'content': msg['content']})
+            messages.append({'role': 'user', 'content': question})
+
+            try:
+                response = bedrock.invoke_model(
+                    modelId=MODEL_ID,
+                    contentType='application/json',
+                    accept='application/json',
+                    body=json.dumps({
+                        'anthropic_version': 'bedrock-2023-05-31',
+                        'max_tokens': 1024,
+                        'system': system_prompt,
+                        'messages': messages
+                    })
+                )
+                result = json.loads(response['body'].read())
+                answer = result['content'][0]['text'].strip()
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'answer': answer})
+                }
+            except Exception as e:
+                return {
+                    'statusCode': 500,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': 'Chat failed: ' + str(e)})
+                }
+
         if action == 'notify':
             recipient = body['recipient']
             subject = body['subject']

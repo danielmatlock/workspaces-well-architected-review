@@ -164,9 +164,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .log-entry.info .log-msg { color: #aab7c4; }
 .log-entry.success .log-msg { color: #1d8102; }
 .log-entry.warn .log-msg { color: #ff9900; }
+/* Chat widget */
+.chat-widget { position: fixed; bottom: 0; right: 20px; width: 400px; z-index: 160; display: flex; flex-direction: column; transition: height 0.2s; }
+.chat-widget.collapsed { height: 42px; }
+.chat-widget.expanded { height: 420px; }
+.chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #232f3e; border-radius: 8px 8px 0 0; cursor: pointer; flex-shrink: 0; }
+.chat-header span { font-size: 13px; font-weight: 600; color: #ff9900; }
+.chat-header button { background: none; border: none; color: #aab7c4; font-size: 16px; cursor: pointer; }
+.chat-header button:hover { color: #ff9900; }
+.chat-body { flex: 1; background: #fff; border-left: 1px solid #e1e4e8; border-right: 1px solid #e1e4e8; overflow-y: auto; padding: 12px; display: none; }
+.chat-widget.expanded .chat-body { display: block; }
+.chat-input-bar { display: none; padding: 8px 12px; background: #fff; border: 1px solid #e1e4e8; border-top: none; border-radius: 0 0 8px 8px; }
+.chat-widget.expanded .chat-input-bar { display: flex; gap: 8px; }
+.chat-input-bar input { flex: 1; padding: 8px 12px; border: 1px solid #d5dbdb; border-radius: 4px; font-size: 13px; }
+.chat-input-bar input:focus { outline: none; border-color: #ff9900; }
+.chat-input-bar button { padding: 8px 14px; background: #ff9900; border: none; color: #fff; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; }
+.chat-input-bar button:hover { background: #ec7211; }
+.chat-input-bar button:disabled { background: #d5dbdb; cursor: not-allowed; }
+.chat-msg { margin-bottom: 10px; }
+.chat-msg.user { text-align: right; }
+.chat-msg.user .chat-bubble { background: #ff9900; color: #fff; display: inline-block; padding: 8px 12px; border-radius: 12px 12px 2px 12px; font-size: 13px; max-width: 85%; text-align: left; }
+.chat-msg.assistant .chat-bubble { background: #f1f3f5; color: #16191f; display: inline-block; padding: 8px 12px; border-radius: 12px 12px 12px 2px; font-size: 13px; max-width: 85%; text-align: left; line-height: 1.5; }
+.chat-msg.assistant .chat-bubble strong { color: #232f3e; }
+.chat-typing { font-size: 12px; color: #5f6b7a; font-style: italic; padding: 4px 0; }
+
 .log-entry.error .log-msg { color: #d13212; }
 @media print {
-  .sidebar, .topbar, .btn, .question-nav { display: none !important; }
+  .sidebar, .topbar, .btn, .question-nav, .chat-widget { display: none !important; }
   .main { margin-left: 0 !important; }
   .content { padding: 10px !important; }
 }
@@ -584,6 +608,7 @@ function getRag(pct) {
 function showHome() {
   state.view = 'home';
   state.activeReview = null;
+  removeChatWidget();
   
   document.getElementById('sidebar').innerHTML = '<div class="sidebar-header"><h1>WAFR Review Tool</h1><h2>Home</h2><div class="sub">v4.0</div></div>' +
     '<div class="sidebar-nav"><div class="nav-section">Navigation</div>' +
@@ -798,6 +823,7 @@ function renderSidebar() {
 function showReviewDashboard() {
   state.view = 'dashboard';
   renderSidebar();
+  renderChatWidget();
   var review = getReview(state.activeReview);
   
   document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
@@ -884,6 +910,7 @@ function showPillar(idx) {
 
 function renderQuestion() {
   renderSidebar();
+  renderChatWidget();
   var review = getReview(state.activeReview);
   var pillar = review.pillars[state.activePillar];
   var q = pillar.questions[state.activeQuestion];
@@ -1013,6 +1040,7 @@ function saveCurrentNotes() {
 function showImprovement() {
   state.view = 'improvement';
   renderSidebar();
+  renderChatWidget();
   var review = getReview(state.activeReview);
   
   document.getElementById('topbar').innerHTML = '<h3>Improvement Plan</h3><div class="topbar-actions"></div>';
@@ -2309,6 +2337,148 @@ function deleteSavedReport(key, reviewId) {
     if (payload.deleted) { showSavedReports(reviewId); }
     else { alert('Delete failed: ' + JSON.stringify(payload)); }
   }).catch(function(e) { alert('Error deleting report: ' + e.message); });
+}
+
+// === CHAT WIDGET ===
+var chatHistory = [];
+var chatContext = '';
+var chatContextLoaded = false;
+
+function renderChatWidget() {
+  // Only show on review dashboard/questions/improvement views
+  if (!state.activeReview) { removeChatWidget(); return; }
+  if (document.getElementById('chat-widget')) return;
+  var widget = document.createElement('div');
+  widget.id = 'chat-widget';
+  widget.className = 'chat-widget collapsed';
+  widget.innerHTML = '<div class="chat-header" onclick="toggleChat()">' +
+    '<span>Ask about this review</span>' +
+    '<button id="chat-toggle-btn">+</button></div>' +
+    '<div class="chat-body" id="chat-body"></div>' +
+    '<div class="chat-input-bar">' +
+    '<input id="chat-input" type="text" placeholder="Ask a question about this review..." onkeydown="if(event.key===\'Enter\')sendChatMsg()">' +
+    '<button id="chat-send-btn" onclick="sendChatMsg()">Send</button></div>';
+  document.body.appendChild(widget);
+}
+
+function removeChatWidget() {
+  var el = document.getElementById('chat-widget');
+  if (el) el.remove();
+  chatHistory = [];
+  chatContext = '';
+  chatContextLoaded = false;
+}
+
+function toggleChat() {
+  var widget = document.getElementById('chat-widget');
+  var btn = document.getElementById('chat-toggle-btn');
+  if (widget.classList.contains('collapsed')) {
+    widget.classList.remove('collapsed');
+    widget.classList.add('expanded');
+    btn.textContent = '\u2212';
+    if (!chatContextLoaded) loadChatContext();
+    setTimeout(function() { document.getElementById('chat-input').focus(); }, 100);
+  } else {
+    widget.classList.remove('expanded');
+    widget.classList.add('collapsed');
+    btn.textContent = '+';
+  }
+}
+
+async function loadChatContext() {
+  var review = getReview(state.activeReview);
+  if (!review) return;
+  chatContextLoaded = true;
+  // Build context from review data (answers + notes)
+  var contextParts = [];
+  contextParts.push('Customer: ' + review.customer);
+  contextParts.push('Date: ' + review.date);
+  contextParts.push('Overall Score: ' + getOverallScore(review) + '%');
+  review.pillars.forEach(function(p, i) {
+    var s = getPillarScore(review, i);
+    contextParts.push(p.name + ': ' + s.pct + '% (' + getRag(s.pct) + '), ' + s.answered + '/' + s.total + ' answered');
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id] || {};
+      if (a.score) {
+        contextParts.push(q.id + ' | ' + q.q + ' | Score: ' + a.score + (a.notes ? ' | Notes: ' + a.notes : ''));
+      }
+    });
+  });
+  chatContext = contextParts.join('\n');
+  // Try to fetch saved reports for richer context
+  try {
+    var res = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'listReports', reviewId: review.id })
+    });
+    var data = await res.json();
+    var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+    var reports = payload.reports || [];
+    // Get latest So What and Standard reports
+    var sowhat = reports.find(function(r) { return r.reportType === 'sowhat' && r.extension === 'html'; });
+    var standard = reports.find(function(r) { return r.reportType === 'standard' && r.extension === 'html'; });
+    if (sowhat) {
+      var r1 = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: sowhat.key }) });
+      var d1 = await r1.json(); var p1 = typeof d1.body === 'string' ? JSON.parse(d1.body) : d1;
+      if (p1.data) chatContext += '\n\n=== SO WHAT REPORT ===\n' + atob(p1.data).replace(/<[^>]+>/g, ' ').substring(0, 12000);
+    }
+    if (standard) {
+      var r2 = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: standard.key }) });
+      var d2 = await r2.json(); var p2 = typeof d2.body === 'string' ? JSON.parse(d2.body) : d2;
+      if (p2.data) chatContext += '\n\n=== WAFR REPORT ===\n' + atob(p2.data).replace(/<[^>]+>/g, ' ').substring(0, 12000);
+    }
+  } catch(e) { console.log('Chat context enrichment skipped:', e); }
+}
+
+async function sendChatMsg() {
+  var input = document.getElementById('chat-input');
+  var question = input.value.trim();
+  if (!question) return;
+  input.value = '';
+  var body = document.getElementById('chat-body');
+  var review = getReview(state.activeReview);
+  // Show user message
+  body.innerHTML += '<div class="chat-msg user"><div class="chat-bubble">' + escapeHtml(question) + '</div></div>';
+  body.innerHTML += '<div class="chat-typing" id="chat-typing">Thinking...</div>';
+  body.scrollTop = body.scrollHeight;
+  document.getElementById('chat-send-btn').disabled = true;
+  try {
+    var res = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'chat',
+        question: question,
+        context: chatContext,
+        history: chatHistory,
+        customerName: review ? review.customer : 'Customer'
+      })
+    });
+    var data = await res.json();
+    var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+    var typing = document.getElementById('chat-typing');
+    if (typing) typing.remove();
+    if (payload.answer) {
+      chatHistory.push({ role: 'user', content: question });
+      chatHistory.push({ role: 'assistant', content: payload.answer });
+      var formatted = payload.answer.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      body.innerHTML += '<div class="chat-msg assistant"><div class="chat-bubble">' + formatted + '</div></div>';
+    } else {
+      body.innerHTML += '<div class="chat-msg assistant"><div class="chat-bubble" style="color:#d13212">Error: ' + (payload.error || 'No response') + '</div></div>';
+    }
+  } catch(e) {
+    var typing = document.getElementById('chat-typing');
+    if (typing) typing.remove();
+    body.innerHTML += '<div class="chat-msg assistant"><div class="chat-bubble" style="color:#d13212">Network error. Please try again.</div></div>';
+  }
+  document.getElementById('chat-send-btn').disabled = false;
+  body.scrollTop = body.scrollHeight;
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // === INIT ===
