@@ -69,3 +69,10 @@ To deploy: Actions tab → "Deploy WorkSpaces WAFR Amplify App" → Run workflow
 | 2026-07-10 | C-Level Deck: Discussion & Next Steps slide with 4 numbered action items and follow-up review date |
 | 2026-07-10 | C-Level Deck: Falls back to mechanical layout if AI curation call fails |
 | 2026-07-10 | Fixed: slide 3 exec summary text overlap, slide 11 cost text clipping, slide 12 roadmap overflow |
+| 2026-07-10 | C-Level Deck: v1.3 spec — wording guard (no "customer" in slide text), KPI stat cards on exec summary, concise executive voice |
+| 2026-07-10 | Fixed: slide 5 critical findings headline overlapping consequence text |
+| 2026-07-10 | Fixed: slides 7-10 card content repositioned with more padding from header |
+| 2026-07-10 | Fixed: slide 11 cost callout box positioned dynamically below items |
+| 2026-07-10 | AI Chat widget added to review dashboard — ask questions about the review, grounded in saved reports + metadata |
+| 2026-07-10 | Chat widget includes all report metadata (C-Level, So What, WAFR) with timestamps and counts |
+| 2026-07-10 | Fixed: sidebar question items now jump directly to selected question (jumpToQuestion) |

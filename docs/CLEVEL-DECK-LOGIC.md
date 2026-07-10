@@ -200,6 +200,7 @@ If the `curateDeck` Lambda call fails (timeout, Bedrock error, JSON parse failur
 | `deleteReport` | Delete saved report from S3 | N/A | S3 key |
 | `email` | Send report as email attachment | N/A | HTML + recipient |
 | `notify` | Send simple notification email | N/A | Subject + body + recipient |
+| `chat` | AI chat — answer questions grounded in review data | 1024 | Question + context + history |
 
 ## Performance
 

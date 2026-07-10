@@ -120,6 +120,14 @@ sequenceDiagram
     L->>L: SES send_email (simple notification)
     L-->>AG: {message: Notification sent}
     AG-->>U: (fire-and-forget, no UI feedback)
+    Note over U: On AI Chat (review dashboard)
+    U->>U: loadChatContext (review data + S3 report metadata + report content)
+    U->>AG: POST /email-report {action: chat, question, context, history}
+    AG->>L: Invoke Lambda (wafr-email-report)
+    L->>B: InvokeModel (system prompt grounded in review context)
+    B-->>L: Answer (1024 tokens max)
+    L-->>AG: {answer: "..."}
+    AG-->>U: Display in chat bubble
 ```
 
 ## Deployment Pipeline
@@ -149,7 +157,7 @@ flowchart LR
 | DynamoDB | Table: `wafr-templates` | Template storage | ✅ Active | ✅ PITR enabled |
 | API Gateway | API: `6ylrfwa3d8` | HTTP API for AI explain + email report | ✅ Active | Git (Lambda code) |
 | Lambda | Function: `wafr-explain` | Calls Bedrock for AI guidance | ✅ Active | Git |
-| Lambda | Function: `wafr-email-report` | Generates tailored reports, sends via SES, manages S3 reports (save/list/get/delete), sends email notifications (notify), curates C-Level Deck findings (curateDeck) (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
+| Lambda | Function: `wafr-email-report` | Generates tailored reports, sends via SES, manages S3 reports (save/list/get/delete), sends email notifications (notify), curates C-Level Deck findings (curateDeck), AI chat (chat) (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
 | Bedrock | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | AI explanation + tailored recommendations | ✅ Active | N/A |
 | S3 | Bucket: `wafr-reports-danmmat-9219112` | Auto-saved report storage | ✅ Active | N/A |
 | SES | Verified sender: `danmmat@amazon.co.uk` | Email delivery for reports | ✅ Active (sandbox) | N/A |
@@ -388,6 +396,41 @@ Deck generation runs (Bedrock + PPTX build)
 
 Note: Notification is only sent if user entered an email address in the field.
       SES sandbox restrictions apply — recipient must be a verified address.
+```
+
+## AI Chat Widget Flow
+
+```
+User opens a review → chat widget appears (collapsed) at bottom-right
+    │
+    ▼
+User clicks "+" to expand chat
+    │
+    ▼
+loadChatContext() fires (first time only):
+    1. Builds context from review data (customer, date, scores, all answers + notes)
+    2. Fetches report list from S3 (all types: WAFR, So What, C-Level)
+    3. Adds report metadata to context (types, timestamps, counts, sizes)
+    4. Downloads latest So What + WAFR report content (HTML stripped to text, 12K chars each)
+    │
+    ▼
+User types question → clicks Send (or presses Enter)
+    │
+    ▼
+Browser sends POST to API Gateway
+    Body: { action: "chat", question, context (25K char max), history (last 6 msgs), customerName }
+    │
+    ▼
+Lambda → Bedrock (Claude Haiku 4.5, 1024 tokens, system prompt grounded in context)
+    │
+    ▼
+Answer displayed in chat bubble
+    │
+    ▼
+Conversation history maintained for follow-up questions (last 6 messages)
+    │
+    ▼
+Widget removed when user navigates back to Home
 ```
 
 ## Network Endpoints
