@@ -114,6 +114,12 @@ sequenceDiagram
     L->>L: Build email with HTML attachment
     L-->>AG: SES send
     AG-->>U: Success confirmation
+    Note over U: On C-Level Deck completion (if notification email provided)
+    U->>AG: POST /email-report {action: notify, recipient, subject, htmlBody}
+    AG->>L: Invoke Lambda (wafr-email-report)
+    L->>L: SES send_email (simple notification)
+    L-->>AG: {message: Notification sent}
+    AG-->>U: (fire-and-forget, no UI feedback)
 ```
 
 ## Deployment Pipeline
@@ -143,7 +149,7 @@ flowchart LR
 | DynamoDB | Table: `wafr-templates` | Template storage | ✅ Active | ✅ PITR enabled |
 | API Gateway | API: `6ylrfwa3d8` | HTTP API for AI explain + email report | ✅ Active | Git (Lambda code) |
 | Lambda | Function: `wafr-explain` | Calls Bedrock for AI guidance | ✅ Active | Git |
-| Lambda | Function: `wafr-email-report` | Generates tailored reports, sends via SES, manages S3 reports (save/list/get/delete) (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
+| Lambda | Function: `wafr-email-report` | Generates tailored reports, sends via SES, manages S3 reports (save/list/get/delete), sends email notifications (notify action) (90s timeout, 256MB, parallel batching) | ✅ Active | Git |
 | Bedrock | `eu.anthropic.claude-haiku-4-5-20251001-v1:0` | AI explanation + tailored recommendations | ✅ Active | N/A |
 | S3 | Bucket: `wafr-reports-danmmat-9219112` | Auto-saved report storage | ✅ Active | N/A |
 | SES | Verified sender: `danmmat@amazon.co.uk` | Email delivery for reports | ✅ Active (sandbox) | N/A |
@@ -320,6 +326,38 @@ SES sends email from danmmat@amazon.co.uk
     │
     ▼
 Note: SES is in sandbox mode — can only send to verified addresses
+```
+
+## C-Level Deck Email Notification Flow
+
+```
+User clicks "C-Level Deck" → modal shows:
+    - So What Report dropdown (optional)
+    - WAFR Report dropdown (optional)
+    - Notification Email field (optional)
+    │
+    ▼
+User enters email and clicks Generate
+    │
+    ▼
+Deck generation runs (Bedrock + PPTX build)
+    │
+    ├── Success → Browser sends POST to API Gateway
+    │       Body: { action: "notify", recipient, subject: "C-Level Deck Generated Successfully — Customer", htmlBody }
+    │       │
+    │       ▼
+    │   Lambda → SES sends success email with filename
+    │
+    ├── Partial success (AI unavailable, fallback to notes) → Same as above with note in body
+    │
+    └── Failure → Browser sends POST to API Gateway
+            Body: { action: "notify", recipient, subject: "C-Level Deck Generation Failed — Customer", htmlBody: error message }
+            │
+            ▼
+        Lambda → SES sends failure email with error details
+
+Note: Notification is only sent if user entered an email address in the field.
+      SES sandbox restrictions apply — recipient must be a verified address.
 ```
 
 ## Network Endpoints

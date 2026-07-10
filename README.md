@@ -53,3 +53,10 @@ To deploy: Actions tab → "Deploy WorkSpaces WAFR Amplify App" → Run workflow
 | 2025-07-07 | C-Level Deck: S3-grounded AI recommendations (replaces local PDF upload), PPTX saves to S3 only |
 | 2025-07-07 | Delete saved reports: red Delete button with confirm dialog, Lambda `deleteReport` action |
 | 2025-07-07 | Renamed "Standard Report" → "WAFR Report" in Saved Reports display |
+| 2026-07-08 | Fixed: orphaned closing div tag removed from HTML structure |
+| 2026-07-08 | C-Level Deck slide 6: fixed text alignment inside prioritisation boxes |
+| 2026-07-08 | C-Level Deck slides 6 + 13: added short question descriptions instead of bare IDs |
+| 2026-07-08 | Fixed: deleteReview now awaits DynamoDB confirmation; warns user on failure |
+| 2026-07-08 | Fixed: cloud sync now treats DynamoDB as source of truth (deleted reviews stay deleted for all users) |
+| 2026-07-08 | Report generation overlay updated to remove specific time estimate |
+| 2026-07-10 | C-Level Deck: optional email notification on completion/failure (new `notify` Lambda action via SES) |
