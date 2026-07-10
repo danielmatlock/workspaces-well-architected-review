@@ -2414,18 +2414,37 @@ async function loadChatContext() {
     var data = await res.json();
     var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
     var reports = payload.reports || [];
-    // Get latest So What and Standard reports
+
+    // Add report metadata to context (all types including C-Level)
+    if (reports.length > 0) {
+      var reportMeta = '\n\n=== SAVED REPORTS METADATA ===\n';
+      reportMeta += 'Total reports generated: ' + reports.length + '\n';
+      var typeCounts = {};
+      reports.forEach(function(r) {
+        var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : 'C-Level Deck';
+        typeCounts[typeLabel] = (typeCounts[typeLabel] || 0) + 1;
+        var ts = r.timestamp.replace('T', ' ').replace(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2})(\d{2})$/, '$1 $2:$3:$4');
+        reportMeta += '- ' + typeLabel + ' | Generated: ' + ts + ' | Extension: ' + r.extension + ' | Size: ' + r.size + ' bytes\n';
+      });
+      reportMeta += '\nReport counts by type:\n';
+      Object.keys(typeCounts).forEach(function(k) { reportMeta += '- ' + k + ': ' + typeCounts[k] + '\n'; });
+      chatContext += reportMeta;
+    } else {
+      chatContext += '\n\n=== SAVED REPORTS ===\nNo reports have been generated yet for this review.\n';
+    }
+
+    // Get latest So What and Standard report content for deeper context
     var sowhat = reports.find(function(r) { return r.reportType === 'sowhat' && r.extension === 'html'; });
     var standard = reports.find(function(r) { return r.reportType === 'standard' && r.extension === 'html'; });
     if (sowhat) {
       var r1 = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: sowhat.key }) });
       var d1 = await r1.json(); var p1 = typeof d1.body === 'string' ? JSON.parse(d1.body) : d1;
-      if (p1.data) chatContext += '\n\n=== SO WHAT REPORT ===\n' + atob(p1.data).replace(/<[^>]+>/g, ' ').substring(0, 12000);
+      if (p1.data) chatContext += '\n\n=== SO WHAT REPORT CONTENT ===\n' + atob(p1.data).replace(/<[^>]+>/g, ' ').substring(0, 12000);
     }
     if (standard) {
       var r2 = await fetch('https://6ylrfwa3d8.execute-api.eu-west-2.amazonaws.com/email-report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: standard.key }) });
       var d2 = await r2.json(); var p2 = typeof d2.body === 'string' ? JSON.parse(d2.body) : d2;
-      if (p2.data) chatContext += '\n\n=== WAFR REPORT ===\n' + atob(p2.data).replace(/<[^>]+>/g, ' ').substring(0, 12000);
+      if (p2.data) chatContext += '\n\n=== WAFR REPORT CONTENT ===\n' + atob(p2.data).replace(/<[^>]+>/g, ' ').substring(0, 12000);
     }
   } catch(e) { console.log('Chat context enrichment skipped:', e); }
 }
