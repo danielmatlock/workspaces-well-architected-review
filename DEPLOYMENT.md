@@ -65,6 +65,46 @@ aws lambda update-function-code --function-name wafr-email-report --zip-file fil
 | Issue | Fix |
 |-------|-----|
 | 404 after deploy | Zip structure wrong — must be `index.html` at root, not nested in `src/` |
+| 404 on root URL `/` but `/index.html` works | Rewrite rules missing or lost — see "Rewrite Rules" section below |
 | Empty zip | CloudShell session expired — re-curl the file from GitHub |
+| Pending job blocking new deploy | Stop it: `aws amplify stop-job --app-id d1p2543h8l2mfc --branch-name main --job-id <JOB_ID> --region eu-west-2` |
+| curl from GitHub returns 404 | Repo may be private — ensure it's public, or clone via `git clone` in CloudShell |
 | Lambda timeout | Current timeout is 90s, memory 256MB — increase if Bedrock calls grow |
 | Amplify not updating | Check `Last updated` in Amplify console — ensure job status is "Succeed" |
+
+---
+
+## Rewrite Rules
+
+Amplify requires a custom rewrite rule to serve `index.html` when accessing the root URL `/`. This was added on 2026-07-14 after a 404 occurred on the root path.
+
+**Current rule:**
+```json
+[{"source": "/<*>", "target": "/index.html", "status": "200"}]
+```
+
+This routes all paths to `index.html`. If this rule is ever lost (e.g. app recreated), restore it with:
+
+```bash
+aws amplify update-app --app-id d1p2543h8l2mfc --region eu-west-2 --custom-rules '[{"source": "/<*>", "target": "/index.html", "status": "200"}]'
+```
+
+Then redeploy for the rule to take effect.
+
+---
+
+## Stuck/Pending Deployments
+
+If a deployment fails mid-way (e.g. zip upload didn't complete), it leaves a pending job that blocks new deployments.
+
+**Diagnose:**
+```bash
+aws amplify list-jobs --app-id d1p2543h8l2mfc --branch-name main --region eu-west-2 --max-items 3
+```
+
+**Fix — cancel the stuck job:**
+```bash
+aws amplify stop-job --app-id d1p2543h8l2mfc --branch-name main --job-id <JOB_ID> --region eu-west-2
+```
+
+Then re-run the deploy commands.
