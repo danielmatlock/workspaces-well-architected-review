@@ -1557,10 +1557,11 @@ function generateSoWhatHTML(review, recommendations) {
     if (!text) return text;
     return text.replace(/\u2014/g, '&mdash;').replace(/\u2013/g, '&ndash;').replace(/\u2018/g, '&lsquo;').replace(/\u2019/g, '&rsquo;').replace(/\u201C/g, '&ldquo;').replace(/\u201D/g, '&rdquo;').replace(/\u2026/g, '&hellip;').replace(/\u00A0/g, '&nbsp;');
   }
-  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>So What? - ' + (review.customer || 'Review') + '</title>';
+  var customerName = sanitizeForHTML(review.customer || 'Review');
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>So What? - ' + customerName + '</title>';
   html += '<style>body{font-family:-apple-system,sans-serif;max-width:900px;margin:0 auto;padding:40px 20px;color:#1a1a1a;} h1{color:#232f3e;margin-bottom:4px;} .subtitle{color:#5f6b7a;margin-bottom:30px;} .q-card{border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:16px;} .q-id{font-weight:700;color:#0073bb;font-size:13px;} .q-text{font-size:15px;margin:4px 0 12px;} .q-obs{background:#f5f5f5;border-left:4px solid #879596;padding:12px;margin-bottom:10px;border-radius:4px;font-size:14px;} .q-rec{background:#f0f4ff;border-left:4px solid #0073bb;padding:12px;border-radius:4px;font-size:14px;} .q-rec a{color:#0073bb;} .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:12px;color:#5f6b7a;} @media print{.no-print{display:none!important;}}</style></head><body>';
   html += '<div class="no-print"><button onclick="window.print()">Save as PDF (Cmd+P)</button><button onclick="window.close()">Close</button><p>Use Cmd+P (Mac) or Ctrl+P (Windows) to save as PDF.</p></div>';
-  html += '<h1>So What? - ' + (review.customer || 'Review') + '</h1>';
+  html += '<h1>So What? - ' + customerName + '</h1>';
   html += '<div class="subtitle">Key findings and recommended actions | ' + (review.date || new Date().toISOString().split('T')[0]) + '</div>';
   review.pillars.forEach(function(p) {
     p.questions.forEach(function(q) {
@@ -2317,6 +2318,7 @@ function previewSavedReport(key) {
   }).then(function(r) { return r.json(); }).then(function(d) {
     var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
     var html = atob(payload.data);
+    html = html.replace(/\u2014/g, '&mdash;').replace(/\u2013/g, '&ndash;').replace(/\u2018/g, '&lsquo;').replace(/\u2019/g, '&rsquo;').replace(/\u201C/g, '&ldquo;').replace(/\u201D/g, '&rdquo;').replace(/\u2026/g, '&hellip;');
     var w = window.open('', '_blank');
     w.document.write(html);
     w.document.close();
