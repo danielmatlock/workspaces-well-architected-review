@@ -2293,6 +2293,13 @@ function showSavedReports(id) {
     var reports = payload.reports || [];
     var el = document.getElementById('saved-reports-list');
     if (reports.length === 0) { el.innerHTML = '<p style="color:#5f6b7a;">No saved reports yet. Generate a report and it will automatically save here.</p>'; return; }
+    var typeOrder = { sowhat: 0, clevel: 1, standard: 2 };
+    reports.sort(function(a, b) {
+      var ta = typeOrder[a.reportType] !== undefined ? typeOrder[a.reportType] : 9;
+      var tb = typeOrder[b.reportType] !== undefined ? typeOrder[b.reportType] : 9;
+      if (ta !== tb) return ta - tb;
+      return (b.timestamp || '').localeCompare(a.timestamp || '');
+    });
     var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
       '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">Type</th><th style="text-align:left;padding:8px;">Date</th><th style="padding:8px;">Actions</th></tr>';
     reports.forEach(function(r) {
