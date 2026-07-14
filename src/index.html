@@ -684,7 +684,7 @@ function showNewReviewModal() {
     '<div class="form-group"><label>Customer Name</label><input id="m-customer" placeholder="e.g. FCA"></div>' +
     '<div class="form-group"><label>Reviewer Name</label><input id="m-reviewer" placeholder="e.g. Daniel Matlock"></div>' +
     '<div class="form-group"><label>Date</label><input id="m-date" type="date" value="' + new Date().toISOString().split('T')[0] + '"></div>' +
-    '<div class="form-group"><label>Import from Spreadsheet <span style="font-size:11px;color:#5f6b7a;font-weight:400">(optional — CSV exported from Excel, columns: ID, Pillar, Question, Info from Customer, Best Practice)</span></label>' +
+    '<div class="form-group"><label>Import from Spreadsheet <span style="font-size:11px;color:#5f6b7a;font-weight:400">(optional - CSV exported from Excel, columns: ID, Pillar, Question, Info from Customer, Best Practice)</span></label>' +
     '<input type="file" id="m-csv" accept=".csv,.txt,text/csv,text/plain" style="font-size:13px;width:100%;cursor:pointer;"></div>' +
     '<div id="m-csv-status" style="font-size:12px;color:#1d8102;margin-top:-8px;"></div>' +
     '<div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button>' +
@@ -1108,7 +1108,7 @@ async function deleteReview(id) {
       await gql('mutation M($id: ID!) { deleteReview(id: $id) { id } }', { id: id });
       appLog('Deleted review from DynamoDB: ' + id, 'success');
     } catch(e) {
-      appLog('DynamoDB delete failed: ' + (e.message || e) + ' — review may reappear on sync', 'error');
+      appLog('DynamoDB delete failed: ' + (e.message || e) + ' - review may reappear on sync', 'error');
       alert('Warning: Review removed locally but cloud delete failed. It may reappear for other users until the issue is resolved.');
     }
   }
@@ -1553,18 +1553,22 @@ async function generateTailoredReport(review) {
 }
 
 function generateSoWhatHTML(review, recommendations) {
+  function sanitizeForHTML(text) {
+    if (!text) return text;
+    return text.replace(/\u2014/g, '&mdash;').replace(/\u2013/g, '&ndash;').replace(/\u2018/g, '&lsquo;').replace(/\u2019/g, '&rsquo;').replace(/\u201C/g, '&ldquo;').replace(/\u201D/g, '&rdquo;').replace(/\u2026/g, '&hellip;').replace(/\u00A0/g, '&nbsp;');
+  }
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>So What? - ' + (review.customer || 'Review') + '</title>';
   html += '<style>body{font-family:-apple-system,sans-serif;max-width:900px;margin:0 auto;padding:40px 20px;color:#1a1a1a;} h1{color:#232f3e;margin-bottom:4px;} .subtitle{color:#5f6b7a;margin-bottom:30px;} .q-card{border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:16px;} .q-id{font-weight:700;color:#0073bb;font-size:13px;} .q-text{font-size:15px;margin:4px 0 12px;} .q-obs{background:#f5f5f5;border-left:4px solid #879596;padding:12px;margin-bottom:10px;border-radius:4px;font-size:14px;} .q-rec{background:#f0f4ff;border-left:4px solid #0073bb;padding:12px;border-radius:4px;font-size:14px;} .q-rec a{color:#0073bb;} .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:12px;color:#5f6b7a;} @media print{.no-print{display:none!important;}}</style></head><body>';
   html += '<div class="no-print"><button onclick="window.print()">Save as PDF (Cmd+P)</button><button onclick="window.close()">Close</button><p>Use Cmd+P (Mac) or Ctrl+P (Windows) to save as PDF.</p></div>';
-  html += '<h1>So What? — ' + (review.customer || 'Review') + '</h1>';
+  html += '<h1>So What? - ' + (review.customer || 'Review') + '</h1>';
   html += '<div class="subtitle">Key findings and recommended actions | ' + (review.date || new Date().toISOString().split('T')[0]) + '</div>';
   review.pillars.forEach(function(p) {
     p.questions.forEach(function(q) {
       var rec = recommendations[q.id];
       if (!rec) return;
       html += '<div class="q-card"><div class="q-id">' + q.id + '</div><div class="q-text">' + q.q + '</div>';
-      if (rec.observation) html += '<div class="q-obs"><strong>What we found:</strong> ' + rec.observation + '</div>';
-      if (rec.recommendation) html += '<div class="q-rec"><strong>What to do:</strong> ' + rec.recommendation.replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+      if (rec.observation) html += '<div class="q-obs"><strong>What we found:</strong> ' + sanitizeForHTML(rec.observation) + '</div>';
+      if (rec.recommendation) html += '<div class="q-rec"><strong>What to do:</strong> ' + sanitizeForHTML(rec.recommendation).replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
       html += '</div>';
     });
   });
@@ -1604,11 +1608,11 @@ function exportCLevelDeck(id) {
   document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
     '<div class="modal" onclick="event.stopPropagation()"><h3>Generate C-Level Deck</h3>' +
     '<p style="font-size:13px;color:#545b64;margin-bottom:16px;">Optionally select saved reports to ground the AI recommendations and reduce hallucinations.</p>' +
-    '<div class="form-group"><label>So What Report <span style="font-size:11px;color:#5f6b7a;font-weight:400">— optional</span></label>' +
+    '<div class="form-group"><label>So What Report <span style="font-size:11px;color:#5f6b7a;font-weight:400">- optional</span></label>' +
     '<select id="deck-sowhat-select" style="width:100%;padding:6px;font-size:13px;"><option value="">None</option></select></div>' +
-    '<div class="form-group"><label>WAFR Report <span style="font-size:11px;color:#5f6b7a;font-weight:400">— optional</span></label>' +
+    '<div class="form-group"><label>WAFR Report <span style="font-size:11px;color:#5f6b7a;font-weight:400">- optional</span></label>' +
     '<select id="deck-wafr-select" style="width:100%;padding:6px;font-size:13px;"><option value="">None</option></select></div>' +
-    '<div class="form-group"><label>Notification Email <span style="font-size:11px;color:#5f6b7a;font-weight:400">— optional, receive alert when complete</span></label>' +
+    '<div class="form-group"><label>Notification Email <span style="font-size:11px;color:#5f6b7a;font-weight:400">- optional, receive alert when complete</span></label>' +
     '<input id="deck-notify-email" type="email" placeholder="you@example.com" style="width:100%;padding:6px;font-size:13px;border:1px solid #e1e4e8;border-radius:4px;"></div>' +
     '<div id="deck-status" style="font-size:12px;margin-top:8px;"></div>' +
     '<div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button>' +
@@ -1720,14 +1724,14 @@ async function startCLevelDeck(id) {
       console.error('Curation failed, falling back:', curationPayload.error);
       hideGeneratingOverlay();
       buildCLevelPptx(review, window._lastRecommendations || {}, notifyEmail);
-      alert('Note: AI curation was unavailable — deck was generated using the standard layout.');
+      alert('Note: AI curation was unavailable - deck was generated using the standard layout.');
     }
   } catch(e) {
     console.error('Curation call failed:', e);
     hideGeneratingOverlay();
     try {
       buildCLevelPptx(review, window._lastRecommendations || {}, notifyEmail);
-      alert('Note: AI curation was unavailable — deck was generated using the standard layout.');
+      alert('Note: AI curation was unavailable - deck was generated using the standard layout.');
     } catch(e2) {
       alert('Error building PowerPoint: ' + e2.message);
       if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, deckFilename, false, e2.message);
