@@ -1843,10 +1843,11 @@ function loadArchSelectList(reviewId) {
     }
     var html = '<div style="max-height:250px;overflow-y:auto;border:1px solid #e1e4e8;border-radius:4px;padding:8px;">';
     files.forEach(function(f) {
-      var checked = f.extracted ? 'checked' : 'disabled';
-      var status = f.extracted ? '' : ' <span style="color:#ff9900;font-size:11px;">(still processing)</span>';
-      html += '<label style="display:block;padding:6px 4px;cursor:pointer;font-size:13px;">' +
-        '<input type="checkbox" ' + checked + ' value="' + f.key + '" class="arch-select-cb" style="margin-right:8px;">' +
+      var checked = f.extracted ? 'checked' : '';
+      var disabled = f.extracted ? '' : 'disabled';
+      var status = f.extracted ? '' : ' <span style="color:#ff9900;font-size:11px;">(still processing — retry upload if stuck)</span>';
+      html += '<label style="display:block;padding:6px 4px;cursor:' + (f.extracted ? 'pointer' : 'default') + ';font-size:13px;">' +
+        '<input type="checkbox" ' + checked + ' ' + disabled + ' value="' + f.key + '" class="arch-select-cb" style="margin-right:8px;">' +
         f.filename + status + '</label>';
     });
     html += '</div>';

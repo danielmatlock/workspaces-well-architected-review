@@ -404,7 +404,8 @@ Respond with ONLY valid JSON in this exact structure:
                                         'type': 'base64',
                                         'media_type': content_type,
                                         'data': content_b64
-                                    }
+                                    },
+                                    'format': doc_format
                                 },
                                 {
                                     'type': 'text',
