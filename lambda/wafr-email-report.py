@@ -98,6 +98,9 @@ def handler(event, context):
             reports = []
             for obj in response.get('Contents', []):
                 key = obj['Key']
+                # Skip architecture info files
+                if '/arch/' in key:
+                    continue
                 filename = key.split('/')[-1]
                 parts = filename.rsplit('.', 1)
                 name_part = parts[0]  # e.g. 'standard_2025-06-15T143200'
