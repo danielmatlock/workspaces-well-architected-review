@@ -887,7 +887,7 @@ function showReviewDashboard() {
   document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
     '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
     '<button class="btn btn-primary" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
-    '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">WAFR Report</button>' +
+    '<button class="btn btn-primary" onclick="showWafrReportModal(\'' + review.id + '\')">WAFR Report</button>' +
     '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
     '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
     '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
@@ -1762,6 +1762,98 @@ function loadArchContext(reviewId) {
   }).catch(function(e) { console.log('Arch context load error (non-fatal):', e); return ''; });
 }
 
+function showWafrReportModal(id) {
+  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="width:650px;max-width:90vw;">' +
+    '<h3>Generate WAFR Report</h3>' +
+    '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Select architecture documents to include as context for more relevant recommendations.</p>' +
+    '<div id="wafr-arch-select-list"><p style="color:#5f6b7a;">Loading architecture documents...</p></div>' +
+    '<div style="margin-top:16px;text-align:right;">' +
+    '<button class="btn" onclick="closeModal()">Cancel</button> ' +
+    '<button class="btn btn-primary" onclick="generateWafrWithArchSelection(\'' + id + '\')">Generate Report</button></div></div></div>';
+  loadArchSelectList(id);
+}
+
+function loadArchSelectList(reviewId) {
+  fetch(ENV.emailEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'getArchInfo', reviewId: reviewId })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    var files = payload.files || [];
+    var el = document.getElementById('wafr-arch-select-list');
+    if (files.length === 0) {
+      el.innerHTML = '<p style="color:#5f6b7a;">No architecture documents uploaded. The report will be generated without architecture context.</p>' +
+        '<p style="font-size:12px;color:#5f6b7a;margin-top:8px;">Tip: Use the <strong>Arch Info</strong> button to upload PDF/Word documents first.</p>';
+      return;
+    }
+    var html = '<div style="max-height:250px;overflow-y:auto;border:1px solid #e1e4e8;border-radius:4px;padding:8px;">';
+    files.forEach(function(f) {
+      var checked = f.extracted ? 'checked' : 'disabled';
+      var status = f.extracted ? '' : ' <span style="color:#ff9900;font-size:11px;">(still processing)</span>';
+      html += '<label style="display:block;padding:6px 4px;cursor:pointer;font-size:13px;">' +
+        '<input type="checkbox" ' + checked + ' value="' + f.key + '" class="arch-select-cb" style="margin-right:8px;">' +
+        f.filename + status + '</label>';
+    });
+    html += '</div>';
+    html += '<p style="font-size:11px;color:#5f6b7a;margin-top:8px;">' + files.length + ' document(s) available. Checked documents will be used as grounding context.</p>';
+    el.innerHTML = html;
+  }).catch(function(e) {
+    document.getElementById('wafr-arch-select-list').innerHTML = '<p style="color:#d13212;">Error loading documents.</p>';
+  });
+}
+
+async function generateWafrWithArchSelection(id) {
+  // Collect selected arch doc keys
+  var checkboxes = document.querySelectorAll('.arch-select-cb:checked');
+  var selectedKeys = [];
+  checkboxes.forEach(function(cb) { selectedKeys.push(cb.value); });
+
+  closeModal();
+  showGeneratingOverlay();
+
+  // Load arch context for selected documents only
+  var archContext = '';
+  if (selectedKeys.length > 0) {
+    try {
+      // Fetch extracted text for each selected document
+      var contextParts = [];
+      for (var i = 0; i < selectedKeys.length; i++) {
+        var textKey = selectedKeys[i] + '.extracted.txt';
+        var r = await fetch(ENV.emailEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: textKey }) });
+        var d = await r.json(); var p = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+        if (p.data) {
+          var text = atob(p.data);
+          var filename = selectedKeys[i].split('/').pop().split('_').slice(1).join('_');
+          contextParts.push('=== Architecture Document: ' + filename + ' ===\n' + text);
+        }
+      }
+      if (contextParts.length > 0) {
+        archContext = '\n\nARCHITECTURE CONTEXT (from uploaded documentation):\n' +
+          'The following is extracted from the customer\'s architecture documents. ' +
+          'Use this to make recommendations more specific to their actual environment.\n\n' +
+          contextParts.join('\n\n');
+      }
+    } catch(e) { console.log('Arch context load error (non-fatal):', e); }
+  }
+
+  // Set context and generate
+  var review = getReview(id);
+  if (archContext) window._pdfReferenceContext = archContext;
+  try {
+    var html = await generateTailoredReport(review);
+    hideGeneratingOverlay();
+    window._pdfReferenceContext = '';
+    var w = window.open('', '_blank'); w.document.write(html); w.document.close();
+    saveReportToCloud(review.id, 'standard', html, 'text/html', 'html', review.customer);
+  } catch(e) {
+    hideGeneratingOverlay();
+    window._pdfReferenceContext = '';
+    console.error('Report generation error:', e);
+  }
+}
+
 function exportReviewAsPrintHTML(id) {
   var review = getReview(id); if (!review) return;
   showGeneratingOverlay();
@@ -2479,7 +2571,7 @@ function showArchInfo(reviewId) {
   document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
     '<div class="modal" onclick="event.stopPropagation()" style="width:700px;max-width:90vw;">' +
     '<h3>Architecture Information</h3>' +
-    '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Upload architecture diagrams and documentation (PDF or Word) to provide context for report generation.</p>' +
+    '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Upload architecture diagrams and documentation (PDF or Word) to provide context for report generation. You can upload multiple documents.</p>' +
     '<div style="margin-bottom:16px;">' +
     '<label style="display:inline-block;padding:8px 16px;background:#232f3e;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;">' +
     '<input type="file" id="arch-file-input" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="handleArchUpload(\'' + reviewId + '\')">' +
