@@ -1725,6 +1725,16 @@ function showGeneratingOverlay() {
 }
 function hideGeneratingOverlay() { document.getElementById('modal-root').innerHTML = ''; }
 
+// Open report in new tab with popup-blocked fallback
+function openReportInNewTab(html) {
+  var w = window.open('', '_blank');
+  if (w) {
+    w.document.write(html); w.document.close();
+  } else {
+    alert('Report generated and saved successfully.\n\nYour browser blocked the popup. You can view it from "Saved Reports".');
+  }
+}
+
 function showPrintModal(id) {
   document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
     '<div class="modal" onclick="event.stopPropagation()"><h3>Print / View Report</h3>' +
@@ -1764,7 +1774,7 @@ async function handlePrintReport(id) {
       var d = await r.json(); var p = typeof d.body === 'string' ? JSON.parse(d.body) : d;
       var html = atob(p.data);
       closeModal();
-      var w = window.open('', '_blank'); w.document.write(html); w.document.close();
+      openReportInNewTab(html);
     } catch(e) { statusEl.innerHTML = '<span style="color:#d13212">Error fetching report.</span>'; }
   } else {
     // Generate new
@@ -1900,7 +1910,7 @@ async function generateWafrWithArchSelection(id) {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
     saveReportToCloud(review.id, 'standard', html, 'text/html', 'html', review.customer);
-    var w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); }
+    openReportInNewTab(html);
   } catch(e) {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
@@ -1917,8 +1927,8 @@ function exportReviewAsPrintHTML(id) {
   }).then(function(html) {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
-    var w = window.open('', '_blank'); w.document.write(html); w.document.close();
     saveReportToCloud(review.id, 'standard', html, 'text/html', 'html', review.customer);
+    openReportInNewTab(html);
   }).catch(function(e) { hideGeneratingOverlay(); window._pdfReferenceContext = ''; console.error('Report error:', e); });
 }
 
@@ -1932,8 +1942,8 @@ function exportSoWhat(id) {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
     var html = generateSoWhatHTML(review, window._lastRecommendations || {});
-    var w = window.open('', '_blank'); w.document.write(html); w.document.close();
     saveReportToCloud(review.id, 'sowhat', html, 'text/html', 'html', review.customer);
+    openReportInNewTab(html);
   });
 }
 
