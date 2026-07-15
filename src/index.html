@@ -2628,8 +2628,8 @@ function showArchInfo(reviewId) {
     '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Upload architecture diagrams and documentation (PDF or Word) to provide context for report generation. You can upload multiple documents.</p>' +
     '<div style="margin-bottom:16px;">' +
     '<label style="display:inline-block;padding:8px 16px;background:#232f3e;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;">' +
-    '<input type="file" id="arch-file-input" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="handleArchUpload(\'' + reviewId + '\')">' +
-    'Upload File (PDF / Word)' +
+    '<input type="file" id="arch-file-input" multiple accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="handleArchUpload(\'' + reviewId + '\')">' +
+    'Upload Files (PDF / Word)' +
     '</label>' +
     '<span id="arch-upload-status" style="margin-left:12px;font-size:12px;color:#5f6b7a;"></span>' +
     '</div>' +
@@ -2673,45 +2673,63 @@ function loadArchFiles(reviewId) {
 
 function handleArchUpload(reviewId) {
   var input = document.getElementById('arch-file-input');
-  var file = input.files[0];
-  if (!file) return;
+  var files = input.files;
+  if (!files || files.length === 0) return;
 
-  // Validate file type
   var validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
   var validExts = ['.pdf', '.doc', '.docx'];
-  var ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-  if (validTypes.indexOf(file.type) === -1 && validExts.indexOf(ext) === -1) {
-    alert('Only PDF and Word (.doc, .docx) files are supported.');
-    input.value = '';
-    return;
+  var statusEl = document.getElementById('arch-upload-status');
+  var totalFiles = files.length;
+  var uploaded = 0;
+  var failed = 0;
+
+  statusEl.innerHTML = '<span style="color:#ff9900;">Uploading ' + totalFiles + ' file(s)...</span>';
+
+  for (var i = 0; i < files.length; i++) {
+    (function(file) {
+      var ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      if (validTypes.indexOf(file.type) === -1 && validExts.indexOf(ext) === -1) {
+        failed++;
+        if (uploaded + failed === totalFiles) { finishUpload(); }
+        return;
+      }
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var base64 = e.target.result.split(',')[1];
+        fetch(ENV.emailEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'uploadArchInfo',
+            reviewId: reviewId,
+            filename: file.name,
+            content: base64,
+            contentType: file.type
+          })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+          var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+          if (payload.error) { failed++; } else { uploaded++; }
+          if (uploaded + failed === totalFiles) { finishUpload(); }
+        }).catch(function(e) {
+          failed++;
+          if (uploaded + failed === totalFiles) { finishUpload(); }
+        });
+      };
+      reader.readAsDataURL(file);
+    })(files[i]);
   }
 
-  var statusEl = document.getElementById('arch-upload-status');
-  statusEl.innerHTML = '<span style="color:#ff9900;">Uploading ' + file.name + '...</span>';
-
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var base64 = e.target.result.split(',')[1];
-    fetch(ENV.emailEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'uploadArchInfo',
-        reviewId: reviewId,
-        filename: file.name,
-        content: base64,
-        contentType: file.type
-      })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
-      if (payload.error) {
-        statusEl.innerHTML = '<span style="color:#d13212;">Upload failed: ' + payload.error + '</span>';
-      } else {
-        statusEl.innerHTML = '<span style="color:#1d8102;">✓ Uploaded — extracting text...</span>';
-        input.value = '';
-        setTimeout(function() { loadArchFiles(reviewId); }, 2000);
-      }
-    }).catch(function(e) {
+  function finishUpload() {
+    input.value = '';
+    if (failed > 0) {
+      statusEl.innerHTML = '<span style="color:#ff9900;">✓ ' + uploaded + ' uploaded, ' + failed + ' failed (PDF/Word only)</span>';
+    } else {
+      statusEl.innerHTML = '<span style="color:#1d8102;">✓ ' + uploaded + ' file(s) uploaded — extracting text...</span>';
+    }
+    setTimeout(function() { loadArchFiles(reviewId); }, 3000);
+  }
+}
       statusEl.innerHTML = '<span style="color:#d13212;">Upload error: ' + e.message + '</span>';
     });
   };

@@ -404,8 +404,7 @@ Respond with ONLY valid JSON in this exact structure:
                                         'type': 'base64',
                                         'media_type': content_type,
                                         'data': content_b64
-                                    },
-                                    'format': doc_format
+                                    }
                                 },
                                 {
                                     'type': 'text',
@@ -442,11 +441,11 @@ Respond with ONLY valid JSON in this exact structure:
                     'body': json.dumps({'message': 'Uploaded and processed', 'key': key, 'extractedChars': len(extracted_text)})
                 }
             except Exception as extract_err:
-                # File uploaded but extraction failed — mark as not extracted
+                # File uploaded but extraction failed — return error details
                 return {
                     'statusCode': 200,
                     'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-                    'body': json.dumps({'message': 'Uploaded but extraction failed', 'key': key, 'extractionError': str(extract_err)})
+                    'body': json.dumps({'message': 'Uploaded but extraction failed', 'key': key, 'extractionError': str(extract_err), 'errorType': type(extract_err).__name__})
                 }
 
         if action == 'getArchInfo':
