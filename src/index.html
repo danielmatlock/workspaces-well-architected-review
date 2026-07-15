@@ -1313,12 +1313,12 @@ function showImportOptionsModal(data) {
     '<div class="modal" onclick="event.stopPropagation()" style="width:600px;max-width:90vw;">' +
     '<h3>Import Review</h3>' +
     '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Importing answers from: <strong>' + (data.customer || 'Unknown') + '</strong> (' + Object.keys(data.answers).length + ' answers)</p>' +
-    '<div style="margin-bottom:16px;">' +
+    '<div style="margin-bottom:16px;padding-right:24px;">' +
     '<label style="display:block;margin-bottom:8px;"><input type="radio" name="import-mode" value="overwrite" checked style="margin-right:8px;">Overwrite answers in an existing review</label>' +
-    '<select id="import-target-review" style="width:calc(100% - 48px);padding:8px;margin-left:24px;margin-bottom:12px;">' +
+    '<select id="import-target-review" style="width:calc(100% - 24px);padding:8px;margin-left:24px;margin-bottom:12px;">' +
     (reviewOptions || '<option value="">No reviews available</option>') + '</select>' +
     '<label style="display:block;margin-bottom:8px;"><input type="radio" name="import-mode" value="new" style="margin-right:8px;">Create a new review</label>' +
-    '<input id="import-new-name" type="text" placeholder="Customer name for new review" style="width:calc(100% - 48px);padding:8px;margin-left:24px;" value="' + (data.customer || '') + '">' +
+    '<input id="import-new-name" type="text" placeholder="Customer name for new review" style="width:calc(100% - 24px);padding:8px;margin-left:24px;" value="' + (data.customer || '') + '">' +
     '</div>' +
     '<div style="margin-top:16px;text-align:right;">' +
     '<button class="btn" onclick="closeModal()">Cancel</button> ' +
