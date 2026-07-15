@@ -709,7 +709,8 @@ function showHome() {
         '<div class="pillar-details">' + pillarHtml + '</div>' +
         '<div class="card-actions">' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();exportReview(\'' + r.id + '\')">Export JSON</button>' +
-        '<button class="btn btn-sm" onclick="event.stopPropagation();exportReviewAsPrintHTML(\'' + r.id + '\')">Print Report</button>' +
+        '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();showArchInfo(\'' + r.id + '\')">Arch Info</button>' +
+        '<button class="btn btn-sm" onclick="event.stopPropagation();showPrintModal(\'' + r.id + '\')">Print Report</button>' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();showEmailModal(\'' + r.id + '\')">Email Report</button>' +
         '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteReview(\'' + r.id + '\')">Delete</button>' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();showSavedReports(\'' + r.id + '\')">Saved Reports</button></div></div>';
@@ -885,8 +886,8 @@ function showReviewDashboard() {
   
   document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
     '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
-    '<button class="btn" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
-    '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">Generate Report</button>' +
+    '<button class="btn btn-primary" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
+    '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">WAFR Report</button>' +
     '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
     '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
     '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
@@ -983,8 +984,8 @@ function renderQuestion() {
   
   document.getElementById('topbar').innerHTML = '<h3>' + pillar.name + '</h3>' +
     '<div class="topbar-actions"><span style="font-size:13px;color:#5f6b7a">Question ' + (state.activeQuestion + 1) + ' of ' + pillar.questions.length + '</span>' +
-    '<button class="btn btn-sm" onclick="showArchInfo(\'' + state.activeReview + '\')">Arch Info</button>' +
-    '<button class="btn btn-sm" onclick="exportReviewAsPrintHTML(\'' + state.activeReview + '\')">Print Report</button>' +
+    '<button class="btn btn-primary btn-sm" onclick="showArchInfo(\'' + state.activeReview + '\')">Arch Info</button>' +
+    '<button class="btn btn-sm" onclick="showPrintModal(\'' + state.activeReview + '\')">Print Report</button>' +
     '<button class="btn btn-primary" onclick="exportSoWhat(\'' + state.activeReview + '\')">So What Report</button>' +
     '<button class="btn btn-primary btn-sm" onclick="exportCLevelDeck(\'' + state.activeReview + '\')">C-Level Deck</button>' +
     '<button class="btn btn-sm" onclick="showEmailModal(\'' + state.activeReview + '\')">Email Report</button></div>';
@@ -1178,9 +1179,13 @@ function showEmailModal(id) {
   document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
     '<div class="modal" onclick="event.stopPropagation()"><h3>Email Report</h3>' +
     '<div class="form-group"><label>Recipient Email</label><input id="m-email-to" type="email" placeholder="customer@example.com"></div>' +
+    '<div class="form-group"><label>Report to Send</label>' +
+    '<select id="m-email-report-select"><option value="">Generate new WAFR Report</option></select>' +
+    '<p style="font-size:11px;color:#5f6b7a;margin-top:4px;">Choose a previously saved report or generate a new one</p></div>' +
     '<div id="email-status" style="font-size:13px;margin-top:8px;"></div>' +
     '<div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button>' +
     '<button class="btn btn-primary" id="email-send-btn" onclick="sendEmailReport(\'' + id + '\')">Send</button></div></div></div>';
+  loadReportSelectOptions(id, 'm-email-report-select');
 }
 
 async function sendEmailReport(id) {
@@ -1188,14 +1193,28 @@ async function sendEmailReport(id) {
   if (!recipient) { alert('Please enter an email address'); return; }
   var statusEl = document.getElementById('email-status');
   var btn = document.getElementById('email-send-btn');
-  statusEl.innerHTML = '<span style="color:#ff9900">Loading architecture context...</span>';
   btn.disabled = true;
   var review = getReview(id);
-  var archCtx = await loadArchContext(id);
-  if (archCtx) window._pdfReferenceContext = (window._pdfReferenceContext || '') + '\n\n' + archCtx;
-  statusEl.innerHTML = '<span style="color:#ff9900">Generating tailored report...</span>';
-  var htmlReport = await generateTailoredReport(review);
-  window._pdfReferenceContext = '';
+  var selectedReport = document.getElementById('m-email-report-select').value;
+  var htmlReport;
+
+  if (selectedReport) {
+    // Use a previously saved report
+    statusEl.innerHTML = '<span style="color:#ff9900">Fetching saved report...</span>';
+    try {
+      var r = await fetch(ENV.emailEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: selectedReport }) });
+      var d = await r.json(); var p = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+      htmlReport = atob(p.data);
+    } catch(e) { statusEl.innerHTML = '<span style="color:#d13212">Error fetching report.</span>'; btn.disabled = false; return; }
+  } else {
+    // Generate a new report
+    statusEl.innerHTML = '<span style="color:#ff9900">Loading architecture context...</span>';
+    var archCtx = await loadArchContext(id);
+    if (archCtx) window._pdfReferenceContext = (window._pdfReferenceContext || '') + '\n\n' + archCtx;
+    statusEl.innerHTML = '<span style="color:#ff9900">Generating tailored report...</span>';
+    htmlReport = await generateTailoredReport(review);
+    window._pdfReferenceContext = '';
+  }
   statusEl.innerHTML = '<span style="color:#ff9900">Sending email...</span>';
   try {
     var res = await fetch(ENV.emailEndpoint, {
@@ -1644,6 +1663,62 @@ function showGeneratingOverlay() {
   document.getElementById('modal-root').innerHTML = '<div class="modal-overlay"><div class="modal" style="text-align:center;padding:40px;"><h3>Generating Report...</h3><p style="color:#5f6b7a;margin-top:12px;">Creating tailored recommendations based on your observations. This may take some time depending on the number of questions assessed.</p></div></div>';
 }
 function hideGeneratingOverlay() { document.getElementById('modal-root').innerHTML = ''; }
+
+function showPrintModal(id) {
+  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
+    '<div class="modal" onclick="event.stopPropagation()"><h3>Print / View Report</h3>' +
+    '<div class="form-group"><label>Report to View</label>' +
+    '<select id="m-print-report-select"><option value="">Generate new WAFR Report</option></select>' +
+    '<p style="font-size:11px;color:#5f6b7a;margin-top:4px;">Choose a previously saved report or generate a new one</p></div>' +
+    '<div id="print-status" style="font-size:13px;margin-top:8px;"></div>' +
+    '<div class="modal-actions"><button class="btn" onclick="closeModal()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="handlePrintReport(\'' + id + '\')">Open Report</button></div></div></div>';
+  loadReportSelectOptions(id, 'm-print-report-select');
+}
+
+async function handlePrintReport(id) {
+  var selectedReport = document.getElementById('m-print-report-select').value;
+  var statusEl = document.getElementById('print-status');
+
+  if (selectedReport) {
+    // Open a previously saved report
+    statusEl.innerHTML = '<span style="color:#ff9900">Fetching saved report...</span>';
+    try {
+      var r = await fetch(ENV.emailEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: selectedReport }) });
+      var d = await r.json(); var p = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+      var html = atob(p.data);
+      closeModal();
+      var w = window.open('', '_blank'); w.document.write(html); w.document.close();
+    } catch(e) { statusEl.innerHTML = '<span style="color:#d13212">Error fetching report.</span>'; }
+  } else {
+    // Generate new
+    closeModal();
+    exportReviewAsPrintHTML(id);
+  }
+}
+
+// Helper: populate a report select dropdown with saved reports
+function loadReportSelectOptions(reviewId, selectId) {
+  fetch(ENV.emailEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'listReports', reviewId: reviewId })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    var reports = payload.reports || [];
+    var sel = document.getElementById(selectId);
+    if (!sel) return;
+    var typeLabels = { standard: 'WAFR Report', sowhat: 'So What Report', clevel: 'C-Level Deck' };
+    reports.forEach(function(r) {
+      if (r.extension === 'pptx') return; // Skip PPTX files (can't be emailed/printed as HTML)
+      var label = (typeLabels[r.reportType] || r.reportType) + ' — ' + (r.timestamp || '').replace('T', ' ').substring(0, 16);
+      var opt = document.createElement('option');
+      opt.value = r.key;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    });
+  }).catch(function(e) { console.log('Report list load error:', e); });
+}
 
 // Load architecture context for a review (returns extracted text or empty string)
 function loadArchContext(reviewId) {
