@@ -2660,7 +2660,8 @@ function loadArchFiles(reviewId) {
         '<td style="padding:8px;">' + f.filename + '</td>' +
         '<td style="padding:8px;">' + (f.timestamp || '').replace('T', ' ').substring(0, 16) + '</td>' +
         '<td style="padding:8px;">' + statusBadge + '</td>' +
-        '<td style="padding:8px;text-align:center;">' +
+        '<td style="padding:8px;text-align:center;white-space:nowrap;">' +
+        '<button class="btn btn-sm" onclick="downloadArchFile(\'' + f.key + '\',\'' + f.filename + '\')">Download</button> ' +
         '<button class="btn btn-sm" style="color:#d13212;border-color:#d13212;" onclick="deleteArchFile(\'' + reviewId + '\',\'' + f.key + '\')">Delete</button>' +
         '</td></tr>';
     });
@@ -2729,6 +2730,23 @@ function handleArchUpload(reviewId) {
     }
     setTimeout(function() { loadArchFiles(reviewId); }, 3000);
   }
+}
+
+function downloadArchFile(key, filename) {
+  fetch(ENV.emailEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'getReport', key: key })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    if (payload.error) { alert('Error: ' + payload.error); return; }
+    var bytes = Uint8Array.from(atob(payload.data), function(c) { return c.charCodeAt(0); });
+    var blob = new Blob([bytes], { type: payload.contentType || 'application/octet-stream' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || 'download';
+    a.click();
+  }).catch(function(e) { alert('Download error: ' + e.message); });
 }
 
 function deleteArchFile(reviewId, key) {
