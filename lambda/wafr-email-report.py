@@ -388,34 +388,31 @@ Respond with ONLY valid JSON in this exact structure:
                 else:
                     doc_format = 'pdf'
 
-                response = bedrock.invoke_model(
+                # Use Converse API for document understanding
+                response = bedrock.converse(
                     modelId=SONNET_MODEL,
-                    contentType='application/json',
-                    accept='application/json',
-                    body=json.dumps({
-                        'anthropic_version': 'bedrock-2023-05-31',
-                        'max_tokens': 8192,
-                        'messages': [{
-                            'role': 'user',
-                            'content': [
-                                {
-                                    'type': 'document',
+                    messages=[{
+                        'role': 'user',
+                        'content': [
+                            {
+                                'document': {
+                                    'name': filename.replace(' ', '_').replace('.', '_'),
+                                    'format': doc_format,
                                     'source': {
-                                        'type': 'base64',
-                                        'media_type': content_type,
-                                        'data': content_b64
+                                        'bytes': file_bytes
                                     }
-                                },
-                                {
-                                    'type': 'text',
-                                    'text': extract_prompt
                                 }
-                            ]
-                        }]
-                    })
+                            },
+                            {
+                                'text': extract_prompt
+                            }
+                        ]
+                    }],
+                    inferenceConfig={
+                        'maxTokens': 8192
+                    }
                 )
-                result = json.loads(response['body'].read())
-                extracted_text = result['content'][0]['text'].strip()
+                extracted_text = response['output']['message']['content'][0]['text'].strip()
 
                 # Store extracted text alongside original
                 text_key = key + '.extracted.txt'
@@ -441,7 +438,10 @@ Respond with ONLY valid JSON in this exact structure:
                     'body': json.dumps({'message': 'Uploaded and processed', 'key': key, 'extractedChars': len(extracted_text)})
                 }
             except Exception as extract_err:
-                # File uploaded but extraction failed — return error details
+                # File uploaded but extraction failed — log and return error details
+                import traceback
+                print(f"EXTRACTION ERROR: {type(extract_err).__name__}: {str(extract_err)}")
+                print(traceback.format_exc())
                 return {
                     'statusCode': 200,
                     'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
