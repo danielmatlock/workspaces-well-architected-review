@@ -1563,6 +1563,41 @@ function generateReportHTML(review, recommendations) {
   });
   html += '</tbody></table></div>';
   
+  // === ARCHITECTURE ASSESSMENT (if findings available) ===
+  if (window._archFindings && window._archFindings.pillars) {
+    var af = window._archFindings;
+    html += '<div class="section"><h2>Architecture Assessment</h2>';
+    html += '<div class="exec-summary"><p><strong>Summary:</strong> ' + (af.summary || 'No summary available.') + '</p></div>';
+    // Per-pillar findings
+    (af.pillars || []).forEach(function(p) {
+      var ragClass = p.rag === 'red' ? 'rag-red' : p.rag === 'amber' ? 'rag-amber' : 'rag-green';
+      html += '<h3>' + p.name + ' <span class="rag ' + ragClass + '">' + p.rag.toUpperCase() + '</span></h3>';
+      html += '<p style="font-size:13px;color:#5f6b7a;margin-bottom:8px;">' + (p.rationale || '') + '</p>';
+      if (p.findings && p.findings.length > 0) {
+        html += '<table class="score-table"><thead><tr><th>Type</th><th>Finding</th><th>Recommendation</th></tr></thead><tbody>';
+        p.findings.forEach(function(f) {
+          var typeColor = f.type === 'gap' ? '#d13212' : f.type === 'risk' ? '#ff9900' : f.type === 'positive' ? '#1d8102' : '#0073bb';
+          html += '<tr><td><span style="color:' + typeColor + ';font-weight:600;text-transform:capitalize;">' + f.type + '</span></td>';
+          html += '<td>' + f.finding + '</td>';
+          html += '<td>' + (f.recommendation || '—') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+    });
+    // Cross-cutting findings
+    if (af.crossCutting && af.crossCutting.length > 0) {
+      html += '<h3>Cross-Cutting Findings</h3>';
+      html += '<table class="score-table"><thead><tr><th>Finding</th><th>Pillars</th><th>Recommendation</th></tr></thead><tbody>';
+      af.crossCutting.forEach(function(c) {
+        html += '<tr><td>' + c.finding + '</td>';
+        html += '<td>' + (c.pillars || []).join(', ') + '</td>';
+        html += '<td>' + (c.recommendation || '—') + '</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+  }
+
   // === PILLAR-BY-PILLAR ANALYSIS ===
   review.pillars.forEach(function(p, pi) {
     var s = getPillarScore(review, pi);
@@ -1877,33 +1912,52 @@ async function generateWafrWithArchSelection(id) {
   closeModal();
   showGeneratingOverlay();
 
-  // Load arch context for selected documents only
-  var archContext = '';
+  var review = getReview(id);
+  window._archFindings = null;
+
+  // Step 1: Run architecture analysis with Sonnet (if docs selected)
   if (selectedKeys.length > 0) {
     try {
-      // Fetch extracted text for each selected document
-      var contextParts = [];
-      for (var i = 0; i < selectedKeys.length; i++) {
-        var textKey = selectedKeys[i] + '.extracted.txt';
-        var r = await fetch(ENV.emailEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: textKey }) });
-        var d = await r.json(); var p = typeof d.body === 'string' ? JSON.parse(d.body) : d;
-        if (p.data) {
-          var text = atob(p.data);
-          var filename = selectedKeys[i].split('/').pop().split('_').slice(1).join('_');
-          contextParts.push('=== Architecture Document: ' + filename + ' ===\n' + text);
-        }
+      document.querySelector('.modal h3').textContent = 'Analysing Architecture...';
+    } catch(e) {}
+    try {
+      var analysisRes = await fetch(ENV.emailEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'analyseArchitecture',
+          reviewId: review.id,
+          customerName: review.customer || 'Customer',
+          pillars: review.pillars ? review.pillars.map(function(p) { return p.name; }) : []
+        })
+      });
+      var analysisData = await analysisRes.json();
+      var analysisPayload = typeof analysisData.body === 'string' ? JSON.parse(analysisData.body) : analysisData;
+      if (analysisPayload.hasData && analysisPayload.findings) {
+        window._archFindings = analysisPayload.findings;
       }
-      if (contextParts.length > 0) {
-        archContext = '\n\nARCHITECTURE CONTEXT (from uploaded documentation):\n' +
-          'The following is extracted from the customer\'s architecture documents. ' +
-          'Use this to make recommendations more specific to their actual environment.\n\n' +
-          contextParts.join('\n\n');
-      }
-    } catch(e) { console.log('Arch context load error (non-fatal):', e); }
+    } catch(e) { console.log('Architecture analysis error (non-fatal):', e); }
   }
 
-  // Set context and generate
-  var review = getReview(id);
+  // Step 2: Build enhanced context from findings for per-question batches
+  var archContext = '';
+  if (window._archFindings) {
+    var findings = window._archFindings;
+    var contextLines = ['ARCHITECTURE ASSESSMENT (from Sonnet analysis of uploaded documents):'];
+    contextLines.push('Summary: ' + (findings.summary || ''));
+    (findings.pillars || []).forEach(function(p) {
+      contextLines.push('\n' + p.name + ' (' + p.rag.toUpperCase() + '): ' + p.rationale);
+      (p.findings || []).forEach(function(f) {
+        contextLines.push('  - [' + f.type + '] ' + f.finding);
+      });
+    });
+    (findings.crossCutting || []).forEach(function(c) {
+      contextLines.push('\nCross-cutting: ' + c.finding + ' (Pillars: ' + c.pillars.join(', ') + ')');
+    });
+    archContext = contextLines.join('\n');
+  }
+
+  // Step 3: Generate per-question recommendations with arch context
   if (archContext) window._pdfReferenceContext = archContext;
   try {
     var html = await generateTailoredReport(review);

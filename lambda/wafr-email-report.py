@@ -521,6 +521,113 @@ Respond with ONLY valid JSON in this exact structure:
                 'body': json.dumps({'deleted': key})
             }
 
+        if action == 'analyseArchitecture':
+            # Pre-analysis: Sonnet analyses arch docs against Well-Architected pillars
+            # Returns structured findings per pillar + overall assessment
+            review_id = body['reviewId']
+            customer_name = body.get('customerName', 'Customer')
+            pillar_names = body.get('pillars', [
+                'Operational Excellence', 'Security', 'Reliability',
+                'Performance Efficiency', 'Cost Optimisation', 'Sustainability'
+            ])
+
+            # Collect all extracted architecture text
+            prefix = f"{review_id}/arch/"
+            response = s3.list_objects_v2(Bucket=REPORTS_BUCKET, Prefix=prefix)
+            context_parts = []
+            for obj in response.get('Contents', []):
+                key = obj['Key']
+                if key.endswith('.extracted.txt'):
+                    text_obj = s3.get_object(Bucket=REPORTS_BUCKET, Key=key)
+                    text = text_obj['Body'].read().decode('utf-8')
+                    source_filename = key.replace('.extracted.txt', '').split('/')[-1].split('_', 1)[-1]
+                    context_parts.append(f"=== {source_filename} ===\n{text}")
+
+            if not context_parts:
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'findings': [], 'summary': '', 'hasData': False})
+                }
+
+            combined_context = '\n\n'.join(context_parts)
+
+            SONNET_MODEL = 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0'
+            analysis_prompt = f"""You are an AWS Solutions Architect performing a Well-Architected Review assessment. 
+You have been provided with architecture documentation for {customer_name}.
+
+Analyse this architecture against the AWS Well-Architected Framework pillars and identify:
+1. Gaps and risks — what's missing or concerning
+2. What needs improvement — specific actionable items
+3. What's done well — positive aspects to acknowledge
+
+For each pillar, provide:
+- A RAG status (red/amber/green) based on what you can determine from the documentation
+- 2-4 key findings (gaps, risks, or improvements needed)
+- Brief justification for the RAG rating
+
+IMPORTANT RULES:
+- Only assess what is evidenced in the documentation. If a pillar has no relevant information, say so.
+- Be specific — reference actual components, services, or patterns mentioned in the docs.
+- Focus on actionable findings, not generic advice.
+- Do NOT use the word "customer" — use "{customer_name}" or "the environment".
+
+Respond with ONLY valid JSON in this exact structure:
+{{
+  "summary": "2-3 sentence overall architecture assessment",
+  "pillars": [
+    {{
+      "name": "Pillar Name",
+      "rag": "red|amber|green",
+      "rationale": "1 sentence justification for RAG",
+      "findings": [
+        {{
+          "type": "gap|risk|improvement|positive",
+          "finding": "Specific finding description",
+          "recommendation": "What should be done (omit for positive type)"
+        }}
+      ]
+    }}
+  ],
+  "crossCutting": [
+    {{
+      "finding": "Finding that spans multiple pillars",
+      "pillars": ["Pillar1", "Pillar2"],
+      "recommendation": "What should be done"
+    }}
+  ]
+}}
+
+ARCHITECTURE DOCUMENTATION:
+{combined_context}"""
+
+            try:
+                response = bedrock.converse(
+                    modelId=SONNET_MODEL,
+                    messages=[{
+                        'role': 'user',
+                        'content': [{'text': analysis_prompt}]
+                    }],
+                    inferenceConfig={'maxTokens': 8192}
+                )
+                result_text = response['output']['message']['content'][0]['text'].strip()
+                # Clean markdown fences if present
+                result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
+                result_text = re.sub(r'\s*```$', '', result_text)
+                findings = json.loads(result_text)
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'findings': findings, 'hasData': True})
+                }
+            except Exception as e:
+                print(f"ARCHITECTURE ANALYSIS ERROR: {type(e).__name__}: {str(e)}")
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'findings': None, 'hasData': False, 'error': str(e)})
+                }
+
         if action == 'getArchContext':
             # Returns all extracted architecture text for a review (used by report generation)
             review_id = body['reviewId']
