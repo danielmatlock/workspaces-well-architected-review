@@ -2625,11 +2625,11 @@ function showArchInfo(reviewId) {
   document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
     '<div class="modal" onclick="event.stopPropagation()" style="width:700px;max-width:90vw;">' +
     '<h3>Architecture Information</h3>' +
-    '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Upload architecture diagrams and documentation (PDF or Word) to provide context for report generation. You can upload multiple documents.</p>' +
+    '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Upload architecture diagrams and documentation (PDF, Word, or Images) to provide context for report generation. You can upload multiple documents.</p>' +
     '<div style="margin-bottom:16px;">' +
     '<label style="display:inline-block;padding:8px 16px;background:#232f3e;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;">' +
-    '<input type="file" id="arch-file-input" multiple accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="handleArchUpload(\'' + reviewId + '\')">' +
-    'Upload Files (PDF / Word)' +
+    '<input type="file" id="arch-file-input" multiple accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" style="display:none;" onchange="handleArchUpload(\'' + reviewId + '\')">' +
+    'Upload Files (PDF / Word / Images)' +
     '</label>' +
     '<span id="arch-upload-status" style="margin-left:12px;font-size:12px;color:#5f6b7a;"></span>' +
     '</div>' +
@@ -2675,10 +2675,9 @@ function handleArchUpload(reviewId) {
   var input = document.getElementById('arch-file-input');
   var files = input.files;
   if (!files || files.length === 0) return;
-  console.log('handleArchUpload called, files:', files.length, 'reviewId:', reviewId);
 
-  var validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-  var validExts = ['.pdf', '.doc', '.docx'];
+  var validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/png', 'image/jpeg'];
+  var validExts = ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'];
   var statusEl = document.getElementById('arch-upload-status');
   var totalFiles = files.length;
   var uploaded = 0;
@@ -2698,7 +2697,6 @@ function handleArchUpload(reviewId) {
       var reader = new FileReader();
       reader.onload = function(e) {
         var base64 = e.target.result.split(',')[1];
-        console.log('File read complete, base64 length:', base64.length, 'uploading:', file.name);
         fetch(ENV.emailEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

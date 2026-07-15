@@ -364,7 +364,7 @@ Respond with ONLY valid JSON in this exact structure:
             )
 
             # Extract text using Bedrock Sonnet (supports document understanding)
-            SONNET_MODEL = 'anthropic.claude-sonnet-4-5-20250929-v1:0'
+            SONNET_MODEL = 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0'
             extract_prompt = (
                 "You are an architecture document analyst. Extract ALL meaningful content from this document including:\n"
                 "- Architecture descriptions and decisions\n"
@@ -388,21 +388,39 @@ Respond with ONLY valid JSON in this exact structure:
                 else:
                     doc_format = 'pdf'
 
-                # Use Converse API for document understanding
+                # Choose content block type based on file type
+                is_image = content_type in ['image/png', 'image/jpeg']
+
+                if is_image:
+                    # Use image block for diagrams/screenshots
+                    image_format = 'png' if content_type == 'image/png' else 'jpeg'
+                    content_block = {
+                        'image': {
+                            'format': image_format,
+                            'source': {
+                                'bytes': file_bytes
+                            }
+                        }
+                    }
+                else:
+                    # Use document block for PDF/Word
+                    content_block = {
+                        'document': {
+                            'name': filename.replace(' ', '_').replace('.', '_'),
+                            'format': doc_format,
+                            'source': {
+                                'bytes': file_bytes
+                            }
+                        }
+                    }
+
+                # Use Converse API for document/image understanding
                 response = bedrock.converse(
                     modelId=SONNET_MODEL,
                     messages=[{
                         'role': 'user',
                         'content': [
-                            {
-                                'document': {
-                                    'name': filename.replace(' ', '_').replace('.', '_'),
-                                    'format': doc_format,
-                                    'source': {
-                                        'bytes': file_bytes
-                                    }
-                                }
-                            },
+                            content_block,
                             {
                                 'text': extract_prompt
                             }
