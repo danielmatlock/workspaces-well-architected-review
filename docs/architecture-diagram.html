@@ -2,153 +2,305 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>WorkSpaces WAFR Tool — Architecture Diagram</title>
+<title>AWS WorkSpaces WAFR Tool — Architecture</title>
 <style>
-@page { size: A3 landscape; margin: 15mm; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #16191f; padding: 30px; max-width: 1400px; margin: 0 auto; background: #fff; }
-h1 { font-size: 22px; color: #232f3e; border-bottom: 3px solid #ff9900; padding-bottom: 8px; margin-bottom: 24px; }
-h2 { font-size: 16px; color: #232f3e; margin-top: 30px; margin-bottom: 12px; }
-.subtitle { font-size: 12px; color: #5f6b7a; margin-bottom: 24px; }
-.diagram { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin: 20px 0; }
-.layer { background: #f8f9fa; border: 1px solid #e1e4e8; border-radius: 8px; padding: 16px; width: 100%; }
-.layer-title { font-size: 13px; font-weight: 600; color: #ff9900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-.services { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.svc { background: #fff; border: 2px solid #232f3e; border-radius: 6px; padding: 10px 14px; text-align: center; min-width: 130px; }
-.svc .svc-name { font-size: 11px; font-weight: 600; color: #232f3e; }
-.svc .svc-detail { font-size: 9px; color: #5f6b7a; margin-top: 4px; }
-.svc.highlight { border-color: #ff9900; background: #fff8f0; }
-.svc.ai { border-color: #0073bb; background: #f0f8ff; }
-.svc.storage { border-color: #1d8102; background: #f2f8f0; }
-.arrow { text-align: center; font-size: 20px; color: #5f6b7a; padding: 8px 0; }
-.flow-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 12px; }
-.flow-table th { background: #232f3e; color: #fff; padding: 8px 12px; text-align: left; }
-.flow-table td { padding: 8px 12px; border-bottom: 1px solid #e1e4e8; }
-.flow-table tr:nth-child(even) { background: #f8f9fa; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; color: #fff; }
-.badge-active { background: #1d8102; }
-.badge-region { background: #0073bb; }
-.note { font-size: 11px; color: #5f6b7a; font-style: italic; margin-top: 16px; }
-@media print { body { padding: 10px; } .no-print { display: none; } }
+@page { size: A3 landscape; margin: 12mm; }
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #16191f; padding: 20px; margin: 0 auto; background: #fff; max-width: 1500px; }
+h1 { font-size: 24px; color: #232f3e; text-align: center; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: #5f6b7a; text-align: center; margin-bottom: 20px; }
+
+/* Outer AWS boundary */
+.aws-boundary { border: 2px solid #232f3e; border-radius: 12px; padding: 30px 24px 24px; position: relative; margin-top: 10px; }
+.aws-boundary::before { content: ''; position: absolute; top: -1px; left: 30px; background: #fff; padding: 0 10px; font-size: 12px; color: #232f3e; }
+
+/* Service boxes */
+.svc { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 14px; border-radius: 6px; min-width: 120px; min-height: 56px; text-align: center; border: 2px solid; font-size: 11px; position: absolute; }
+.svc .svc-name { font-weight: 700; font-size: 11px; line-height: 1.3; }
+.svc .svc-detail { font-size: 9px; color: #555; margin-top: 2px; }
+
+/* Colour classes matching the PDF legend */
+.cat-network { background: #e8e0f7; border-color: #7b61c2; }
+.cat-compute { background: #fff3e0; border-color: #ff9900; }
+.cat-auth { background: #fce4ec; border-color: #e53935; }
+.cat-api { background: #fce4ec; border-color: #d81b60; }
+.cat-database { background: #e8eaf6; border-color: #1a237e; }
+.cat-ai { background: #e0f2f1; border-color: #00897b; }
+.cat-storage { background: #e8f5e9; border-color: #2e7d32; }
+.cat-client { background: #e3f2fd; border-color: #90caf9; }
+
+/* Canvas for arrows */
+.diagram-canvas { position: relative; width: 100%; height: 680px; }
+
+/* SVG arrows layer */
+.arrows-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.arrows-layer line, .arrows-layer path { stroke: #5f6b7a; stroke-width: 1.5; fill: none; }
+.arrows-layer text { font-size: 9px; fill: #5f6b7a; font-family: -apple-system, sans-serif; }
+.arrows-layer marker path { fill: #5f6b7a; }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 20px; padding: 10px; border-top: 1px solid #e1e4e8; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+.legend-swatch { width: 16px; height: 16px; border-radius: 3px; border: 2px solid; }
+
+/* Print helpers */
+.no-print { text-align: center; margin-bottom: 16px; }
+@media print { .no-print { display: none; } body { padding: 10px; } }
+
+/* Actor outside box */
+.actor { position: absolute; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+.actor-icon { font-size: 20px; }
 </style>
 </head>
 <body>
-<div class="no-print" style="margin-bottom:16px;text-align:center;padding:12px;background:#232f3e;border-radius:6px;">
+
+<div class="no-print">
   <button onclick="window.print()" style="padding:10px 24px;background:#ff9900;border:none;color:#fff;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer;">Save as PDF (Cmd+P)</button>
 </div>
 
-<h1>WorkSpaces WAFR Tool — System Architecture</h1>
-<div class="subtitle">Account: 590183747733 | Region: eu-west-2 | Last updated: July 2026</div>
+<h1>AWS WorkSpaces WAFR Tool — Architecture</h1>
+<div class="subtitle">AWS Cloud (Account: 590183747733 — eu-west-2)</div>
 
-<!-- User Layer -->
-<div class="layer">
-  <div class="layer-title">User Layer</div>
-  <div class="services">
-    <div class="svc"><div class="svc-name">TAM / Reviewer</div><div class="svc-detail">Browser (Chrome/Safari)</div></div>
-    <div class="svc"><div class="svc-name">pptxgenjs</div><div class="svc-detail">Client-side PPTX gen (CDN)</div></div>
-    <div class="svc"><div class="svc-name">Cognito JS SDK</div><div class="svc-detail">Auth (CDN)</div></div>
+<div class="aws-boundary">
+<div class="diagram-canvas">
+
+  <!-- Actor: TAM/Reviewer (outside left) -->
+  <div class="actor" style="left: -10px; top: 310px;">
+    <span class="actor-icon">&#9632;</span> TAM /<br>Reviewer
   </div>
+
+  <!-- Row 1: Networking / Hosting / Auth -->
+  <div class="svc cat-network" style="left: 140px; top: 290px;">
+    <span class="svc-name">CloudFront</span>
+    <span class="svc-detail">CDN</span>
+  </div>
+
+  <div class="svc cat-compute" style="left: 300px; top: 290px;">
+    <span class="svc-name">AWS Amplify</span>
+    <span class="svc-detail">Hosting (S3)</span>
+  </div>
+
+  <div class="svc cat-auth" style="left: 220px; top: 140px;">
+    <span class="svc-name">Amazon Cognito</span>
+    <span class="svc-detail">User Pool</span>
+  </div>
+
+  <!-- Row 2: API layer -->
+  <div class="svc cat-api" style="left: 460px; top: 140px;">
+    <span class="svc-name">AWS AppSync</span>
+    <span class="svc-detail">GraphQL API</span>
+  </div>
+
+  <div class="svc cat-api" style="left: 460px; top: 370px;">
+    <span class="svc-name">API Gateway</span>
+    <span class="svc-detail">HTTP API</span>
+  </div>
+
+  <!-- Row 3: Databases -->
+  <div class="svc cat-database" style="left: 680px; top: 80px;">
+    <span class="svc-name">DynamoDB</span>
+    <span class="svc-detail">wafr-reviews</span>
+  </div>
+
+  <div class="svc cat-database" style="left: 680px; top: 160px;">
+    <span class="svc-name">DynamoDB</span>
+    <span class="svc-detail">wafr-templates</span>
+  </div>
+
+  <!-- Row 4: Lambda functions -->
+  <div class="svc cat-compute" style="left: 680px; top: 310px;">
+    <span class="svc-name">Lambda</span>
+    <span class="svc-detail">wafr-explain</span>
+  </div>
+
+  <div class="svc cat-compute" style="left: 680px; top: 420px;">
+    <span class="svc-name">Lambda</span>
+    <span class="svc-detail">wafr-email-report</span>
+  </div>
+
+  <!-- Row 5: AI / Email / Storage -->
+  <div class="svc cat-ai" style="left: 920px; top: 310px;">
+    <span class="svc-name">Amazon Bedrock</span>
+    <span class="svc-detail">Claude Haiku 4.5</span>
+  </div>
+
+  <div class="svc cat-auth" style="left: 920px; top: 420px;">
+    <span class="svc-name">Amazon SES</span>
+    <span class="svc-detail">Email Delivery</span>
+  </div>
+
+  <div class="svc cat-storage" style="left: 920px; top: 530px;">
+    <span class="svc-name">S3 Bucket</span>
+    <span class="svc-detail">wafr-reports-*</span>
+  </div>
+
+  <!-- Client-side -->
+  <div class="svc cat-client" style="left: 460px; top: 530px;">
+    <span class="svc-name">pptxgenjs</span>
+    <span class="svc-detail">Client-side PPTX</span>
+  </div>
+
+  <!-- SVG Arrow Layer -->
+  <svg class="arrows-layer" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L8,3 L0,6 Z" />
+      </marker>
+    </defs>
+
+    <!-- Actor → CloudFront -->
+    <line x1="80" y1="320" x2="140" y2="315" marker-end="url(#arrowhead)" />
+    <text x="88" y="308">HTTPS</text>
+
+    <!-- CloudFront → Amplify -->
+    <line x1="260" y1="310" x2="300" y2="310" marker-end="url(#arrowhead)" />
+
+    <!-- Amplify → Cognito -->
+    <line x1="350" y1="290" x2="290" y2="180" marker-end="url(#arrowhead)" />
+    <text x="295" y="238">Auth (JWT)</text>
+
+    <!-- Amplify → AppSync -->
+    <line x1="420" y1="290" x2="480" y2="180" marker-end="url(#arrowhead)" />
+    <text x="430" y="238">GraphQL</text>
+
+    <!-- Amplify → API Gateway -->
+    <line x1="380" y1="340" x2="470" y2="380" marker-end="url(#arrowhead)" />
+    <text x="390" y="365">REST API</text>
+
+    <!-- AppSync → DynamoDB reviews -->
+    <line x1="580" y1="155" x2="680" y2="105" marker-end="url(#arrowhead)" />
+
+    <!-- AppSync → DynamoDB templates -->
+    <line x1="580" y1="165" x2="680" y2="175" marker-end="url(#arrowhead)" />
+
+    <!-- API Gateway → Lambda explain -->
+    <line x1="580" y1="385" x2="680" y2="335" marker-end="url(#arrowhead)" />
+    <text x="600" y="355">/explain</text>
+
+    <!-- API Gateway → Lambda email-report -->
+    <line x1="580" y1="400" x2="680" y2="440" marker-end="url(#arrowhead)" />
+    <text x="595" y="430">/email-report</text>
+
+    <!-- Lambda explain → Bedrock -->
+    <line x1="800" y1="330" x2="920" y2="335" marker-end="url(#arrowhead)" />
+    <text x="830" y="322">InvokeModel</text>
+
+    <!-- Lambda email-report → Bedrock -->
+    <line x1="800" y1="435" x2="920" y2="345" marker-end="url(#arrowhead)" />
+    <text x="840" y="385">InvokeModel</text>
+
+    <!-- Lambda email-report → SES -->
+    <line x1="800" y1="450" x2="920" y2="440" marker-end="url(#arrowhead)" />
+    <text x="830" y="460">SendRawEmail</text>
+
+    <!-- Lambda email-report → S3 -->
+    <line x1="760" y1="470" x2="920" y2="545" marker-end="url(#arrowhead)" />
+    <text x="800" y="520">Save/Get/List/Delete</text>
+
+    <!-- API Gateway → pptxgenjs (grounding) -->
+    <line x1="510" y1="420" x2="510" y2="530" marker-end="url(#arrowhead)" />
+    <text x="515" y="485">Grounding data</text>
+
+  </svg>
+
+</div><!-- /diagram-canvas -->
+</div><!-- /aws-boundary -->
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch cat-network"></div> Networking/CDN</div>
+  <div class="legend-item"><div class="legend-swatch cat-compute"></div> Compute/Hosting</div>
+  <div class="legend-item"><div class="legend-swatch cat-auth"></div> Auth/Email</div>
+  <div class="legend-item"><div class="legend-swatch cat-api"></div> API</div>
+  <div class="legend-item"><div class="legend-swatch cat-database"></div> Database</div>
+  <div class="legend-item"><div class="legend-swatch cat-ai"></div> AI/ML</div>
+  <div class="legend-item"><div class="legend-swatch cat-storage"></div> Storage</div>
+  <div class="legend-item"><div class="legend-swatch cat-client"></div> Client-side</div>
 </div>
 
-<div class="arrow">▼ HTTPS</div>
+<!-- Data Flow Summary Table -->
+<h2 style="font-size:16px; margin-top:30px; color:#232f3e; border-bottom:2px solid #ff9900; padding-bottom:6px;">Data Flows & Lambda Actions</h2>
 
-<!-- Hosting Layer -->
-<div class="layer">
-  <div class="layer-title">Hosting & Delivery</div>
-  <div class="services">
-    <div class="svc highlight"><div class="svc-name">AWS Amplify</div><div class="svc-detail">App: d1p2543h8l2mfc</div></div>
-    <div class="svc"><div class="svc-name">CloudFront</div><div class="svc-detail">CDN (auto via Amplify)</div></div>
-    <div class="svc"><div class="svc-name">S3</div><div class="svc-detail">Static assets (auto)</div></div>
-  </div>
-</div>
-
-<div class="arrow">▼ HTTPS</div>
-
-<!-- Auth Layer -->
-<div class="layer">
-  <div class="layer-title">Authentication</div>
-  <div class="services">
-    <div class="svc highlight"><div class="svc-name">Amazon Cognito</div><div class="svc-detail">User Pool: eu-west-2_Wy0eJHyN3</div></div>
-  </div>
-</div>
-
-<div class="arrow">▼ JWT Token</div>
-
-<!-- API Layer -->
-<div class="layer">
-  <div class="layer-title">API Layer</div>
-  <div class="services">
-    <div class="svc highlight"><div class="svc-name">AWS AppSync</div><div class="svc-detail">GraphQL API (Cognito auth)</div></div>
-    <div class="svc highlight"><div class="svc-name">API Gateway</div><div class="svc-detail">HTTP API: 6ylrfwa3d8</div></div>
-  </div>
-</div>
-
-<div class="arrow">▼</div>
-
-<!-- Compute Layer -->
-<div class="layer">
-  <div class="layer-title">Compute</div>
-  <div class="services">
-    <div class="svc"><div class="svc-name">Lambda: wafr-explain</div><div class="svc-detail">AI Guidance (512 tokens)</div></div>
-    <div class="svc highlight"><div class="svc-name">Lambda: wafr-email-report</div><div class="svc-detail">90s timeout, 256MB<br>Actions: generate, curateDeck, chat, email, notify, saveReport, listReports, getReport, deleteReport</div></div>
-  </div>
-</div>
-
-<div class="arrow">▼</div>
-
-<!-- AI + Storage Layer -->
-<div class="layer">
-  <div class="layer-title">AI & Storage</div>
-  <div class="services">
-    <div class="svc ai"><div class="svc-name">Amazon Bedrock</div><div class="svc-detail">Claude Haiku 4.5 (EU)<br>eu.anthropic.claude-haiku-4-5</div></div>
-    <div class="svc storage"><div class="svc-name">DynamoDB</div><div class="svc-detail">wafr-reviews<br>wafr-templates<br>PITR enabled</div></div>
-    <div class="svc storage"><div class="svc-name">S3</div><div class="svc-detail">wafr-reports-danmmat-9219112<br>Saved reports (HTML/PPTX)</div></div>
-    <div class="svc"><div class="svc-name">Amazon SES</div><div class="svc-detail">Email delivery<br>Sender: danmmat@amazon.co.uk</div></div>
-  </div>
-</div>
-
-<h2>Data Flows</h2>
-<table class="flow-table">
-<thead><tr><th>Flow</th><th>Path</th><th>Purpose</th></tr></thead>
+<table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:12px;">
+<thead>
+<tr style="background:#232f3e; color:#fff;">
+  <th style="padding:8px; text-align:left;">Flow</th>
+  <th style="padding:8px; text-align:left;">Route / Action</th>
+  <th style="padding:8px; text-align:left;">Services</th>
+  <th style="padding:8px; text-align:left;">Description</th>
+</tr>
+</thead>
 <tbody>
-<tr><td>Auth</td><td>Browser → Cognito → JWT → AppSync/API GW</td><td>User authentication</td></tr>
-<tr><td>CRUD</td><td>Browser → AppSync → DynamoDB</td><td>Save/load reviews and templates</td></tr>
-<tr><td>AI Guidance</td><td>Browser → API GW → Lambda (explain) → Bedrock</td><td>Per-question guidance panel</td></tr>
-<tr><td>Report Gen</td><td>Browser → API GW → Lambda (generate) → Bedrock</td><td>Tailored observations/recommendations (batched)</td></tr>
-<tr><td>C-Level Curation</td><td>Browser → API GW → Lambda (curateDeck) → Bedrock</td><td>AI curation of findings into business narrative</td></tr>
-<tr><td>AI Chat</td><td>Browser → API GW → Lambda (chat) → Bedrock</td><td>Conversational Q&A grounded in review data</td></tr>
-<tr><td>Email</td><td>Browser → API GW → Lambda (email/notify) → SES</td><td>Send reports and notifications</td></tr>
-<tr><td>Report Storage</td><td>Browser → API GW → Lambda → S3</td><td>Save/list/get/delete generated reports</td></tr>
-<tr><td>PPTX Build</td><td>Browser (pptxgenjs) → S3 (via Lambda saveReport)</td><td>C-Level Deck generation + save</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Authentication</td><td>Cognito SRP</td><td>Cognito → Browser (JWT)</td><td>User signs in, JWT stored in localStorage for API calls</td></tr>
+<tr><td style="padding:6px 8px;">Cloud Sync</td><td>GraphQL mutations/queries</td><td>AppSync → DynamoDB</td><td>CRUD operations on wafr-reviews and wafr-templates</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">AI Guidance</td><td>POST /explain</td><td>API GW → Lambda → Bedrock</td><td>Concise TAM guidance per question (512 tokens)</td></tr>
+<tr><td style="padding:6px 8px;">Report Generation</td><td>POST /email-report<br><code>action: generate</code></td><td>API GW → Lambda → Bedrock</td><td>Batched (5 Qs/call), parallel Bedrock calls, 4096 tokens</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Email Report</td><td>POST /email-report<br><code>action: email</code></td><td>API GW → Lambda → SES</td><td>HTML report as email attachment via SES</td></tr>
+<tr><td style="padding:6px 8px;">Save Report</td><td>POST /email-report<br><code>action: saveReport</code></td><td>API GW → Lambda → S3</td><td>Auto-saves Standard/So What/C-Level reports to S3</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">List Reports</td><td>POST /email-report<br><code>action: listReports</code></td><td>API GW → Lambda → S3</td><td>Lists saved reports for a review (by prefix)</td></tr>
+<tr><td style="padding:6px 8px;">Get Report</td><td>POST /email-report<br><code>action: getReport</code></td><td>API GW → Lambda → S3</td><td>Returns base64 report content (direct GetObject)</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Delete Report</td><td>POST /email-report<br><code>action: deleteReport</code></td><td>API GW → Lambda → S3</td><td>Removes saved report from S3</td></tr>
+<tr><td style="padding:6px 8px;">Curate C-Level Deck</td><td>POST /email-report<br><code>action: curateDeck</code></td><td>API GW → Lambda → Bedrock</td><td>AI curates findings into executive tiers (8192 tokens)</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Email Notification</td><td>POST /email-report<br><code>action: notify</code></td><td>API GW → Lambda → SES</td><td>Fire-and-forget notification (deck complete/failed)</td></tr>
+<tr><td style="padding:6px 8px;">AI Chat</td><td>POST /email-report<br><code>action: chat</code></td><td>API GW → Lambda → Bedrock</td><td>Grounded Q&A on review data + saved reports (1024 tokens)</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">C-Level PPTX</td><td>Client-side (pptxgenjs)</td><td>Browser → S3 (via saveReport)</td><td>13-slide deck built in browser, saved to S3</td></tr>
 </tbody>
 </table>
 
-<h2>Services Summary</h2>
-<table class="flow-table">
-<thead><tr><th>Service</th><th>Resource</th><th>Purpose</th><th>Status</th></tr></thead>
+<!-- Services Table -->
+<h2 style="font-size:16px; margin-top:30px; color:#232f3e; border-bottom:2px solid #ff9900; padding-bottom:6px;">AWS Services</h2>
+
+<table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:12px;">
+<thead>
+<tr style="background:#232f3e; color:#fff;">
+  <th style="padding:8px; text-align:left;">Service</th>
+  <th style="padding:8px; text-align:left;">Resource</th>
+  <th style="padding:8px; text-align:left;">Purpose</th>
+  <th style="padding:8px; text-align:left;">Config</th>
+</tr>
+</thead>
 <tbody>
-<tr><td>Amplify</td><td>d1p2543h8l2mfc</td><td>Static site hosting + CDN</td><td><span class="badge badge-active">Active</span></td></tr>
-<tr><td>Cognito</td><td>eu-west-2_Wy0eJHyN3</td><td>User authentication</td><td><span class="badge badge-active">Active</span></td></tr>
-<tr><td>AppSync</td><td>GraphQL API</td><td>Review/template CRUD</td><td><span class="badge badge-active">Active</span></td></tr>
-<tr><td>API Gateway</td><td>6ylrfwa3d8</td><td>HTTP API for Lambda</td><td><span class="badge badge-active">Active</span></td></tr>
-<tr><td>Lambda</td><td>wafr-explain</td><td>AI guidance</td><td><span class="badge badge-active">Active</span></td></tr>
-<tr><td>Lambda</td><td>wafr-email-report</td><td>Reports, email, chat, curation</td><td><span class="badge badge-active">Active</span></td></tr>
-<tr><td>Bedrock</td><td>Claude Haiku 4.5</td><td>AI generation</td><td><span class="badge badge-region">eu-west-2</span></td></tr>
-<tr><td>DynamoDB</td><td>wafr-reviews, wafr-templates</td><td>Data storage (PITR)</td><td><span class="badge badge-active">Active</span></td></tr>
-<tr><td>S3</td><td>wafr-reports-danmmat-9219112</td><td>Report storage</td><td><span class="badge badge-active">Active</span></td></tr>
-<tr><td>SES</td><td>danmmat@amazon.co.uk</td><td>Email delivery</td><td><span class="badge badge-active">Active</span></td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Amplify Hosting</td><td>App: d1p2543h8l2mfc</td><td>Static site hosting + CDN</td><td>Manual zip deploy</td></tr>
+<tr><td style="padding:6px 8px;">CloudFront</td><td>Auto (via Amplify)</td><td>Content delivery</td><td>—</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Cognito</td><td>User Pool: eu-west-2_Wy0eJHyN3</td><td>User authentication (SRP + JWT)</td><td>2 users</td></tr>
+<tr><td style="padding:6px 8px;">AppSync</td><td>API: 4up36qgqubd6tcuekx5cmexmii</td><td>GraphQL API for reviews + templates</td><td>Cognito auth</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">DynamoDB</td><td>wafr-reviews</td><td>Review storage</td><td>PAY_PER_REQUEST, PITR</td></tr>
+<tr><td style="padding:6px 8px;">DynamoDB</td><td>wafr-templates</td><td>Template storage</td><td>PAY_PER_REQUEST, PITR</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">API Gateway</td><td>HTTP API: 6ylrfwa3d8</td><td>REST endpoints (/explain, /email-report)</td><td>CORS enabled</td></tr>
+<tr><td style="padding:6px 8px;">Lambda</td><td>wafr-explain</td><td>AI guidance per question</td><td>Python 3.12, 30s, 128MB</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Lambda</td><td>wafr-email-report</td><td>Reports, email, S3 ops, chat, curateDeck, notify</td><td>Python 3.12, 90s, 256MB</td></tr>
+<tr><td style="padding:6px 8px;">Bedrock</td><td>eu.anthropic.claude-haiku-4-5-20251001-v1:0</td><td>AI explanations, recommendations, curation, chat</td><td>EU inference profile</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">SES</td><td>Sender: danmmat@amazon.co.uk</td><td>Email delivery for reports + notifications</td><td>Sandbox mode</td></tr>
+<tr><td style="padding:6px 8px;">S3</td><td>wafr-reports-danmmat-9219112</td><td>Auto-saved reports (HTML + PPTX)</td><td>eu-west-2</td></tr>
 </tbody>
 </table>
 
-<h2>Deployment</h2>
-<table class="flow-table">
-<thead><tr><th>Component</th><th>Deploy Method</th><th>Trigger</th></tr></thead>
+<!-- Cost Estimate -->
+<h2 style="font-size:16px; margin-top:30px; color:#232f3e; border-bottom:2px solid #ff9900; padding-bottom:6px;">Monthly Cost Estimate</h2>
+
+<table style="width:100%; border-collapse:collapse; font-size:11px; margin-top:12px;">
+<thead>
+<tr style="background:#232f3e; color:#fff;">
+  <th style="padding:8px; text-align:left;">Service</th>
+  <th style="padding:8px; text-align:left;">Expected Usage</th>
+  <th style="padding:8px; text-align:right;">Cost</th>
+</tr>
+</thead>
 <tbody>
-<tr><td>Frontend (index.html)</td><td>Amplify manual deployment (zip upload via CloudShell)</td><td>Manual after git push</td></tr>
-<tr><td>Lambda (wafr-email-report)</td><td>Lambda update-function-code (zip via CloudShell)</td><td>Manual after git push</td></tr>
-<tr><td>Source code</td><td>GitHub (private repo, SSH push from Kiro)</td><td>On code change</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Amplify Hosting</td><td>&lt;1GB served</td><td style="text-align:right;">Free tier</td></tr>
+<tr><td style="padding:6px 8px;">DynamoDB (+ PITR)</td><td>&lt;25 WCU/RCU, &lt;1GB</td><td style="text-align:right;">~$0.20</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">AppSync</td><td>&lt;250K queries</td><td style="text-align:right;">Free tier</td></tr>
+<tr><td style="padding:6px 8px;">Cognito</td><td>1-2 users</td><td style="text-align:right;">Free tier</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">API Gateway</td><td>&lt;100 requests/month</td><td style="text-align:right;">Free tier</td></tr>
+<tr><td style="padding:6px 8px;">Lambda</td><td>&lt;150 invocations/month</td><td style="text-align:right;">Free tier</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">Bedrock (Haiku 4.5)</td><td>~100-200 calls (512-8192 tokens)</td><td style="text-align:right;">~$0.20</td></tr>
+<tr><td style="padding:6px 8px;">S3 (Reports)</td><td>&lt;1GB stored, &lt;200 requests</td><td style="text-align:right;">~$0.03</td></tr>
+<tr style="background:#f8f9fa;"><td style="padding:6px 8px;">SES</td><td>&lt;50 emails/month</td><td style="text-align:right;">Free tier</td></tr>
+<tr><td style="padding:6px 8px; font-weight:700;">Total</td><td></td><td style="text-align:right; font-weight:700;">&lt;$1/month</td></tr>
 </tbody>
 </table>
 
-<div class="note">Architecture generated from docs/ARCHITECTURE.md | Account 590183747733 | Region eu-west-2</div>
+<p style="font-size:10px; color:#5f6b7a; margin-top:24px; text-align:center;">Last updated: July 2025 | Diagram version aligned with ARCHITECTURE.md</p>
+
 </body>
 </html>

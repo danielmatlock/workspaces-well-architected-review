@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html><head><style id="qw-theme">:root {
+  --color-bg: #faf9fc;
+  --color-text: #131920;
+  --color-navbar-bg: #f9f9fb;
+  --color-bg-chat-view: #fcfcfd;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f9fafb;
+  --color-bg-hover: #f3f4f6;
+  --color-surface: #f9fafb;
+  --color-surface-hover: #f3f4f6;
+  --color-surface-active: #e5e7eb;
+  --color-border: rgba(0, 0, 0, .12);
+  --color-border-light: rgba(0, 0, 0, .06);
+  --color-border-strong: #d1d5db;
+  --color-primary: #4200db;
+  --color-primary-dark: #35009e;
+  --color-primary-light: #8575ff;
+  --color-primary-bg: #e8e6ff;
+  --color-primary-hover-border: #35009e;
+  --color-nav-icon-active: #4200db;
+  --color-nav-hover-border: #4200db;
+  --color-primary-alpha-3: color-mix(in srgb, #4200db 3%, transparent);
+  --color-primary-alpha-5: color-mix(in srgb, #4200db 5%, transparent);
+  --color-primary-alpha-8: color-mix(in srgb, #4200db 8%, transparent);
+  --color-primary-alpha-12: color-mix(in srgb, #4200db 12%, transparent);
+  --color-primary-alpha-15: color-mix(in srgb, #4200db 15%, transparent);
+  --color-primary-alpha-20: color-mix(in srgb, #4200db 20%, transparent);
+  --color-primary-alpha-25: color-mix(in srgb, #4200db 25%, transparent);
+  --color-primary-alpha-30: color-mix(in srgb, #4200db 30%, transparent);
+  --color-primary-alpha-40: color-mix(in srgb, #4200db 40%, transparent);
+  --color-primary-alpha-50: color-mix(in srgb, #4200db 50%, transparent);
+  --color-primary-alpha-60: color-mix(in srgb, #4200db 60%, transparent);
+  --color-primary-subtle: color-mix(in srgb, #4200db 12%, transparent);
+  --color-primary-border: color-mix(in srgb, #4200db 30%, transparent);
+  --color-focus-ring: color-mix(in srgb, #4200db 50%, transparent);
+  --color-sidebar-hover: color-mix(in srgb, #4200db 12%, transparent);
+  --color-accent: #4200db;
+  --color-accent-foreground: #4200db;
+  --color-accent-dark: #35009e;
+  --color-accent-light: #e8e6ff;
+  --color-accent-inverse: #ffffff;
+  --color-link: #4200db;
+  --color-primary-gradient-end: #e8e6ff;
+  --color-primary-bg-solid: #e8e6ff;
+  --color-user-bubble: #F3F3F7;
+  --color-user-bubble-text: #131920;
+  --color-text-secondary: #5e5e5e;
+  --color-text-tertiary: #656871;
+  --color-text-muted: #9ca3af;
+  --color-text-on-primary: #ffffff;
+  --color-success: #00802f;
+  --color-success-dark: #00471e;
+  --color-success-light: #d9ffd6;
+  --color-success-hover: #005c26;
+  --color-success-bg: #e6f5eb;
+  --color-success-border: #b3d9bf;
+  --color-success-foreground: #00802f;
+  --color-success-dark-foreground: #00471e;
+  --color-success-text: #00471e;
+  --color-error: #db0000;
+  --color-error-dark: #700000;
+  --color-error-light: #ffe0e0;
+  --color-error-hover: #ffe0e0;
+  --color-error-bg: #fceaea;
+  --color-error-border: #f2cccc;
+  --color-error-active-border: #db0000;
+  --color-error-foreground: #db0000;
+  --color-error-dark-foreground: #700000;
+  --color-error-inverse: #ffffff;
+  --color-error-text: #700000;
+  --color-warning: #f2b100;
+  --color-warning-dark: #573a00;
+  --color-warning-light: #fffbbd;
+  --color-warning-hover: #db9200;
+  --color-warning-bg: #fef7e6;
+  --color-warning-border: #f9dfa3;
+  --color-warning-foreground: #f2b100;
+  --color-warning-dark-foreground: #573a00;
+  --color-warning-inverse: #573a00;
+  --color-surface-warning: #fffbbd;
+  --color-text-warning: #573a00;
+  --color-info: #006ce0;
+  --color-info-dark: #002a66;
+  --color-info-light: #d1f1ff;
+  --color-info-hover: #003b8f;
+  --color-info-bg: #ebf3fc;
+  --color-info-border: #b3d1f0;
+  --color-info-foreground: #006ce0;
+  --color-info-dark-foreground: #002a66;
+  --color-info-inverse: #ffffff;
+  --color-overlay: rgba(0, 0, 0, .5);
+  --color-shadow: rgba(0, 0, 0, .08);
+  --color-hover: rgba(0, 0, 0, .05);
+  --color-tooltip-bg: rgba(0, 0, 0, .85);
+  --color-tooltip-text: #ffffff;
+  --color-voice-purple: #8575ff;
+  --color-voice-purple-dark: #4200db;
+  --color-voice-purple-light: #8575ff;
+  --color-voice-red: #db0000;
+  --color-voice-red-dark: #700000;
+  --color-voice-amber: #f2b100;
+  --color-voice-purple-glow: rgba(66, 0, 219, .4);
+  --color-voice-red-glow: rgba(219, 0, 0, .4);
+  --font-sans: "Amazon Ember", "Helvetica Neue", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", "Monaco", "Menlo", "Consolas", monospace;
+  --text-2xs: .5625rem;
+  --text-xs: .625rem;
+  --text-sm: .6875rem;
+  --text-base: .75rem;
+  --text-md: .8125rem;
+  --text-lg: .875rem;
+  --text-xl: 1rem;
+  --text-2xl: 1.125rem;
+  --text-3xl: 1.25rem;
+  --text-4xl: 1.5rem;
+  --text-5xl: 2rem;
+  --spacing-1: calc(.25rem * 1);
+  --spacing-1-5: calc(.25rem * 1.5);
+  --spacing-2: calc(.25rem * 2);
+  --spacing-3: calc(.25rem * 3);
+  --spacing-4: calc(.25rem * 4);
+  --spacing-5: calc(.25rem * 5);
+  --spacing-6: calc(.25rem * 6);
+  --spacing-7: calc(.25rem * 7);
+  --spacing-8: calc(.25rem * 8);
+  --spacing-9: calc(.25rem * 9);
+  --spacing-10: calc(.25rem * 10);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-card: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 8px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, .08);
+  --color-success-bg-solid: #d9ffd6;
+  --color-error-bg-solid: #ffe0e0;
+  --color-error-border-solid: #ffe0e0;
+  --color-warning-bg-solid: #fffbbd;
+  --color-warning-text: #573a00;
+  --color-info-bg-solid: #d1f1ff;
+  --color-info-bg-solid-alt: #d1f1ff;
+  --color-info-text: #002a66;
+  --color-info-text-alt: #002a66;
+  --color-emerald: #10b981;
+  --color-teal: #4ecdc4;
+  --color-code-bg: #F3F3F7;
+  --color-code-header-bg: #f1f3f5;
+  --color-code-text: #24292e;
+  --color-code-border: #e1e4e8;
+  --color-code-muted: #6a737d;
+  --color-inline-code-bg: #F3F3F7;
+  --color-inline-code-text: #24292e;
+  --color-inline-code-border: #e1e4e8;
+  --color-scrollbar-thumb: #d1d5db;
+  --color-scrollbar-track: transparent;
+  --color-graph-node-text: #333333;
+  --color-graph-node-text-dim: #7F8C8D;
+  --color-graph-edge-default: #95A5A6;
+  --color-graph-edge-cross: #E67E22;
+  --color-graph-edge-text: #666666;
+  --color-graph-edge-stroke: #ffffff;
+  --color-graph-highlight-bg: #FF6B6B;
+  --color-graph-highlight-border: #E74C3C;
+  --color-graph-search-bg: #FFD700;
+  --color-graph-search-border: #FFA500;
+  --color-graph-focus-border: #C0392B;
+  --color-graph-external-border: #95A5A6;
+  --color-graph-cat-file: #3498DB;
+  --color-graph-cat-folder: #7F8C8D;
+  --color-graph-cat-file-aggregate: #2980B9;
+  --color-graph-cat-class: #9B59B6;
+  --color-graph-cat-function: #2ECC71;
+  --color-graph-cat-method: #1ABC9C;
+  --color-graph-cat-variable: #F39C12;
+  --color-graph-cat-import: #D35400;
+  --color-graph-cat-module: #5B6ABF;
+  --color-graph-cat-concept: #E74C3C;
+  --color-graph-cat-person: #FF6B6B;
+  --color-graph-cat-org: #4ECDC4;
+  --color-graph-cat-organization: #4ECDC4;
+  --color-graph-cat-product: #A29BFE;
+  --color-graph-cat-metric: #FD79A8;
+  --color-graph-cat-location: #34495E;
+  --color-graph-cat-date: #E056A0;
+  --color-graph-cat-code: #3498DB;
+  --color-graph-cat-doc: #7F8C8D;
+  --color-graph-cat-url: #00B894;
+  --color-graph-cat-email: #6C5CE7;
+  --color-graph-cat-unknown: #BDC3C7;
+  --color-graph-rel-contains: #BDC3C7;
+  --color-graph-rel-extends: #9B59B6;
+  --color-graph-rel-implements: #3498DB;
+  --color-graph-rel-imports: #E67E22;
+  --color-graph-rel-uses: #2ECC71;
+  --color-graph-rel-calls: #27AE60;
+  --color-graph-rel-references: #F39C12;
+  --color-graph-rel-related-to: #95A5A6;
+  --color-graph-rel-works-on: #E74C3C;
+  --color-graph-rel-owns: #1ABC9C;
+  --color-graph-rel-depends-on: #E67E22;
+  --color-graph-rel-parent-of: #BDC3C7;
+  --qs-content: #fff;
+  --qs-main: #fff;
+  --qs-primary-foreground: #131920;
+  --qs-secondary-foreground: #656871;
+  --qs-tertiary-foreground: #9ca3af;
+  --qs-placeholder-foreground: #8c8c94;
+  --qs-divider: #dedee3;
+  --qs-default-border: #8c8c94;
+  --qs-neutral-soft: #b4b4bb;
+  --qs-neutral-gray-50: #f9fafb;
+  --qs-tertiary-background: #f9fafb;
+  --qs-action-hover: #f3f3f7;
+  --qs-primary-default: #4200db;
+  --qs-primary-dark: #35009e;
+  --qs-primary-light: #e8e6ff;
+  --qs-success-default: #00802f;
+  --qs-error-default: #db0000;
+  --qs-font-sans: "Amazon Ember", "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+  --qs-font-family: "Amazon Ember", "Helvetica Neue", "Segoe UI", Helvetica, Arial, sans-serif;
+  --qs-font-base-letter-spacing: .15px;
+  --qs-shadow-sm: 0 0 2px 0 #00000029, 0 0 4px 0 #00000029;
+  --qs-shadow-md: 0 0 2px 0 #00000029, 0 2px 8px 1px #00000029;
+  --qs-shadow-lg: 0 4px 16px 4px #00000029, 0 2px 6px 1px #00000029;
+  --qs-shadow-xl: 0 4px 8px 2px #00000029, 0 6px 20px 4px #00000029;
+  --qs-width-modal-sm: 384px;
+  --qs-width-modal-md: 600px;
+  --qs-width-modal-lg: 1136px;
+  --qs-grid-gap: 16px;
+  --qs-grid-gap-xl: 24px;
+  --qs-primary-medium: #8575ff;
+  --qs-primary-inverse: #fff;
+  --qs-neutral-lightest: #f9f9fb;
+  --qs-neutral-light: #f3f3f7;
+  --qs-neutral-default: #dedee3;
+  --qs-neutral-medium: #8c8c94;
+  --qs-neutral-deep: #656871;
+  --qs-neutral-dark: #333843;
+  --qs-neutral-strong: #131920;
+  --qs-neutral-white: #fff;
+  --qs-neutral-black: #000;
+  --qs-success-medium: #005c26;
+  --qs-success-dark: #00471e;
+  --qs-success-light: #d9ffd6;
+  --qs-success-inverse: #fff;
+  --qs-info-default: #006ce0;
+  --qs-info-medium: #003b8f;
+  --qs-info-dark: #002a66;
+  --qs-info-light: #d1f1ff;
+  --qs-info-inverse: #fff;
+  --qs-warning-default: #f2b100;
+  --qs-warning-medium: #db9200;
+  --qs-warning-dark: #573a00;
+  --qs-warning-light: #fffbbd;
+  --qs-warning-inverse: #573a00;
+  --qs-warning-experimental: #f2b100;
+  --qs-warning-experimental-light: #fffbbd;
+  --qs-warning-experimental-light-foreground: #fffbbd;
+  --qs-error-medium: #900;
+  --qs-error-dark: #700000;
+  --qs-error-light: #ffe0e0;
+  --qs-error-inverse: #fff;
+  --qs-connection-default: #db3300;
+  --qs-connection-soft: #ff997a;
+  --qs-connection-light: #ffe0d6;
+  --qs-connection-dark: #661800;
+  --qs-automation-default: #b3008f;
+  --qs-automation-medium: #d600ba;
+  --qs-automation-soft: #ff94f1;
+  --qs-automation-light: #ffe0fb;
+  --qs-automation-dark: #660052;
+  --qs-insight-default: #a000b8;
+  --qs-insight-soft: #f299ff;
+  --qs-insight-light: #fce6ff;
+  --qs-insight-dark: #590066;
+  --qs-visualization-default: #7300e5;
+  --qs-visualization-soft: #d4a8ff;
+  --qs-visualization-light: #f2e5ff;
+  --qs-visualization-dark: #45008a;
+  --qs-spice: #ff9800;
+  --qs-coachmark: #006ce0;
+  --qs-brand: #fff;
+  --qs-brand-foreground: #131920;
+  --qs-brand-navbar: #131920;
+  --qs-brand-navbar-foreground: #fff;
+  --qs-brand-navbar-light: #dedee3;
+  --qs-brand-navbar-dark: #000;
+  --qs-application-navbar: #4200db;
+  --qs-application-navbar-foreground: #fff;
+  --qs-application-navbar-light: #e8e6ff;
+  --qs-application-navbar-dark: #35009e;
+  --qs-dimension: #4200db;
+  --qs-dimension-foreground: #fff;
+  --qs-dimension-experimental: #4200db;
+  --qs-dimension-experimental-foreground: #4200db;
+  --qs-measure: #00802f;
+  --qs-measure-foreground: #fff;
+  --qs-measure-experimental: #f2b100;
+  --qs-measure-experimental-foreground: #f2b100;
+  --qs-content-inverse: #333843;
+  --qs-content-inverse-active: #131920;
+  --qs-secondary: #dedee3;
+  --qs-disabled: #8c8c94;
+  --qs-divider-light: #f3f3f7;
+  --qs-hover-border: #333843;
+  --qs-active-border: #4200db;
+  --qs-disabled-border: #dedee3;
+  --qs-error-border: #ffe0e0;
+  --qs-error-active-border: #db0000;
+  --qs-disabled-foreground: #b4b4bb;
+  --qs-primary-inverse-foreground: #fff;
+  --qs-error-foreground: #db0000;
+  --qs-contrast-foreground: #131920;
+  --qs-main-foreground: #131920;
+  --qs-main-secondary-foreground: #656871;
+  --qs-action-disabled: #f3f3f7;
+  --qs-action-active: #e8e6ff;
+  --qs-default-badge: #dedee3;
+  --qs-tag-default: #dedee3;
+  --qs-tag-soft-border: #b4b4bb;
+  --qs-focus-offset: 1px;
+  --qs-toggle-tile-sm: calc(.25rem * 8);
+  --qs-toggle-tile-md: calc(.25rem * 12);
+  --qs-toggle-tile-lg: calc(.25rem * 15);
+  --qs-shadow-pin-right: inset 4px 0 4px -4px #00000029;
+  --qs-shadow-pin-left: inset -4px 0 4px -4px #00000029;
+  --react-pdf-text-layer: 1;
+  --highlight-bg-color: rgba(180, 0, 170, 1);
+  --highlight-selected-bg-color: rgba(0, 100, 0, 1);
+  --react-pdf-annotation-layer: 1;
+  --annotation-unfocused-field-background: url("data:image/svg+xml;charset=UTF-8,<svg width='1px' height='1px' xmlns='http://www.w3.org/2000/svg'><rect width='100%' height='100%' style='fill:rgba(0, 54, 255, 0.13);'/></svg>");
+  --input-focus-border-color: Highlight;
+  --input-focus-outline: 1px solid Canvas;
+  --input-unfocused-border-color: transparent;
+  --input-disabled-border-color: transparent;
+  --input-hover-border-color: black;
+  --link-outline: none;
+  color-scheme: light;
+}
+body { background: var(--color-bg); color: var(--color-text); }
+a { color: var(--color-link, var(--color-primary)); }</style>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #ffffff; color: #232F3E; padding: 40px; }
+.container { max-width: 1100px; margin: 0 auto; }
+h1 { text-align: center; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+.subtitle { text-align: center; font-size: 14px; color: #545B64; margin-bottom: 40px; }
+
+/* Diagram Canvas */
+.diagram { position: relative; width: 100%; height: 660px; border: 2px solid #E8EAED; border-radius: 12px; padding: 30px; margin-bottom: 40px; background: #F0F2F5; }
+
+/* Service Nodes */
+.svc { position: absolute; border: 2px solid #ccc; border-radius: 10px; padding: 10px 14px; text-align: center; background: white; min-width: 120px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.svc .name { font-size: 12px; font-weight: 700; }
+.svc .detail { font-size: 10px; color: #8B929A; margin-top: 2px; }
+
+/* Category borders */
+.svc.network { border-color: #8C4FFF; }
+.svc.compute { border-color: #FF9900; }
+.svc.auth { border-color: #DD344C; }
+.svc.api { border-color: #0073BB; }
+.svc.database { border-color: #3B48CC; }
+.svc.ai { border-color: #1B660F; }
+.svc.storage { border-color: #067F68; }
+.svc.client { border-color: #545B64; }
+.svc.user { border-color: #232F3E; background: #F4F5F7; }
+
+/* Connection labels */
+.conn-label { position: absolute; font-size: 9px; color: #8B929A; font-style: italic; background: white; padding: 1px 4px; white-space: nowrap; }
+
+/* SVG layer for lines */
+.diagram svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.diagram svg line, .diagram svg path { stroke: #B0B8C1; stroke-width: 1.5; fill: none; }
+.diagram svg .arrow-head { fill: #B0B8C1; }
+
+/* Legend */
+.legend { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-bottom: 40px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #545B64; }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 2px solid; }
+
+/* Tables */
+.section-title { font-size: 18px; font-weight: 700; margin: 32px 0 16px; border-bottom: 2px solid #FF9900; padding-bottom: 8px; display: inline-block; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 32px; }
+thead th { text-align: left; padding: 10px 14px; background: #232F3E; color: white; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+thead th:first-child { border-radius: 6px 0 0 0; }
+thead th:last-child { border-radius: 0 6px 0 0; }
+tbody td { padding: 10px 14px; border-bottom: 1px solid #E8EAED; }
+tbody tr:hover td { background: #F7F9FB; }
+.mono { font-family: 'SF Mono', Consolas, monospace; font-size: 11px; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 600; }
+.badge-green { background: #E6F9F0; color: #1B660F; }
+.badge-blue { background: #E8F4FD; color: #0073BB; }
+.badge-orange { background: #FFF4E5; color: #B86E00; }
+
+/* Cost total */
+.cost-box { display: inline-flex; align-items: center; gap: 10px; background: #E6F9F0; border-radius: 8px; padding: 12px 20px; margin-top: 8px; }
+.cost-box .amount { font-size: 24px; font-weight: 700; color: #1B660F; font-family: 'SF Mono', monospace; }
+.cost-box .label { font-size: 12px; color: #1B660F; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>AWS WorkSpaces WAFR Tool — Architecture</h1>
+<p class="subtitle">AWS Cloud (Account: 590183747733 — eu-west-2)</p>
+
+<!-- Architecture Diagram -->
+<div class="diagram">
+  <svg xmlns="http://www.w3.org/2000/svg">
+    <!-- TAM → CloudFront -->
+    <line x1="90" y1="370" x2="170" y2="370"></line>
+    <!-- CloudFront → Amplify -->
+    <line x1="280" y1="370" x2="350" y2="370"></line>
+    <!-- Amplify → Cognito (up-left) -->
+    <path d="M 410,340 C 410,290 340,260 300,240"></path>
+    <!-- Amplify → AppSync (up) -->
+    <path d="M 440,340 C 440,290 440,270 440,240"></path>
+    <!-- Amplify → API Gateway (down) -->
+    <path d="M 440,400 C 440,430 440,440 440,450"></path>
+    <!-- AppSync → DynamoDB reviews -->
+    <line x1="510" y1="210" x2="620" y2="150"></line>
+    <!-- AppSync → DynamoDB templates -->
+    <line x1="510" y1="230" x2="620" y2="280"></line>
+    <!-- API GW → Lambda explain -->
+    <path d="M 510,460 C 560,460 580,380 620,380"></path>
+    <!-- API GW → Lambda email-report -->
+    <path d="M 510,480 C 560,490 580,500 620,500"></path>
+    <!-- Lambda explain → Bedrock -->
+    <line x1="740" y1="380" x2="840" y2="380"></line>
+    <!-- Lambda email → Bedrock -->
+    <path d="M 740,490 C 780,490 800,400 840,400"></path>
+    <!-- Lambda email → SES -->
+    <line x1="740" y1="510" x2="840" y2="510"></line>
+    <!-- Lambda email → S3 -->
+    <path d="M 700,540 C 700,570 770,580 840,580"></path>
+    <!-- Amplify → pptxgenjs (down) -->
+    <path d="M 410,400 C 410,500 420,550 460,570"></path>
+    <!-- pptxgenjs → S3 -->
+    <line x1="580" y1="580" x2="840" y2="580"></line>
+    <!-- Cognito auth line -->
+    <path d="M 200,340 C 200,290 240,260 260,240"></path>
+  </svg>
+
+  <!-- User Node -->
+  <div class="svc user" style="left:30px; top:350px; min-width:80px;">
+    <div class="name">TAM /<br>Reviewer</div>
+  </div>
+
+  <!-- CloudFront -->
+  <div class="svc network" style="left:170px; top:350px;">
+    <div class="name">CloudFront</div>
+    <div class="detail">CDN</div>
+  </div>
+
+  <!-- Amplify -->
+  <div class="svc compute" style="left:350px; top:345px;">
+    <div class="name">AWS Amplify</div>
+    <div class="detail">Hosting (S3)</div>
+  </div>
+
+  <!-- Cognito -->
+  <div class="svc auth" style="left:180px; top:200px;">
+    <div class="name">Amazon Cognito</div>
+    <div class="detail">User Pool</div>
+  </div>
+
+  <!-- AppSync -->
+  <div class="svc api" style="left:380px; top:200px;">
+    <div class="name">AWS AppSync</div>
+    <div class="detail">GraphQL API</div>
+  </div>
+
+  <!-- DynamoDB reviews -->
+  <div class="svc database" style="left:600px; top:110px;">
+    <div class="name">DynamoDB</div>
+    <div class="detail">wafr-reviews</div>
+  </div>
+
+  <!-- DynamoDB templates -->
+  <div class="svc database" style="left:600px; top:245px;">
+    <div class="name">DynamoDB</div>
+    <div class="detail">wafr-templates</div>
+  </div>
+
+  <!-- API Gateway -->
+  <div class="svc api" style="left:380px; top:440px;">
+    <div class="name">API Gateway</div>
+    <div class="detail">HTTP API</div>
+  </div>
+
+  <!-- Lambda explain -->
+  <div class="svc compute" style="left:620px; top:360px;">
+    <div class="name">Lambda</div>
+    <div class="detail">wafr-explain</div>
+  </div>
+
+  <!-- Lambda email-report -->
+  <div class="svc compute" style="left:620px; top:480px;">
+    <div class="name">Lambda</div>
+    <div class="detail">wafr-email-report</div>
+  </div>
+
+  <!-- Bedrock -->
+  <div class="svc ai" style="left:840px; top:360px;">
+    <div class="name">Amazon Bedrock</div>
+    <div class="detail">Claude Haiku 4.5</div>
+  </div>
+
+  <!-- SES -->
+  <div class="svc auth" style="left:840px; top:490px;">
+    <div class="name">Amazon SES</div>
+    <div class="detail">Email Delivery</div>
+  </div>
+
+  <!-- S3 -->
+  <div class="svc storage" style="left:840px; top:560px;">
+    <div class="name">S3 Bucket</div>
+    <div class="detail">wafr-reports-*</div>
+  </div>
+
+  <!-- pptxgenjs -->
+  <div class="svc client" style="left:460px; top:560px;">
+    <div class="name">pptxgenjs</div>
+    <div class="detail">Client-side PPTX</div>
+  </div>
+
+  <!-- Connection Labels -->
+  <span class="conn-label" style="left:115px; top:355px;">HTTPS</span>
+  <span class="conn-label" style="left:305px; top:355px;">Origin</span>
+  <span class="conn-label" style="left:210px; top:285px;">Auth (JWT)</span>
+  <span class="conn-label" style="left:420px; top:275px;">GraphQL</span>
+  <span class="conn-label" style="left:415px; top:420px;">REST API</span>
+  <span class="conn-label" style="left:545px; top:365px;">/explain</span>
+  <span class="conn-label" style="left:540px; top:485px;">/email-report</span>
+  <span class="conn-label" style="left:770px; top:365px;">InvokeModel</span>
+  <span class="conn-label" style="left:760px; top:440px;">InvokeModel</span>
+  <span class="conn-label" style="left:770px; top:498px;">SendRawEmail</span>
+  <span class="conn-label" style="left:720px; top:565px;">Save/Get/List/Delete</span>
+  <span class="conn-label" style="left:555px; top:130px;">Save/Get</span>
+  <span class="conn-label" style="left:555px; top:260px;">Save/Get</span>
+  <span class="conn-label" style="left:400px; top:565px;">Grounding data</span>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="border-color:#8C4FFF"></div>Networking/CDN</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color:#FF9900"></div>Compute/Hosting</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color:#DD344C"></div>Auth/Email</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color:#0073BB"></div>API</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color:#3B48CC"></div>Database</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color:#1B660F"></div>AI/ML</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color:#067F68"></div>Storage</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color:#545B64"></div>Client-side</div>
+</div>
+
+<!-- Data Flows Table -->
+<div class="section-title">Data Flows &amp; Lambda Actions</div>
+<table>
+  <thead><tr><th>Flow</th><th>Route / Action</th><th>Services</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Authentication</strong></td><td class="mono">Cognito SRP</td><td>Cognito → Browser (JWT)</td><td>User signs in, JWT stored in localStorage</td></tr>
+    <tr><td><strong>Cloud Sync</strong></td><td class="mono">GraphQL mutations/queries</td><td>AppSync → DynamoDB</td><td>CRUD on wafr-reviews and wafr-templates</td></tr>
+    <tr><td><strong>AI Guidance</strong></td><td class="mono">POST /explain</td><td>API GW → Lambda → Bedrock</td><td>Concise TAM guidance per question (512 tokens)</td></tr>
+    <tr><td><strong>Report Generation</strong></td><td class="mono">POST /email-report <span class="badge badge-blue">generate</span></td><td>API GW → Lambda → Bedrock</td><td>Batched (5 Qs/call), parallel Bedrock, 4096 tokens</td></tr>
+    <tr><td><strong>Email Report</strong></td><td class="mono">POST /email-report <span class="badge badge-orange">email</span></td><td>API GW → Lambda → SES</td><td>HTML report as email attachment</td></tr>
+    <tr><td><strong>Save Report</strong></td><td class="mono">POST /email-report <span class="badge badge-green">saveReport</span></td><td>API GW → Lambda → S3</td><td>Auto-saves Standard/So What/C-Level to S3</td></tr>
+    <tr><td><strong>List Reports</strong></td><td class="mono">POST /email-report <span class="badge badge-green">listReports</span></td><td>API GW → Lambda → S3</td><td>Lists saved reports by prefix</td></tr>
+    <tr><td><strong>Get Report</strong></td><td class="mono">POST /email-report <span class="badge badge-green">getReport</span></td><td>API GW → Lambda → S3</td><td>Returns base64 report content</td></tr>
+    <tr><td><strong>Delete Report</strong></td><td class="mono">POST /email-report <span class="badge badge-green">deleteReport</span></td><td>API GW → Lambda → S3</td><td>Removes saved report from S3</td></tr>
+    <tr><td><strong>Curate C-Level Deck</strong></td><td class="mono">POST /email-report <span class="badge badge-blue">curateDeck</span></td><td>API GW → Lambda → Bedrock</td><td>AI curates findings into executive tiers (8192 tokens)</td></tr>
+    <tr><td><strong>Notification</strong></td><td class="mono">POST /email-report <span class="badge badge-orange">notify</span></td><td>API GW → Lambda → SES</td><td>Fire-and-forget notification</td></tr>
+    <tr><td><strong>AI Chat</strong></td><td class="mono">POST /email-report <span class="badge badge-blue">chat</span></td><td>API GW → Lambda → Bedrock</td><td>Grounded Q&amp;A on review data (1024 tokens)</td></tr>
+    <tr><td><strong>C-Level PPTX</strong></td><td class="mono">Client-side (pptxgenjs)</td><td>Browser → S3</td><td>13-slide deck built in browser, saved to S3</td></tr>
+  </tbody>
+</table>
+
+<!-- AWS Services -->
+<div class="section-title">AWS Services Configuration</div>
+<table>
+  <thead><tr><th>Service</th><th>Resource</th><th>Purpose</th><th>Config</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Amplify Hosting</strong></td><td class="mono">d1p2543h8l2mfc</td><td>Static site hosting + CDN</td><td>Manual zip deploy</td></tr>
+    <tr><td><strong>CloudFront</strong></td><td class="mono">Auto (via Amplify)</td><td>Content delivery</td><td>—</td></tr>
+    <tr><td><strong>Cognito</strong></td><td class="mono">eu-west-2_Wy0eJHyN3</td><td>User authentication (SRP + JWT)</td><td>2 users</td></tr>
+    <tr><td><strong>AppSync</strong></td><td class="mono">4up36qgqubd6tc...</td><td>GraphQL API for reviews + templates</td><td>Cognito auth</td></tr>
+    <tr><td><strong>DynamoDB</strong></td><td class="mono">wafr-reviews</td><td>Review storage</td><td>PAY_PER_REQUEST, PITR</td></tr>
+    <tr><td><strong>DynamoDB</strong></td><td class="mono">wafr-templates</td><td>Template storage</td><td>PAY_PER_REQUEST, PITR</td></tr>
+    <tr><td><strong>API Gateway</strong></td><td class="mono">6ylrfwa3d8</td><td>REST endpoints</td><td>CORS enabled</td></tr>
+    <tr><td><strong>Lambda</strong></td><td class="mono">wafr-explain</td><td>AI guidance per question</td><td>Python 3.12, 30s, 128MB</td></tr>
+    <tr><td><strong>Lambda</strong></td><td class="mono">wafr-email-report</td><td>Reports, email, S3 ops, chat</td><td>Python 3.12, 90s, 256MB</td></tr>
+    <tr><td><strong>Bedrock</strong></td><td class="mono">claude-haiku-4-5</td><td>AI explanations &amp; curation</td><td>EU inference profile</td></tr>
+    <tr><td><strong>SES</strong></td><td class="mono">danmmat@amazon.co.uk</td><td>Email delivery</td><td>Sandbox mode</td></tr>
+    <tr><td><strong>S3</strong></td><td class="mono">wafr-reports-danmmat-*</td><td>Auto-saved reports</td><td>eu-west-2</td></tr>
+  </tbody>
+</table>
+
+<!-- Cost Estimate -->
+<div class="section-title">Monthly Cost Estimate</div>
+<table>
+  <thead><tr><th>Service</th><th>Expected Usage</th><th>Cost</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Amplify Hosting</strong></td><td>&lt;1GB served</td><td><span class="badge badge-green">Free tier</span></td></tr>
+    <tr><td><strong>DynamoDB (+ PITR)</strong></td><td>&lt;25 WCU/RCU, &lt;1GB</td><td class="mono">~$0.20</td></tr>
+    <tr><td><strong>AppSync</strong></td><td>&lt;250K queries</td><td><span class="badge badge-green">Free tier</span></td></tr>
+    <tr><td><strong>Cognito</strong></td><td>1–2 users</td><td><span class="badge badge-green">Free tier</span></td></tr>
+    <tr><td><strong>API Gateway</strong></td><td>&lt;100 requests/month</td><td><span class="badge badge-green">Free tier</span></td></tr>
+    <tr><td><strong>Lambda</strong></td><td>&lt;150 invocations/month</td><td><span class="badge badge-green">Free tier</span></td></tr>
+    <tr><td><strong>Bedrock (Haiku 4.5)</strong></td><td>~100–200 calls</td><td class="mono">~$0.20</td></tr>
+    <tr><td><strong>S3 (Reports)</strong></td><td>&lt;1GB, &lt;200 requests</td><td class="mono">~$0.03</td></tr>
+    <tr><td><strong>SES</strong></td><td>&lt;50 emails/month</td><td><span class="badge badge-green">Free tier</span></td></tr>
+  </tbody>
+</table>
+<div class="cost-box">
+  <div class="amount">&lt;$1</div>
+  <div class="label">/month total estimated cost</div>
+</div>
+
+</div>
+
+
+</body></html>

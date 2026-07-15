@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Problem Statement — WorkSpaces WAFR Tool</title>
+<style>
+:root {
+  --aws-squid: #232F3E;
+  --aws-orange: #FF9900;
+  --text: #232F3E;
+  --text-secondary: #3D4F5F;
+  --text-muted: #8B929A;
+  --border: #E8EAED;
+  --bg: #FAFBFC;
+  --green: #1B660F;
+  --red: #DD344C;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 48px; }
+.container { max-width: 720px; margin: 0 auto; }
+
+/* AWS Logo */
+.logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.aws-logo { display: flex; align-items: center; gap: 8px; }
+.aws-logo svg { width: 60px; height: 36px; }
+.aws-logo span { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+
+.badge { display: inline-block; background: var(--aws-orange); color: white; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+h1 { font-size: 28px; font-weight: 700; line-height: 1.3; margin-bottom: 24px; color: var(--text); }
+.divider { width: 60px; height: 3px; background: var(--aws-orange); border-radius: 2px; margin-bottom: 24px; }
+.section-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 8px; }
+p { font-size: 16px; line-height: 1.7; color: var(--text-secondary); margin-bottom: 20px; }
+.highlight-box { background: white; border-left: 4px solid var(--aws-orange); border-radius: 0 8px 8px 0; padding: 20px 24px; margin: 24px 0; box-shadow: 0 2px 8px rgba(35,47,62,0.06); }
+.highlight-box p { margin-bottom: 0; font-size: 15px; }
+.gap-list { list-style: none; padding: 0; margin: 16px 0; }
+.gap-list li { padding: 10px 0 10px 28px; position: relative; font-size: 15px; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+.gap-list li:last-child { border-bottom: none; }
+.gap-list li::before { content: "✗"; position: absolute; left: 0; color: var(--red); font-weight: 700; font-size: 16px; }
+.solution-box { background: #E6F9F0; border-left: 4px solid var(--green); border-radius: 0 8px 8px 0; padding: 20px 24px; margin: 24px 0; }
+.solution-box .section-label { color: var(--green); }
+.solution-box p { color: var(--green); margin-bottom: 0; }
+.footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- AWS Logo -->
+<div class="logo-bar">
+  <div class="aws-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 304 182">
+      <path fill="#252F3E" d="M86.4 66.4c0 3.7.4 6.7 1.1 8.9.8 2.2 1.8 4.6 3.2 7.1.5.8.7 1.6.7 2.3 0 1-.6 2-1.9 3l-6.3 4.2c-.9.6-1.8.9-2.6.9-1 0-2-.5-3-1.4-1.4-1.5-2.6-3.1-3.6-4.7-1-1.7-2-3.6-3.1-5.9-7.8 9.2-17.6 13.8-29.4 13.8-8.4 0-15.1-2.4-20-7.2-4.9-4.8-7.4-11.2-7.4-19.2 0-8.5 3-15.4 9.1-20.6 6.1-5.2 14.2-7.8 24.5-7.8 3.4 0 6.9.3 10.6.8 3.7.5 7.5 1.3 11.5 2.2v-7.3c0-7.6-1.6-12.9-4.7-16-3.2-3.1-8.6-4.6-16.3-4.6-3.5 0-7.1.4-10.8 1.3-3.7.9-7.3 2-10.8 3.4-1.6.7-2.8 1.1-3.5 1.3-.7.2-1.2.3-1.6.3-1.4 0-2.1-1-2.1-3.1v-4.9c0-1.6.2-2.8.7-3.5.5-.7 1.4-1.4 2.8-2.1 3.5-1.8 7.7-3.3 12.6-4.5 4.9-1.3 10.1-1.9 15.6-1.9 11.9 0 20.6 2.7 26.2 8.1 5.5 5.4 8.3 13.6 8.3 24.6v32.4zM45.8 81.6c3.3 0 6.7-.6 10.3-1.8 3.6-1.2 6.8-3.4 9.5-6.4 1.6-1.9 2.8-4 3.4-6.4.6-2.4 1-5.3 1-8.7v-4.2c-2.9-.7-6-1.3-9.2-1.7-3.2-.4-6.3-.6-9.4-.6-6.7 0-11.6 1.3-14.9 4-3.3 2.7-4.9 6.5-4.9 11.5 0 4.7 1.2 8.2 3.7 10.6 2.4 2.5 5.9 3.7 10.5 3.7zm80.3 10.8c-1.8 0-3-.3-3.8-1-.8-.6-1.5-2-2.1-3.9l-23.5-77.3c-.6-2-.9-3.3-.9-4 0-1.6.8-2.5 2.4-2.5h9.8c1.9 0 3.2.3 3.9 1 .8.6 1.4 2 2 3.9l16.8 66.2 15.6-66.2c.5-2 1.1-3.3 1.9-3.9.8-.6 2.2-1 4-1h8c1.9 0 3.2.3 4 1 .8.6 1.5 2 1.9 3.9l15.8 67 17.3-67c.6-2 1.3-3.3 2-3.9.8-.6 2.1-1 3.9-1h9.3c1.6 0 2.5.8 2.5 2.5 0 .5-.1 1-.2 1.6-.1.6-.3 1.4-.7 2.5l-24.1 77.3c-.6 2-1.3 3.3-2.1 3.9-.8.6-2.1 1-3.8 1h-8.6c-1.9 0-3.2-.3-4-1-.8-.7-1.5-2-1.9-4l-15.5-64.5-15.4 64.4c-.5 2-1.1 3.3-1.9 4-.8.7-2.2 1-4 1h-8.6zm128.5 2.7c-5.2 0-10.4-.6-15.4-1.8-5-1.2-8.9-2.5-11.5-4-1.6-.9-2.7-1.9-3.1-2.8-.4-.9-.6-1.9-.6-2.8v-5.1c0-2.1.8-3.1 2.3-3.1.6 0 1.2.1 1.8.3.6.2 1.5.6 2.5 1 3.4 1.5 7.1 2.7 11 3.5 4 .8 7.9 1.2 11.9 1.2 6.3 0 11.2-1.1 14.6-3.3 3.4-2.2 5.2-5.4 5.2-9.5 0-2.8-.9-5.1-2.7-7-1.8-1.9-5.2-3.6-10.1-5.2l-14.5-4.5c-7.3-2.3-12.7-5.7-16-10.2-3.3-4.4-5-9.3-5-14.5 0-4.2.9-7.9 2.7-11.1 1.8-3.2 4.2-6 7.2-8.2 3-2.3 6.4-4 10.4-5.2 4-1.2 8.2-1.7 12.6-1.7 2.2 0 4.5.1 6.7.4 2.3.3 4.4.7 6.5 1.1 2 .5 3.9 1 5.7 1.6 1.8.6 3.2 1.2 4.2 1.8 1.4.8 2.4 1.6 3 2.5.6.8.9 1.9.9 3.3v4.7c0 2.1-.8 3.2-2.3 3.2-.8 0-2.1-.4-3.8-1.2-5.7-2.6-12.1-3.9-19.2-3.9-5.7 0-10.2.9-13.3 2.8-3.1 1.9-4.7 4.8-4.7 8.9 0 2.8 1 5.2 3 7.1 2 1.9 5.7 3.8 11 5.5l14.2 4.5c7.2 2.3 12.4 5.5 15.5 9.6 3.1 4.1 4.6 8.8 4.6 14 0 4.3-.9 8.2-2.6 11.6-1.8 3.4-4.2 6.4-7.3 8.8-3.1 2.5-6.8 4.3-11.1 5.6-4.5 1.4-9.2 2.1-14.3 2.1z"/>
+      <path fill="#F90" d="M273.5 143.7c-32.9 24.3-80.7 37.2-121.8 37.2-57.6 0-109.5-21.3-148.7-56.7-3.1-2.8-.3-6.6 3.4-4.4 42.4 24.6 94.7 39.5 148.8 39.5 36.5 0 76.6-7.6 113.5-23.2 5.5-2.5 10.2 3.6 4.8 7.6z"/>
+      <path fill="#F90" d="M287.2 128.1c-4.2-5.4-27.8-2.6-38.5-1.3-3.2.4-3.7-2.4-.8-4.5 18.8-13.2 49.7-9.4 53.3-5 3.6 4.5-1 35.4-18.6 50.2-2.7 2.3-5.3 1.1-4.1-1.9 4-9.9 12.9-32.2 8.7-37.5z"/>
+    </svg>
+  </div>
+  <span style="color:#8B929A; font-size: 13px;">Amazon Web Services</span>
+</div>
+
+<div class="badge">Problem Statement</div>
+<h1>No Well-Architected Review Exists for Amazon WorkSpaces Fundamentals</h1>
+<div class="divider"></div>
+
+<div class="section-label">Background</div>
+<p>For Agentic Workspaces, there was no existing Well-Architected Framework Review that dived deep into the fundamentals of Amazon WorkSpaces — covering areas such as networking, directory services, image management, scaling, security, and cost optimisation specific to the service.</p>
+
+<div class="highlight-box">
+<div class="section-label">The Gap</div>
+<p>TAMs had no structured, repeatable assessment to evaluate a customer's WorkSpaces deployment against best practices — and no automated way to generate a professional report from the findings.</p>
+</div>
+
+<div class="section-label">Specific Challenges</div>
+<ul class="gap-list">
+<li>No WorkSpaces-specific WAFR questions or review framework existed</li>
+<li>Reports had to be manually created for each customer engagement — time-consuming and inconsistent</li>
+<li>No standardised way to capture findings, score them, and present actionable recommendations</li>
+<li>Each TAM reinvented the process independently, with no reusable tooling</li>
+</ul>
+
+<div class="solution-box">
+<div class="section-label">Solution</div>
+<p>Build a purpose-built WAFR tool for Amazon WorkSpaces that provides structured review questions across all pillars, automated scoring, and generates customer-ready reports — eliminating manual effort and ensuring consistent, high-quality output for every engagement.</p>
+</div>
+
+<div class="footer">
+  <span>AWS WorkSpaces WAFR Tool · Problem Statement</span>
+  <span>Daniel Matlock · July 2026</span>
+</div>
+</div>
+</body>
+</html>
