@@ -1899,8 +1899,8 @@ async function generateWafrWithArchSelection(id) {
     var html = await generateTailoredReport(review);
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
-    var w = window.open('', '_blank'); w.document.write(html); w.document.close();
     saveReportToCloud(review.id, 'standard', html, 'text/html', 'html', review.customer);
+    var w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); }
   } catch(e) {
     hideGeneratingOverlay();
     window._pdfReferenceContext = '';
