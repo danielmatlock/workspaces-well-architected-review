@@ -1,6 +1,13 @@
 name: Deploy WorkSpaces WAFR Tool
 
 on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'src/**'
+      - 'lambda/**'
   workflow_dispatch:
     inputs:
       environment:
