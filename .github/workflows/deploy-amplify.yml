@@ -67,6 +67,19 @@ jobs:
           BRANCH=${{ steps.env.outputs.branch }}
           echo "Deploying to branch: $BRANCH (${{ steps.env.outputs.environment }})"
           
+          # Cancel any stuck/pending deployments
+          PENDING_JOB=$(aws amplify list-jobs \
+            --app-id $AMPLIFY_APP_ID \
+            --branch-name $BRANCH \
+            --region $AWS_REGION \
+            --query "jobSummaries[?status=='PENDING'].jobId | [0]" \
+            --output text 2>/dev/null || echo "None")
+          if [[ "$PENDING_JOB" != "None" && "$PENDING_JOB" != "" ]]; then
+            echo "Cancelling pending job: $PENDING_JOB"
+            aws amplify stop-job --app-id $AMPLIFY_APP_ID --branch-name $BRANCH --job-id $PENDING_JOB --region $AWS_REGION || true
+            sleep 5
+          fi
+          
           DEPLOY=$(aws amplify create-deployment \
             --app-id $AMPLIFY_APP_ID \
             --branch-name $BRANCH \
