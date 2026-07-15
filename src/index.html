@@ -709,7 +709,7 @@ function showHome() {
         '<div class="pillar-details">' + pillarHtml + '</div>' +
         '<div class="card-actions">' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();exportReview(\'' + r.id + '\')">Export JSON</button>' +
-        '<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();showArchInfo(\'' + r.id + '\')">Arch Info</button>' +
+        '<button class="btn btn-sm" onclick="event.stopPropagation();showArchInfo(\'' + r.id + '\')">Arch Info</button>' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();showPrintModal(\'' + r.id + '\')">Print Report</button>' +
         '<button class="btn btn-sm" onclick="event.stopPropagation();showEmailModal(\'' + r.id + '\')">Email Report</button>' +
         '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteReview(\'' + r.id + '\')">Delete</button>' +
@@ -1199,7 +1199,15 @@ async function sendEmailReport(id) {
   var htmlReport;
 
   if (selectedReport) {
-    // Use a previously saved report
+    // Check if it's a PPTX file
+    var selEl = document.getElementById('m-email-report-select');
+    var selectedOpt = selEl.options[selEl.selectedIndex];
+    if (selectedOpt.dataset && selectedOpt.dataset.format === 'pptx') {
+      statusEl.innerHTML = '<span style="color:#d13212">Cannot email PPTX files directly. Use Saved Reports to download it instead.</span>';
+      btn.disabled = false;
+      return;
+    }
+    // Use a previously saved HTML report
     statusEl.innerHTML = '<span style="color:#ff9900">Fetching saved report...</span>';
     try {
       var r = await fetch(ENV.emailEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: selectedReport }) });
@@ -1681,7 +1689,22 @@ async function handlePrintReport(id) {
   var statusEl = document.getElementById('print-status');
 
   if (selectedReport) {
-    // Open a previously saved report
+    // Check if it's a PPTX file
+    var selEl = document.getElementById('m-print-report-select');
+    var selectedOpt = selEl.options[selEl.selectedIndex];
+    if (selectedOpt.dataset && selectedOpt.dataset.format === 'pptx') {
+      statusEl.innerHTML = '<span style="color:#ff9900">Downloading PPTX...</span>';
+      try {
+        var r = await fetch(ENV.emailEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: selectedReport }) });
+        var d = await r.json(); var p = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+        var bytes = Uint8Array.from(atob(p.data), function(c) { return c.charCodeAt(0); });
+        var blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = p.filename || 'report.pptx'; a.click();
+        closeModal();
+      } catch(e) { statusEl.innerHTML = '<span style="color:#d13212">Error downloading file.</span>'; }
+      return;
+    }
+    // Open a previously saved HTML report
     statusEl.innerHTML = '<span style="color:#ff9900">Fetching saved report...</span>';
     try {
       var r = await fetch(ENV.emailEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: selectedReport }) });
@@ -1710,11 +1733,12 @@ function loadReportSelectOptions(reviewId, selectId) {
     if (!sel) return;
     var typeLabels = { standard: 'WAFR Report', sowhat: 'So What Report', clevel: 'C-Level Deck' };
     reports.forEach(function(r) {
-      if (r.extension === 'pptx') return; // Skip PPTX files (can't be emailed/printed as HTML)
       var label = (typeLabels[r.reportType] || r.reportType) + ' — ' + (r.timestamp || '').replace('T', ' ').substring(0, 16);
+      if (r.extension === 'pptx') label += ' (PPTX)';
       var opt = document.createElement('option');
       opt.value = r.key;
       opt.textContent = label;
+      if (r.extension === 'pptx') opt.dataset.format = 'pptx';
       sel.appendChild(opt);
     });
   }).catch(function(e) { console.log('Report list load error:', e); });
