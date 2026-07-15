@@ -345,6 +345,181 @@ Respond with ONLY valid JSON in this exact structure:
                     'body': json.dumps({'error': 'Curation failed: ' + str(e)})
                 }
 
+        if action == 'uploadArchInfo':
+            import base64
+            from datetime import datetime
+            review_id = body['reviewId']
+            filename = body['filename']
+            content_b64 = body['content']
+            content_type = body.get('contentType', 'application/pdf')
+            file_bytes = base64.b64decode(content_b64)
+            timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H%M%S')
+            key = f"{review_id}/arch/{timestamp}_{filename}"
+
+            # Store original file in S3
+            s3.put_object(
+                Bucket=REPORTS_BUCKET, Key=key, Body=file_bytes,
+                ContentType=content_type,
+                Metadata={'filename': filename, 'timestamp': timestamp, 'extracted': 'false'}
+            )
+
+            # Extract text using Bedrock Sonnet (supports document understanding)
+            SONNET_MODEL = 'eu.anthropic.claude-sonnet-4-20250514-v1:0'
+            extract_prompt = (
+                "You are an architecture document analyst. Extract ALL meaningful content from this document including:\n"
+                "- Architecture descriptions and decisions\n"
+                "- Component names, services, and their relationships\n"
+                "- Data flows and integration points\n"
+                "- Security controls and boundaries\n"
+                "- Resilience and availability patterns\n"
+                "- Performance considerations\n"
+                "- Cost-related decisions\n"
+                "- Operational procedures\n\n"
+                "Return the extracted information as structured plain text. Preserve all technical details. "
+                "If the document contains diagrams, describe them in text form."
+            )
+
+            try:
+                # Determine media type for Bedrock document block
+                if content_type == 'application/pdf':
+                    doc_format = 'pdf'
+                elif content_type in ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+                    doc_format = 'docx'
+                else:
+                    doc_format = 'pdf'
+
+                response = bedrock.invoke_model(
+                    modelId=SONNET_MODEL,
+                    contentType='application/json',
+                    accept='application/json',
+                    body=json.dumps({
+                        'anthropic_version': 'bedrock-2023-05-31',
+                        'max_tokens': 8192,
+                        'messages': [{
+                            'role': 'user',
+                            'content': [
+                                {
+                                    'type': 'document',
+                                    'source': {
+                                        'type': 'base64',
+                                        'media_type': content_type,
+                                        'data': content_b64
+                                    }
+                                },
+                                {
+                                    'type': 'text',
+                                    'text': extract_prompt
+                                }
+                            ]
+                        }]
+                    })
+                )
+                result = json.loads(response['body'].read())
+                extracted_text = result['content'][0]['text'].strip()
+
+                # Store extracted text alongside original
+                text_key = key + '.extracted.txt'
+                s3.put_object(
+                    Bucket=REPORTS_BUCKET, Key=text_key,
+                    Body=extracted_text.encode('utf-8'),
+                    ContentType='text/plain',
+                    Metadata={'source_file': key, 'model': SONNET_MODEL}
+                )
+
+                # Update original file metadata to mark as extracted
+                s3.copy_object(
+                    Bucket=REPORTS_BUCKET, Key=key,
+                    CopySource={'Bucket': REPORTS_BUCKET, 'Key': key},
+                    ContentType=content_type,
+                    Metadata={'filename': filename, 'timestamp': timestamp, 'extracted': 'true'},
+                    MetadataDirective='REPLACE'
+                )
+
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'message': 'Uploaded and processed', 'key': key, 'extractedChars': len(extracted_text)})
+                }
+            except Exception as extract_err:
+                # File uploaded but extraction failed — mark as not extracted
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'message': 'Uploaded but extraction failed', 'key': key, 'extractionError': str(extract_err)})
+                }
+
+        if action == 'getArchInfo':
+            review_id = body['reviewId']
+            prefix = f"{review_id}/arch/"
+            response = s3.list_objects_v2(Bucket=REPORTS_BUCKET, Prefix=prefix)
+            files = []
+            for obj in response.get('Contents', []):
+                key = obj['Key']
+                # Skip extracted text files
+                if key.endswith('.extracted.txt'):
+                    continue
+                filename_part = key.split('/')[-1]
+                # Parse timestamp_filename format
+                parts = filename_part.split('_', 1)
+                timestamp = parts[0] if len(parts) > 1 else ''
+                original_filename = parts[1] if len(parts) > 1 else filename_part
+                # Check if extracted text exists
+                text_key = key + '.extracted.txt'
+                extracted = False
+                try:
+                    s3.head_object(Bucket=REPORTS_BUCKET, Key=text_key)
+                    extracted = True
+                except:
+                    pass
+                files.append({
+                    'key': key,
+                    'filename': original_filename,
+                    'timestamp': timestamp,
+                    'size': obj['Size'],
+                    'extracted': extracted
+                })
+            files.sort(key=lambda f: f['timestamp'], reverse=True)
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'files': files})
+            }
+
+        if action == 'deleteArchInfo':
+            review_id = body['reviewId']
+            key = body['key']
+            # Delete the original file and its extracted text
+            s3.delete_object(Bucket=REPORTS_BUCKET, Key=key)
+            try:
+                s3.delete_object(Bucket=REPORTS_BUCKET, Key=key + '.extracted.txt')
+            except:
+                pass
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'deleted': key})
+            }
+
+        if action == 'getArchContext':
+            # Returns all extracted architecture text for a review (used by report generation)
+            review_id = body['reviewId']
+            prefix = f"{review_id}/arch/"
+            response = s3.list_objects_v2(Bucket=REPORTS_BUCKET, Prefix=prefix)
+            context_parts = []
+            for obj in response.get('Contents', []):
+                key = obj['Key']
+                if key.endswith('.extracted.txt'):
+                    text_obj = s3.get_object(Bucket=REPORTS_BUCKET, Key=key)
+                    text = text_obj['Body'].read().decode('utf-8')
+                    source_filename = key.replace('.extracted.txt', '').split('/')[-1].split('_', 1)[-1]
+                    context_parts.append(f"=== Architecture Document: {source_filename} ===\n{text}")
+            combined = '\n\n'.join(context_parts)
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'context': combined, 'documentCount': len(context_parts)})
+            }
+
         return {
             'statusCode': 400,
             'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},

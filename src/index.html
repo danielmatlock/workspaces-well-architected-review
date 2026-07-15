@@ -885,6 +885,7 @@ function showReviewDashboard() {
   
   document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
     '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
+    '<button class="btn" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
     '<button class="btn btn-primary" onclick="exportReviewAsPrintHTML(\'' + review.id + '\')">Generate Report</button>' +
     '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
     '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
@@ -982,6 +983,7 @@ function renderQuestion() {
   
   document.getElementById('topbar').innerHTML = '<h3>' + pillar.name + '</h3>' +
     '<div class="topbar-actions"><span style="font-size:13px;color:#5f6b7a">Question ' + (state.activeQuestion + 1) + ' of ' + pillar.questions.length + '</span>' +
+    '<button class="btn btn-sm" onclick="showArchInfo(\'' + state.activeReview + '\')">Arch Info</button>' +
     '<button class="btn btn-sm" onclick="exportReviewAsPrintHTML(\'' + state.activeReview + '\')">Print Report</button>' +
     '<button class="btn btn-primary" onclick="exportSoWhat(\'' + state.activeReview + '\')">So What Report</button>' +
     '<button class="btn btn-primary btn-sm" onclick="exportCLevelDeck(\'' + state.activeReview + '\')">C-Level Deck</button>' +
@@ -1186,10 +1188,14 @@ async function sendEmailReport(id) {
   if (!recipient) { alert('Please enter an email address'); return; }
   var statusEl = document.getElementById('email-status');
   var btn = document.getElementById('email-send-btn');
-  statusEl.innerHTML = '<span style="color:#ff9900">Generating tailored report...</span>';
+  statusEl.innerHTML = '<span style="color:#ff9900">Loading architecture context...</span>';
   btn.disabled = true;
   var review = getReview(id);
+  var archCtx = await loadArchContext(id);
+  if (archCtx) window._pdfReferenceContext = (window._pdfReferenceContext || '') + '\n\n' + archCtx;
+  statusEl.innerHTML = '<span style="color:#ff9900">Generating tailored report...</span>';
   var htmlReport = await generateTailoredReport(review);
+  window._pdfReferenceContext = '';
   statusEl.innerHTML = '<span style="color:#ff9900">Sending email...</span>';
   try {
     var res = await fetch(ENV.emailEndpoint, {
@@ -1639,21 +1645,47 @@ function showGeneratingOverlay() {
 }
 function hideGeneratingOverlay() { document.getElementById('modal-root').innerHTML = ''; }
 
+// Load architecture context for a review (returns extracted text or empty string)
+function loadArchContext(reviewId) {
+  return fetch(ENV.emailEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'getArchContext', reviewId: reviewId })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    var ctx = payload.context || '';
+    if (ctx && payload.documentCount > 0) {
+      return '\n\nARCHITECTURE CONTEXT (from uploaded documentation):\n' +
+        'The following is extracted from the customer\'s architecture documents. ' +
+        'Use this to make recommendations more specific to their actual environment.\n\n' + ctx;
+    }
+    return '';
+  }).catch(function(e) { console.log('Arch context load error (non-fatal):', e); return ''; });
+}
+
 function exportReviewAsPrintHTML(id) {
   var review = getReview(id); if (!review) return;
   showGeneratingOverlay();
-  generateTailoredReport(review).then(function(html) {
+  loadArchContext(id).then(function(archCtx) {
+    if (archCtx) window._pdfReferenceContext = (window._pdfReferenceContext || '') + '\n\n' + archCtx;
+    return generateTailoredReport(review);
+  }).then(function(html) {
     hideGeneratingOverlay();
+    window._pdfReferenceContext = '';
     var w = window.open('', '_blank'); w.document.write(html); w.document.close();
     saveReportToCloud(review.id, 'standard', html, 'text/html', 'html', review.customer);
-  });
+  }).catch(function(e) { hideGeneratingOverlay(); window._pdfReferenceContext = ''; console.error('Report error:', e); });
 }
 
 function exportSoWhat(id) {
   var review = getReview(id); if (!review) return;
   showGeneratingOverlay();
-  generateTailoredReport(review).then(function(fullHtml) {
+  loadArchContext(id).then(function(archCtx) {
+    if (archCtx) window._pdfReferenceContext = (window._pdfReferenceContext || '') + '\n\n' + archCtx;
+    return generateTailoredReport(review);
+  }).then(function(fullHtml) {
     hideGeneratingOverlay();
+    window._pdfReferenceContext = '';
     var html = generateSoWhatHTML(review, window._lastRecommendations || {});
     var w = window.open('', '_blank'); w.document.write(html); w.document.close();
     saveReportToCloud(review.id, 'sowhat', html, 'text/html', 'html', review.customer);
@@ -1714,6 +1746,13 @@ async function startCLevelDeck(id) {
       refContext += '=== WAFR REPORT ===\n' + t2.replace(/<[^>]+>/g,' ').substring(0, 15000) + '\n\n';
     }
   } catch(e) { console.log('Report fetch error:', e); }
+
+  // Also load architecture context
+  try {
+    var archCtx = await loadArchContext(id);
+    if (archCtx) refContext += archCtx;
+  } catch(e) { console.log('Arch context load error (non-fatal):', e); }
+
   closeModal();
   showGeneratingOverlay();
   var deckFilename = 'WAFR_Executive_Briefing_' + (review.customer || 'Customer').replace(/[^a-zA-Z0-9]/g, '_') + '_' + (review.date || new Date().toISOString().split('T')[0]) + '.pptx';
@@ -2334,6 +2373,117 @@ function saveReportToCloud(reviewId, reportType, content, contentType, extension
     var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
     console.log('Report saved to cloud:', payload.key || payload.message);
   }).catch(function(e) { console.log('Save report error:', e); });
+}
+
+// === ARCHITECTURE INFO ===
+function showArchInfo(reviewId) {
+  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="width:700px;max-width:90vw;">' +
+    '<h3>Architecture Information</h3>' +
+    '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Upload architecture diagrams and documentation (PDF or Word) to provide context for report generation.</p>' +
+    '<div style="margin-bottom:16px;">' +
+    '<label style="display:inline-block;padding:8px 16px;background:#232f3e;color:#fff;border-radius:4px;cursor:pointer;font-size:13px;">' +
+    '<input type="file" id="arch-file-input" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none;" onchange="handleArchUpload(\'' + reviewId + '\')">' +
+    'Upload File (PDF / Word)' +
+    '</label>' +
+    '<span id="arch-upload-status" style="margin-left:12px;font-size:12px;color:#5f6b7a;"></span>' +
+    '</div>' +
+    '<div id="arch-file-list"><p style="color:#5f6b7a;">Loading...</p></div>' +
+    '<div style="margin-top:16px;text-align:right;"><button class="btn" onclick="closeModal()">Close</button></div>' +
+    '</div></div>';
+  loadArchFiles(reviewId);
+}
+
+function loadArchFiles(reviewId) {
+  fetch(ENV.emailEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'getArchInfo', reviewId: reviewId })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    var files = payload.files || [];
+    var el = document.getElementById('arch-file-list');
+    if (files.length === 0) {
+      el.innerHTML = '<p style="color:#5f6b7a;">No architecture documents uploaded yet.</p>';
+      return;
+    }
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+      '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">File</th><th style="text-align:left;padding:8px;">Uploaded</th><th style="text-align:left;padding:8px;">Status</th><th style="padding:8px;">Actions</th></tr>';
+    files.forEach(function(f) {
+      var statusBadge = f.extracted ? '<span style="color:#1d8102;">✓ Processed</span>' : '<span style="color:#ff9900;">⏳ Processing</span>';
+      html += '<tr style="border-bottom:1px solid #eee;">' +
+        '<td style="padding:8px;">' + f.filename + '</td>' +
+        '<td style="padding:8px;">' + (f.timestamp || '').replace('T', ' ').substring(0, 16) + '</td>' +
+        '<td style="padding:8px;">' + statusBadge + '</td>' +
+        '<td style="padding:8px;text-align:center;">' +
+        '<button class="btn btn-sm" style="color:#d13212;border-color:#d13212;" onclick="deleteArchFile(\'' + reviewId + '\',\'' + f.key + '\')">Delete</button>' +
+        '</td></tr>';
+    });
+    html += '</table>';
+    el.innerHTML = html;
+  }).catch(function(e) {
+    document.getElementById('arch-file-list').innerHTML = '<p style="color:#d13212;">Error loading files.</p>';
+  });
+}
+
+function handleArchUpload(reviewId) {
+  var input = document.getElementById('arch-file-input');
+  var file = input.files[0];
+  if (!file) return;
+
+  // Validate file type
+  var validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  var validExts = ['.pdf', '.doc', '.docx'];
+  var ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+  if (validTypes.indexOf(file.type) === -1 && validExts.indexOf(ext) === -1) {
+    alert('Only PDF and Word (.doc, .docx) files are supported.');
+    input.value = '';
+    return;
+  }
+
+  var statusEl = document.getElementById('arch-upload-status');
+  statusEl.innerHTML = '<span style="color:#ff9900;">Uploading ' + file.name + '...</span>';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var base64 = e.target.result.split(',')[1];
+    fetch(ENV.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'uploadArchInfo',
+        reviewId: reviewId,
+        filename: file.name,
+        content: base64,
+        contentType: file.type
+      })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+      if (payload.error) {
+        statusEl.innerHTML = '<span style="color:#d13212;">Upload failed: ' + payload.error + '</span>';
+      } else {
+        statusEl.innerHTML = '<span style="color:#1d8102;">✓ Uploaded — extracting text...</span>';
+        input.value = '';
+        setTimeout(function() { loadArchFiles(reviewId); }, 2000);
+      }
+    }).catch(function(e) {
+      statusEl.innerHTML = '<span style="color:#d13212;">Upload error: ' + e.message + '</span>';
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function deleteArchFile(reviewId, key) {
+  if (!confirm('Delete this architecture document?')) return;
+  fetch(ENV.emailEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'deleteArchInfo', reviewId: reviewId, key: key })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    var payload = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+    if (payload.deleted) { loadArchFiles(reviewId); }
+    else { alert('Delete failed.'); }
+  }).catch(function(e) { alert('Error: ' + e.message); });
 }
 
 function showSavedReports(id) {
