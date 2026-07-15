@@ -1293,20 +1293,73 @@ function importReview() {
     reader.onload = function(ev) {
       try {
         var data = JSON.parse(ev.target.result);
-        if (!data.customer || !data.pillars || !data.answers) { alert('Invalid review file.'); return; }
-        if (!data.id) data.id = 'imported-' + Date.now();
-        var reviews = getReviews();
-        var existing = -1;
-        for (var j = 0; j < reviews.length; j++) { if (reviews[j].id === data.id) { existing = j; break; } }
-        if (existing >= 0) { if (!confirm('Review exists. Overwrite?')) return; reviews[existing] = data; }
-        else { reviews.push(data); }
-        saveReviews(reviews); showHome();
-        alert('Review for "' + data.customer + '" imported successfully.');
+        if (!data.pillars || !data.answers) { alert('Invalid review file. Must contain pillars and answers.'); return; }
+        window._importedReviewData = data;
+        showImportOptionsModal(data);
       } catch(err) { alert('Error: ' + err.message); }
     };
     reader.readAsText(file);
   };
   input.click();
+}
+
+function showImportOptionsModal(data) {
+  var reviews = getReviews();
+  var reviewOptions = reviews.map(function(r) {
+    return '<option value="' + r.id + '">' + r.customer + ' (' + r.date + ')</option>';
+  }).join('');
+
+  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="width:600px;max-width:90vw;">' +
+    '<h3>Import Review</h3>' +
+    '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Importing answers from: <strong>' + (data.customer || 'Unknown') + '</strong> (' + Object.keys(data.answers).length + ' answers)</p>' +
+    '<div style="margin-bottom:16px;">' +
+    '<label style="display:block;margin-bottom:8px;"><input type="radio" name="import-mode" value="overwrite" checked style="margin-right:8px;">Overwrite answers in an existing review</label>' +
+    '<select id="import-target-review" style="width:100%;padding:8px;margin-left:24px;margin-bottom:12px;">' +
+    (reviewOptions || '<option value="">No reviews available</option>') + '</select>' +
+    '<label style="display:block;margin-bottom:8px;"><input type="radio" name="import-mode" value="new" style="margin-right:8px;">Create a new review</label>' +
+    '<input id="import-new-name" type="text" placeholder="Customer name for new review" style="width:100%;padding:8px;margin-left:24px;" value="' + (data.customer || '') + '">' +
+    '</div>' +
+    '<div style="margin-top:16px;text-align:right;">' +
+    '<button class="btn" onclick="closeModal()">Cancel</button> ' +
+    '<button class="btn btn-primary" onclick="executeImportReview()">Import</button></div></div></div>';
+}
+
+function executeImportReview() {
+  var data = window._importedReviewData;
+  if (!data) { alert('No import data found.'); return; }
+  var mode = document.querySelector('input[name="import-mode"]:checked').value;
+  var reviews = getReviews();
+
+  if (mode === 'overwrite') {
+    var targetId = document.getElementById('import-target-review').value;
+    if (!targetId) { alert('Please select a review to overwrite.'); return; }
+    var idx = -1;
+    for (var i = 0; i < reviews.length; i++) { if (reviews[i].id === targetId) { idx = i; break; } }
+    if (idx === -1) { alert('Review not found.'); return; }
+    // Overwrite answers and notes
+    reviews[idx].answers = data.answers;
+    if (data.notes) reviews[idx].notes = data.notes;
+    saveReviews(reviews);
+    closeModal();
+    showHome();
+    alert('Answers imported into "' + reviews[idx].customer + '" successfully.');
+  } else {
+    var newName = document.getElementById('import-new-name').value.trim();
+    if (!newName) { alert('Please enter a customer name for the new review.'); return; }
+    var newReview = JSON.parse(JSON.stringify(data));
+    newReview.id = 'imported-' + Date.now();
+    newReview.customer = newName;
+    newReview.date = new Date().toISOString().split('T')[0];
+    if (!newReview.reviewer) newReview.reviewer = (currentUser && currentUser.username) || 'Imported';
+    if (!newReview.status) newReview.status = 'In Progress';
+    reviews.push(newReview);
+    saveReviews(reviews);
+    closeModal();
+    showHome();
+    alert('New review created for "' + newName + '" with imported answers.');
+  }
+  window._importedReviewData = null;
 }
 
 function deleteTemplate(id) {
