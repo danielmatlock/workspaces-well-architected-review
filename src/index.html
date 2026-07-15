@@ -396,6 +396,8 @@ function showApp() {
 function checkEnvironmentAccess(payload) {
   var groups = payload['cognito:groups'] || [];
   var envName = ENV.name; // 'development' or 'production'
+  // If no groups configured yet (migration period), allow access
+  if (groups.length === 0) return true;
   // Admins can access everything
   if (groups.indexOf('Admins') !== -1) return true;
   // Dev group can access development
