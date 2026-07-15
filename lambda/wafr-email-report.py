@@ -364,7 +364,7 @@ Respond with ONLY valid JSON in this exact structure:
             )
 
             # Extract text using Bedrock Sonnet (supports document understanding)
-            SONNET_MODEL = 'eu.anthropic.claude-sonnet-4-20250514-v1:0'
+            SONNET_MODEL = 'anthropic.claude-sonnet-4-5-20250929-v1:0'
             extract_prompt = (
                 "You are an architecture document analyst. Extract ALL meaningful content from this document including:\n"
                 "- Architecture descriptions and decisions\n"
