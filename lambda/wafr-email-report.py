@@ -1,5 +1,6 @@
 import json
 import re
+import os
 import boto3
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -10,9 +11,9 @@ from botocore.config import Config
 ses = boto3.client('ses', region_name='eu-west-2')
 bedrock = boto3.client('bedrock-runtime', region_name='eu-west-2')
 s3 = boto3.client('s3', region_name='eu-west-2', endpoint_url='https://s3.eu-west-2.amazonaws.com', config=Config(signature_version='s3v4', s3={'addressing_style': 'path'}))
-SENDER = 'danmmat@amazon.co.uk'
-MODEL_ID = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0'
-REPORTS_BUCKET = 'wafr-reports-danmmat-9219112'
+SENDER = os.environ.get('SENDER_EMAIL', 'danmmat@amazon.co.uk')
+MODEL_ID = os.environ.get('MODEL_ID', 'eu.anthropic.claude-haiku-4-5-20251001-v1:0')
+REPORTS_BUCKET = os.environ.get('REPORTS_BUCKET', 'wafr-reports-danmmat-9219112')
 
 def generate_tailored_recommendations(questions_with_notes, reference_context=''):
     if not questions_with_notes:

@@ -1,7 +1,23 @@
-name: Deploy WorkSpaces WAFR Amplify App
+name: Deploy WorkSpaces WAFR Tool
 
 on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'src/**'
+      - 'lambda/**'
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - production
 
 permissions:
   id-token: write
@@ -9,13 +25,31 @@ permissions:
 
 env:
   AWS_REGION: eu-west-2
+  AMPLIFY_APP_ID: d1p2543h8l2mfc
 
 jobs:
-  deploy:
+  deploy-frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENV="production"
+          else
+            ENV="dev"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+          if [[ "$ENV" == "production" ]]; then
+            echo "branch=main" >> $GITHUB_OUTPUT
+          else
+            echo "branch=dev" >> $GITHUB_OUTPUT
+          fi
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -23,15 +57,73 @@ jobs:
           role-to-assume: arn:aws:iam::590183747733:role/github-actions-amplify-deploy
           aws-region: eu-west-2
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Package frontend
+        run: |
+          cd src
+          zip -r /tmp/deploy.zip index.html
+
+      - name: Deploy to Amplify (${{ steps.env.outputs.environment }})
+        run: |
+          BRANCH=${{ steps.env.outputs.branch }}
+          echo "Deploying to branch: $BRANCH (${{ steps.env.outputs.environment }})"
+          
+          DEPLOY=$(aws amplify create-deployment \
+            --app-id $AMPLIFY_APP_ID \
+            --branch-name $BRANCH \
+            --region $AWS_REGION \
+            --output json)
+          
+          UPLOAD_URL=$(echo $DEPLOY | python3 -c "import sys,json; print(json.load(sys.stdin)['zipUploadUrl'])")
+          JOB_ID=$(echo $DEPLOY | python3 -c "import sys,json; print(json.load(sys.stdin)['jobId'])")
+          
+          curl -T /tmp/deploy.zip "$UPLOAD_URL"
+          
+          aws amplify start-deployment \
+            --app-id $AMPLIFY_APP_ID \
+            --branch-name $BRANCH \
+            --job-id $JOB_ID \
+            --region $AWS_REGION
+          
+          echo "Deployed to: https://$BRANCH.$AMPLIFY_APP_ID.amplifyapp.com"
+
+  deploy-lambda:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.modified, 'lambda/') || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ inputs.environment }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENV="production"
+          else
+            ENV="dev"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          node-version: '18'
+          role-to-assume: arn:aws:iam::590183747733:role/github-actions-amplify-deploy
+          aws-region: eu-west-2
 
-      - name: Install dependencies
-        working-directory: cloudformation/workspaces-wafr-amplify
-        run: npm ci
-
-      - name: Deploy
-        working-directory: cloudformation/workspaces-wafr-amplify
-        run: echo "Deploy step placeholder — configure when ready"
+      - name: Deploy Lambda (${{ steps.env.outputs.environment }})
+        run: |
+          ENV=${{ steps.env.outputs.environment }}
+          if [[ "$ENV" == "production" ]]; then
+            FUNCTION_NAME="wafr-email-report"
+          else
+            FUNCTION_NAME="wafr-email-report-dev"
+          fi
+          
+          echo "Deploying Lambda: $FUNCTION_NAME"
+          cd lambda
+          zip /tmp/lambda.zip wafr-email-report.py
+          aws lambda update-function-code \
+            --function-name $FUNCTION_NAME \
+            --zip-file fileb:///tmp/lambda.zip \
+            --region $AWS_REGION
