@@ -2675,6 +2675,7 @@ function handleArchUpload(reviewId) {
   var input = document.getElementById('arch-file-input');
   var files = input.files;
   if (!files || files.length === 0) return;
+  console.log('handleArchUpload called, files:', files.length, 'reviewId:', reviewId);
 
   var validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
   var validExts = ['.pdf', '.doc', '.docx'];
@@ -2697,6 +2698,7 @@ function handleArchUpload(reviewId) {
       var reader = new FileReader();
       reader.onload = function(e) {
         var base64 = e.target.result.split(',')[1];
+        console.log('File read complete, base64 length:', base64.length, 'uploading:', file.name);
         fetch(ENV.emailEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
