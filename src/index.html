@@ -2730,11 +2730,6 @@ function handleArchUpload(reviewId) {
     setTimeout(function() { loadArchFiles(reviewId); }, 3000);
   }
 }
-      statusEl.innerHTML = '<span style="color:#d13212;">Upload error: ' + e.message + '</span>';
-    });
-  };
-  reader.readAsDataURL(file);
-}
 
 function deleteArchFile(reviewId, key) {
   if (!confirm('Delete this architecture document?')) return;
