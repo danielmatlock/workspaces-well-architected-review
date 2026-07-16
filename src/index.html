@@ -1926,24 +1926,36 @@ async function generateWafrWithArchSelection(id) {
           notes: 'Perform a full architecture assessment',
           best: 'Identify gaps, risks, improvements, and positives per pillar. Return as structured analysis.'
         }];
-        var analysisRes = await fetch(ENV.emailEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'generate',
-            questions: analysisPrompt,
-            referenceContext: archContext,
-            isArchAnalysis: true
-          })
+        var analysisBody = JSON.stringify({
+          action: 'generate',
+          questions: analysisPrompt,
+          referenceContext: archContext,
+          isArchAnalysis: true
         });
-        var analysisData = await analysisRes.json();
-        var analysisPayload = typeof analysisData.body === 'string' ? JSON.parse(analysisData.body) : analysisData;
-        if (analysisPayload.recommendations && analysisPayload.recommendations['ARCH-ANALYSIS']) {
-          window._archFindings = {
-            summary: analysisPayload.recommendations['ARCH-ANALYSIS'].observation || '',
-            details: analysisPayload.recommendations['ARCH-ANALYSIS'].recommendation || ''
-          };
-          console.log('Architecture analysis complete');
+        // Retry up to 3 times on 503 (Lambda throttle/cold start)
+        var analysisRes = null;
+        for (var attempt = 0; attempt < 3; attempt++) {
+          analysisRes = await fetch(ENV.emailEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: analysisBody
+          });
+          if (analysisRes.status !== 503) break;
+          console.log('Arch analysis attempt ' + (attempt + 1) + ' got 503, retrying in 3s...');
+          await new Promise(function(resolve) { setTimeout(resolve, 3000); });
+        }
+        if (analysisRes && analysisRes.ok) {
+          var analysisData = await analysisRes.json();
+          var analysisPayload = typeof analysisData.body === 'string' ? JSON.parse(analysisData.body) : analysisData;
+          if (analysisPayload.recommendations && analysisPayload.recommendations['ARCH-ANALYSIS']) {
+            window._archFindings = {
+              summary: analysisPayload.recommendations['ARCH-ANALYSIS'].observation || '',
+              details: analysisPayload.recommendations['ARCH-ANALYSIS'].recommendation || ''
+            };
+            console.log('Architecture analysis complete');
+          }
+        } else {
+          console.log('Architecture analysis failed after retries (status:', analysisRes ? analysisRes.status : 'null', ')');
         }
       } catch(e) { console.log('Architecture analysis error (non-fatal):', e); }
     }
