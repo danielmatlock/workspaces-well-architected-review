@@ -1931,7 +1931,7 @@ async function generateWafrWithArchSelection(id) {
         var analysisBody = JSON.stringify({
           action: 'generate',
           questions: analysisPrompt,
-          referenceContext: archContext,
+          reviewId: review.id,
           isArchAnalysis: true
         });
         var analysisRes = null;

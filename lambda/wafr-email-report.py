@@ -142,6 +142,21 @@ def handler(event, context):
             questions_with_notes = body.get('questions', [])
             reference_context = body.get('referenceContext', '')
             is_arch_analysis = body.get('isArchAnalysis', False)
+            review_id = body.get('reviewId', '')
+            
+            # If arch analysis, load context from S3 instead of request body
+            if is_arch_analysis and review_id and not reference_context:
+                prefix = f"{review_id}/arch/"
+                s3_response = s3.list_objects_v2(Bucket=REPORTS_BUCKET, Prefix=prefix)
+                context_parts = []
+                for obj in s3_response.get('Contents', []):
+                    key = obj['Key']
+                    if key.endswith('.extracted.txt'):
+                        text_obj = s3.get_object(Bucket=REPORTS_BUCKET, Key=key)
+                        text = text_obj['Body'].read().decode('utf-8')
+                        source_filename = key.replace('.extracted.txt', '').split('/')[-1].split('_', 1)[-1]
+                        context_parts.append(f"=== {source_filename} ===\n{text}")
+                reference_context = '\n\n'.join(context_parts)
             
             if is_arch_analysis and reference_context:
                 # Special architecture analysis mode — use Haiku with a focused prompt
@@ -175,6 +190,18 @@ def handler(event, context):
                     text = result['content'][0]['text'].strip()
                     text = re.sub(r'^```(?:json)?\s*', '', text)
                     text = re.sub(r'\s*```$', '', text)
+                    # Extract just the JSON object (handle extra text after closing brace)
+                    brace_count = 0
+                    json_end = 0
+                    for ci, ch in enumerate(text):
+                        if ch == '{': brace_count += 1
+                        elif ch == '}': 
+                            brace_count -= 1
+                            if brace_count == 0:
+                                json_end = ci + 1
+                                break
+                    if json_end > 0:
+                        text = text[:json_end]
                     recommendations = json.loads(text)
                 except Exception as e:
                     recommendations = {"ARCH-ANALYSIS": {"observation": "Architecture analysis unavailable.", "recommendation": "Error: " + str(e)}}
