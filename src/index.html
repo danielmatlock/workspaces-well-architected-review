@@ -1568,10 +1568,12 @@ function generateReportHTML(review, recommendations) {
     var af = window._archFindings;
     html += '<div class="section"><h2>Architecture Assessment</h2>';
     if (af.summary) {
-      html += '<div class="exec-summary"><p><strong>Overview:</strong> ' + af.summary + '</p></div>';
+      var summaryText = typeof af.summary === 'string' ? af.summary : JSON.stringify(af.summary);
+      html += '<div class="exec-summary"><p><strong>Overview:</strong> ' + summaryText + '</p></div>';
     }
     if (af.details) {
-      html += '<div class="q-gap" style="background:#f0f4ff;border-left:4px solid #0073bb;padding:16px;margin:16px 0;"><strong>Findings & Recommendations:</strong><br>' + af.details.replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+      var detailsText = typeof af.details === 'string' ? af.details : JSON.stringify(af.details, null, 2);
+      html += '<div class="q-gap" style="background:#f0f4ff;border-left:4px solid #0073bb;padding:16px;margin:16px 0;"><strong>Findings & Recommendations:</strong><br>' + detailsText.replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
     }
     html += '</div>';
   }
@@ -1915,50 +1917,8 @@ async function generateWafrWithArchSelection(id) {
       }
     } catch(e) { console.log('Arch context load error (non-fatal):', e); }
 
-    // Run architecture analysis via generate action with special prompt
-    if (archContext) {
-      console.log('Running architecture analysis...');
-      try {
-        var analysisPrompt = [{
-          id: 'ARCH-ANALYSIS',
-          question: 'Analyse this architecture against AWS Well-Architected Framework pillars',
-          score: 'analysis',
-          notes: 'Perform a full architecture assessment',
-          best: 'Identify gaps, risks, improvements, and positives per pillar. Return as structured analysis.'
-        }];
-        var analysisBody = JSON.stringify({
-          action: 'generate',
-          questions: analysisPrompt,
-          referenceContext: archContext,
-          isArchAnalysis: true
-        });
-        // Retry up to 3 times on 503 (Lambda throttle/cold start)
-        var analysisRes = null;
-        for (var attempt = 0; attempt < 3; attempt++) {
-          analysisRes = await fetch(ENV.emailEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: analysisBody
-          });
-          if (analysisRes.status !== 503) break;
-          console.log('Arch analysis attempt ' + (attempt + 1) + ' got 503, retrying in 3s...');
-          await new Promise(function(resolve) { setTimeout(resolve, 3000); });
-        }
-        if (analysisRes && analysisRes.ok) {
-          var analysisData = await analysisRes.json();
-          var analysisPayload = typeof analysisData.body === 'string' ? JSON.parse(analysisData.body) : analysisData;
-          if (analysisPayload.recommendations && analysisPayload.recommendations['ARCH-ANALYSIS']) {
-            window._archFindings = {
-              summary: analysisPayload.recommendations['ARCH-ANALYSIS'].observation || '',
-              details: analysisPayload.recommendations['ARCH-ANALYSIS'].recommendation || ''
-            };
-            console.log('Architecture analysis complete');
-          }
-        } else {
-          console.log('Architecture analysis failed after retries (status:', analysisRes ? analysisRes.status : 'null', ')');
-        }
-      } catch(e) { console.log('Architecture analysis error (non-fatal):', e); }
-    }
+    // Architecture analysis will be included in the first batch of per-question generation
+    // No separate API call needed — avoids API Gateway 30s timeout issues
   } else {
     console.log('No arch docs selected, skipping analysis');
   }
