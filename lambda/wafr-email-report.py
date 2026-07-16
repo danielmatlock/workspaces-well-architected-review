@@ -165,14 +165,16 @@ def handler(event, context):
                     "AWS Well-Architected Framework. Based on the architecture documentation below, provide:\n\n"
                     "1. 'observation': A 3-4 sentence summary of the architecture's overall posture — "
                     "what's in place, what patterns are used, and the general maturity level.\n\n"
-                    "2. 'recommendation': A structured assessment with:\n"
-                    "   • GAPS (things missing or not addressed):\n"
-                    "   • RISKS (potential issues or vulnerabilities):\n"
-                    "   • IMPROVEMENTS NEEDED (specific actionable items):\n"
-                    "   • POSITIVES (what's done well):\n\n"
-                    "For each item, be specific — reference actual services, components, or patterns from the documentation. "
-                    "Do NOT give generic advice. Only assess what is evidenced in the documentation.\n\n"
-                    "Format as JSON: {\"ARCH-ANALYSIS\": {\"observation\": \"...\", \"recommendation\": \"...\"}}\n\n"
+                    "2. 'recommendation': A JSON object with these keys:\n"
+                    "   • GAPS: array of strings (max 5 items, each 1-2 sentences)\n"
+                    "   • RISKS: array of strings (max 5 items, each 1-2 sentences)\n"
+                    "   • IMPROVEMENTS_NEEDED: array of strings (max 8 items, each 1-2 sentences)\n"
+                    "   • POSITIVES: array of strings (max 5 items, each 1-2 sentences)\n\n"
+                    "IMPORTANT: Keep each item CONCISE (1-2 sentences max). Prioritise the most critical items. "
+                    "Be specific — reference actual services, components, or patterns from the documentation. "
+                    "Do NOT give generic advice. Only assess what is evidenced.\n\n"
+                    "Format response as JSON ONLY:\n"
+                    "{\"ARCH-ANALYSIS\": {\"observation\": \"summary here\", \"recommendation\": {\"GAPS\": [\"...\"], \"RISKS\": [\"...\"], \"IMPROVEMENTS_NEEDED\": [\"...\"], \"POSITIVES\": [\"...\"]}}}\n\n"
                     "ARCHITECTURE DOCUMENTATION:\n" + reference_context[:25000]
                 )
                 try:
@@ -182,7 +184,7 @@ def handler(event, context):
                         accept='application/json',
                         body=json.dumps({
                             'anthropic_version': 'bedrock-2023-05-31',
-                            'max_tokens': 4096,
+                            'max_tokens': 8192,
                             'messages': [{'role': 'user', 'content': arch_prompt}]
                         })
                     )
