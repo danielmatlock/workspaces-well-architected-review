@@ -1917,8 +1917,49 @@ async function generateWafrWithArchSelection(id) {
       }
     } catch(e) { console.log('Arch context load error (non-fatal):', e); }
 
-    // Architecture analysis will be included in the first batch of per-question generation
-    // No separate API call needed — avoids API Gateway 30s timeout issues
+    // Run architecture analysis with retry logic for cold starts
+    if (archContext) {
+      console.log('Running architecture analysis...');
+      try {
+        var analysisPrompt = [{
+          id: 'ARCH-ANALYSIS',
+          question: 'Analyse this architecture against AWS Well-Architected Framework pillars',
+          score: 'analysis',
+          notes: 'Perform a full architecture assessment',
+          best: 'Identify gaps, risks, improvements, and positives per pillar.'
+        }];
+        var analysisBody = JSON.stringify({
+          action: 'generate',
+          questions: analysisPrompt,
+          referenceContext: archContext,
+          isArchAnalysis: true
+        });
+        var analysisRes = null;
+        for (var attempt = 0; attempt < 4; attempt++) {
+          analysisRes = await fetch(ENV.emailEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: analysisBody
+          });
+          if (analysisRes.status !== 503) break;
+          console.log('Arch analysis attempt ' + (attempt + 1) + ' got 503, retrying in 3s...');
+          await new Promise(function(resolve) { setTimeout(resolve, 3000); });
+        }
+        if (analysisRes && analysisRes.ok) {
+          var analysisData = await analysisRes.json();
+          var analysisPayload = typeof analysisData.body === 'string' ? JSON.parse(analysisData.body) : analysisData;
+          if (analysisPayload.recommendations && analysisPayload.recommendations['ARCH-ANALYSIS']) {
+            window._archFindings = {
+              summary: analysisPayload.recommendations['ARCH-ANALYSIS'].observation || '',
+              details: analysisPayload.recommendations['ARCH-ANALYSIS'].recommendation || ''
+            };
+            console.log('Architecture analysis complete');
+          }
+        } else {
+          console.log('Architecture analysis failed after retries');
+        }
+      } catch(e) { console.log('Architecture analysis error (non-fatal):', e); }
+    }
   } else {
     console.log('No arch docs selected, skipping analysis');
   }
