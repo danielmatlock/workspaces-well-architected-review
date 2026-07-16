@@ -141,7 +141,46 @@ def handler(event, context):
         if action == 'generate':
             questions_with_notes = body.get('questions', [])
             reference_context = body.get('referenceContext', '')
-            recommendations = generate_tailored_recommendations(questions_with_notes, reference_context)
+            is_arch_analysis = body.get('isArchAnalysis', False)
+            
+            if is_arch_analysis and reference_context:
+                # Special architecture analysis mode — use Haiku with a focused prompt
+                arch_prompt = (
+                    "You are an AWS Solutions Architect assessing architecture documentation against the "
+                    "AWS Well-Architected Framework. Based on the architecture documentation below, provide:\n\n"
+                    "1. 'observation': A 3-4 sentence summary of the architecture's overall posture — "
+                    "what's in place, what patterns are used, and the general maturity level.\n\n"
+                    "2. 'recommendation': A structured assessment with:\n"
+                    "   • GAPS (things missing or not addressed):\n"
+                    "   • RISKS (potential issues or vulnerabilities):\n"
+                    "   • IMPROVEMENTS NEEDED (specific actionable items):\n"
+                    "   • POSITIVES (what's done well):\n\n"
+                    "For each item, be specific — reference actual services, components, or patterns from the documentation. "
+                    "Do NOT give generic advice. Only assess what is evidenced in the documentation.\n\n"
+                    "Format as JSON: {\"ARCH-ANALYSIS\": {\"observation\": \"...\", \"recommendation\": \"...\"}}\n\n"
+                    "ARCHITECTURE DOCUMENTATION:\n" + reference_context[:25000]
+                )
+                try:
+                    response = bedrock.invoke_model(
+                        modelId=MODEL_ID,
+                        contentType='application/json',
+                        accept='application/json',
+                        body=json.dumps({
+                            'anthropic_version': 'bedrock-2023-05-31',
+                            'max_tokens': 4096,
+                            'messages': [{'role': 'user', 'content': arch_prompt}]
+                        })
+                    )
+                    result = json.loads(response['body'].read())
+                    text = result['content'][0]['text'].strip()
+                    text = re.sub(r'^```(?:json)?\s*', '', text)
+                    text = re.sub(r'\s*```$', '', text)
+                    recommendations = json.loads(text)
+                except Exception as e:
+                    recommendations = {"ARCH-ANALYSIS": {"observation": "Architecture analysis unavailable.", "recommendation": "Error: " + str(e)}}
+            else:
+                recommendations = generate_tailored_recommendations(questions_with_notes, reference_context)
+            
             return {
                 'statusCode': 200,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},

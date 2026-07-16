@@ -1564,36 +1564,14 @@ function generateReportHTML(review, recommendations) {
   html += '</tbody></table></div>';
   
   // === ARCHITECTURE ASSESSMENT (if findings available) ===
-  if (window._archFindings && window._archFindings.pillars) {
+  if (window._archFindings && (window._archFindings.summary || window._archFindings.details)) {
     var af = window._archFindings;
     html += '<div class="section"><h2>Architecture Assessment</h2>';
-    html += '<div class="exec-summary"><p><strong>Summary:</strong> ' + (af.summary || 'No summary available.') + '</p></div>';
-    // Per-pillar findings
-    (af.pillars || []).forEach(function(p) {
-      var ragClass = p.rag === 'red' ? 'rag-red' : p.rag === 'amber' ? 'rag-amber' : 'rag-green';
-      html += '<h3>' + p.name + ' <span class="rag ' + ragClass + '">' + p.rag.toUpperCase() + '</span></h3>';
-      html += '<p style="font-size:13px;color:#5f6b7a;margin-bottom:8px;">' + (p.rationale || '') + '</p>';
-      if (p.findings && p.findings.length > 0) {
-        html += '<table class="score-table"><thead><tr><th>Type</th><th>Finding</th><th>Recommendation</th></tr></thead><tbody>';
-        p.findings.forEach(function(f) {
-          var typeColor = f.type === 'gap' ? '#d13212' : f.type === 'risk' ? '#ff9900' : f.type === 'positive' ? '#1d8102' : '#0073bb';
-          html += '<tr><td><span style="color:' + typeColor + ';font-weight:600;text-transform:capitalize;">' + f.type + '</span></td>';
-          html += '<td>' + f.finding + '</td>';
-          html += '<td>' + (f.recommendation || '—') + '</td></tr>';
-        });
-        html += '</tbody></table>';
-      }
-    });
-    // Cross-cutting findings
-    if (af.crossCutting && af.crossCutting.length > 0) {
-      html += '<h3>Cross-Cutting Findings</h3>';
-      html += '<table class="score-table"><thead><tr><th>Finding</th><th>Pillars</th><th>Recommendation</th></tr></thead><tbody>';
-      af.crossCutting.forEach(function(c) {
-        html += '<tr><td>' + c.finding + '</td>';
-        html += '<td>' + (c.pillars || []).join(', ') + '</td>';
-        html += '<td>' + (c.recommendation || '—') + '</td></tr>';
-      });
-      html += '</tbody></table>';
+    if (af.summary) {
+      html += '<div class="exec-summary"><p><strong>Overview:</strong> ' + af.summary + '</p></div>';
+    }
+    if (af.details) {
+      html += '<div class="q-gap" style="background:#f0f4ff;border-left:4px solid #0073bb;padding:16px;margin:16px 0;"><strong>Findings & Recommendations:</strong><br>' + af.details.replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
     }
     html += '</div>';
   }
@@ -1915,52 +1893,68 @@ async function generateWafrWithArchSelection(id) {
   var review = getReview(id);
   window._archFindings = null;
 
-  // Step 1: Run architecture analysis with Sonnet (if docs selected)
+  // Step 1: Load arch context and run architecture analysis
+  var archContext = '';
   if (selectedKeys.length > 0) {
-    console.log('Running architecture analysis with', selectedKeys.length, 'documents');
+    console.log('Loading architecture context for', selectedKeys.length, 'documents');
     try {
-      var analysisRes = await fetch(ENV.emailEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'analyseArchitecture',
-          reviewId: review.id,
-          customerName: review.customer || 'Customer',
-          pillars: review.pillars ? review.pillars.map(function(p) { return p.name; }) : []
-        })
-      });
-      var analysisData = await analysisRes.json();
-      var analysisPayload = typeof analysisData.body === 'string' ? JSON.parse(analysisData.body) : analysisData;
-      console.log('Architecture analysis result:', analysisPayload.hasData, analysisPayload.error || 'no error');
-      if (analysisPayload.hasData && analysisPayload.findings) {
-        window._archFindings = analysisPayload.findings;
-        console.log('Architecture findings loaded:', window._archFindings.summary);
+      // Fetch extracted text for selected docs
+      var contextParts = [];
+      for (var i = 0; i < selectedKeys.length; i++) {
+        var textKey = selectedKeys[i] + '.extracted.txt';
+        var r = await fetch(ENV.emailEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'getReport', key: textKey }) });
+        var d = await r.json(); var p = typeof d.body === 'string' ? JSON.parse(d.body) : d;
+        if (p.data) {
+          var text = atob(p.data);
+          var filename = selectedKeys[i].split('/').pop().split('_').slice(1).join('_');
+          contextParts.push('=== Architecture Document: ' + filename + ' ===\n' + text);
+        }
       }
-    } catch(e) { console.log('Architecture analysis error (non-fatal):', e); }
+      if (contextParts.length > 0) {
+        archContext = contextParts.join('\n\n');
+      }
+    } catch(e) { console.log('Arch context load error (non-fatal):', e); }
+
+    // Run architecture analysis via generate action with special prompt
+    if (archContext) {
+      console.log('Running architecture analysis...');
+      try {
+        var analysisPrompt = [{
+          id: 'ARCH-ANALYSIS',
+          question: 'Analyse this architecture against AWS Well-Architected Framework pillars',
+          score: 'analysis',
+          notes: 'Perform a full architecture assessment',
+          best: 'Identify gaps, risks, improvements, and positives per pillar. Return as structured analysis.'
+        }];
+        var analysisRes = await fetch(ENV.emailEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'generate',
+            questions: analysisPrompt,
+            referenceContext: archContext,
+            isArchAnalysis: true
+          })
+        });
+        var analysisData = await analysisRes.json();
+        var analysisPayload = typeof analysisData.body === 'string' ? JSON.parse(analysisData.body) : analysisData;
+        if (analysisPayload.recommendations && analysisPayload.recommendations['ARCH-ANALYSIS']) {
+          window._archFindings = {
+            summary: analysisPayload.recommendations['ARCH-ANALYSIS'].observation || '',
+            details: analysisPayload.recommendations['ARCH-ANALYSIS'].recommendation || ''
+          };
+          console.log('Architecture analysis complete');
+        }
+      } catch(e) { console.log('Architecture analysis error (non-fatal):', e); }
+    }
   } else {
     console.log('No arch docs selected, skipping analysis');
   }
 
-  // Step 2: Build enhanced context from findings for per-question batches
-  var archContext = '';
-  if (window._archFindings) {
-    var findings = window._archFindings;
-    var contextLines = ['ARCHITECTURE ASSESSMENT (from Sonnet analysis of uploaded documents):'];
-    contextLines.push('Summary: ' + (findings.summary || ''));
-    (findings.pillars || []).forEach(function(p) {
-      contextLines.push('\n' + p.name + ' (' + p.rag.toUpperCase() + '): ' + p.rationale);
-      (p.findings || []).forEach(function(f) {
-        contextLines.push('  - [' + f.type + '] ' + f.finding);
-      });
-    });
-    (findings.crossCutting || []).forEach(function(c) {
-      contextLines.push('\nCross-cutting: ' + c.finding + ' (Pillars: ' + c.pillars.join(', ') + ')');
-    });
-    archContext = contextLines.join('\n');
+  // Step 2: Generate per-question recommendations with arch context
+  if (archContext) {
+    window._pdfReferenceContext = '\n\nARCHITECTURE CONTEXT:\n' + archContext;
   }
-
-  // Step 3: Generate per-question recommendations with arch context
-  if (archContext) window._pdfReferenceContext = archContext;
   try {
     var html = await generateTailoredReport(review);
     hideGeneratingOverlay();
