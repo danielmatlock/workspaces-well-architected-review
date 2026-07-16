@@ -1572,8 +1572,39 @@ function generateReportHTML(review, recommendations) {
       html += '<div class="exec-summary"><p><strong>Overview:</strong> ' + summaryText + '</p></div>';
     }
     if (af.details) {
-      var detailsText = typeof af.details === 'string' ? af.details : JSON.stringify(af.details, null, 2);
-      html += '<div class="q-gap" style="background:#f0f4ff;border-left:4px solid #0073bb;padding:16px;margin:16px 0;"><strong>Findings & Recommendations:</strong><br>' + detailsText.replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+      var details = af.details;
+      // Try to parse as JSON if it's a structured object
+      var parsedDetails = null;
+      if (typeof details === 'string') {
+        try { parsedDetails = JSON.parse(details); } catch(e) { parsedDetails = null; }
+      } else if (typeof details === 'object') {
+        parsedDetails = details;
+      }
+
+      if (parsedDetails && typeof parsedDetails === 'object') {
+        // Render structured findings
+        var sectionConfig = [
+          { key: 'GAPS', title: 'Gaps Identified', color: '#d13212', icon: '⚠️' },
+          { key: 'RISKS', title: 'Risks', color: '#d13212', icon: '🔴' },
+          { key: 'IMPROVEMENTS_NEEDED', title: 'Improvements Needed', color: '#ff9900', icon: '🟠' },
+          { key: 'POSITIVES', title: 'What\'s Done Well', color: '#1d8102', icon: '🟢' }
+        ];
+        sectionConfig.forEach(function(sec) {
+          var items = parsedDetails[sec.key];
+          if (items && items.length > 0) {
+            html += '<h3 style="color:' + sec.color + ';margin-top:20px;">' + sec.icon + ' ' + sec.title + ' (' + items.length + ')</h3>';
+            html += '<ul style="font-size:13px;line-height:1.8;padding-left:20px;">';
+            items.forEach(function(item) {
+              html += '<li>' + item.replace(/\*\*/g, '') + '</li>';
+            });
+            html += '</ul>';
+          }
+        });
+      } else {
+        // Fallback: render as formatted text
+        var detailsText = typeof details === 'string' ? details : JSON.stringify(details, null, 2);
+        html += '<div style="background:#f0f4ff;border-left:4px solid #0073bb;padding:16px;margin:16px 0;font-size:13px;line-height:1.8;">' + detailsText.replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+      }
     }
     html += '</div>';
   }
