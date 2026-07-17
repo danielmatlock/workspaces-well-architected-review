@@ -684,9 +684,6 @@ function getReviews() {
 
 function saveReviews(reviews) {
   localStorage.setItem('wafr-reviews', JSON.stringify(reviews));
-  if (idToken) {
-    reviews.forEach(function(r) { syncReviewToCloud(r); });
-  }
 }
 
 function getReview(id) {
@@ -698,6 +695,7 @@ function updateReview(review) {
   var idx = reviews.findIndex(function(r) { return r.id === review.id; });
   if (idx >= 0) reviews[idx] = review;
   saveReviews(reviews);
+  syncReviewToCloud(review);
 }
 
 // === SCORING ===
@@ -1427,6 +1425,7 @@ function executeImportReview() {
     reviews[idx].answers = data.answers;
     if (data.notes) reviews[idx].notes = data.notes;
     saveReviews(reviews);
+    syncReviewToCloud(reviews[idx]);
     closeModal();
     showHome();
     alert('Answers imported into "' + reviews[idx].customer + '" successfully.');
@@ -1441,6 +1440,7 @@ function executeImportReview() {
     if (!newReview.status) newReview.status = 'In Progress';
     reviews.push(newReview);
     saveReviews(reviews);
+    syncReviewToCloud(newReview);
     closeModal();
     showHome();
     alert('New review created for "' + newName + '" with imported answers.');
@@ -1812,6 +1812,7 @@ async function generateTailoredReport(review) {
       try {
         var fetchBody = { action: 'generate', questions: batch };
         if (window._pdfReferenceContext) fetchBody.referenceContext = window._pdfReferenceContext;
+        if (review.templateId) fetchBody.templateId = review.templateId;
         var res = await fetch(ENV.emailEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2242,7 +2243,8 @@ async function startCLevelDeck(id) {
         overallScore: overall,
         pillarScores: pillarScores,
         customerName: review.customer || 'Customer',
-        referenceContext: refContext
+        referenceContext: refContext,
+        templateId: review.templateId || 'workspaces-default'
       })
     });
     var curationData = await curationRes.json();
