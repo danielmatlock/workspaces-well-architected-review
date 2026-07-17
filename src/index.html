@@ -742,7 +742,7 @@ function showHome() {
   state.activeReview = null;
   removeChatWidget();
   
-  document.getElementById('sidebar').innerHTML = '<div class="sidebar-header"><h1>WAFR Review Tool</h1><h2>Home</h2><div class="sub">v4.0</div></div>' +
+  document.getElementById('sidebar').innerHTML = '<div class="sidebar-header"><h1>WAFR Review Tool</h1><h2>Home</h2><div class="sub">v4.1</div></div>' +
     '<div class="sidebar-nav"><div class="nav-section">Navigation</div>' +
     '<div class="nav-item active" onclick="showHome()">My Reviews</div></div>';
   
@@ -759,37 +759,52 @@ function showHome() {
   if (reviews.length === 0) {
     html += '<p style="color:#5f6b7a;font-size:13px;">No reviews yet. Click "+ New Review" to start.</p>';
   } else {
-    reviews.forEach(function(r) {
-      var totalQ = 0, answeredQ = 0;
-      var pillarHtml = '';
-      r.pillars.forEach(function(p, i) {
-        var s = getPillarScore(r, i);
-        totalQ += s.total; answeredQ += s.answered;
-        var rag = getRag(s.pct);
-        var ragColor = rag === 'green' ? '#1d8102' : rag === 'amber' ? '#ff9900' : '#d13212';
-        var barColor = s.answered === 0 ? '#d5dbdb' : ragColor;
-        pillarHtml += '<div class="pillar-row">' +
-          '<span class="pillar-name">' + p.name + '</span>' +
-          '<span class="pillar-score">' + s.answered + '/' + s.total + '</span>' +
-          '<div class="pillar-bar"><div class="pillar-bar-fill" style="width:' + (s.total > 0 ? Math.round(s.answered/s.total*100) : 0) + '%;background:' + barColor + '"></div></div>' +
-          '</div>';
+    // Group reviews by template type
+    var wafrReviews = reviews.filter(function(r) { return r.templateId !== 'orr-default'; });
+    var orrReviews = reviews.filter(function(r) { return r.templateId === 'orr-default'; });
+    function renderReviewCards(reviewList) {
+      var cardsHtml = '';
+      reviewList.forEach(function(r) {
+        var totalQ = 0, answeredQ = 0;
+        var pillarHtml = '';
+        r.pillars.forEach(function(p, i) {
+          var s = getPillarScore(r, i);
+          totalQ += s.total; answeredQ += s.answered;
+          var rag = getRag(s.pct);
+          var ragColor = rag === 'green' ? '#1d8102' : rag === 'amber' ? '#ff9900' : '#d13212';
+          var barColor = s.answered === 0 ? '#d5dbdb' : ragColor;
+          pillarHtml += '<div class="pillar-row">' +
+            '<span class="pillar-name">' + p.name + '</span>' +
+            '<span class="pillar-score">' + s.answered + '/' + s.total + '</span>' +
+            '<div class="pillar-bar"><div class="pillar-bar-fill" style="width:' + (s.total > 0 ? Math.round(s.answered/s.total*100) : 0) + '%;background:' + barColor + '"></div></div>' +
+            '</div>';
+        });
+        var pct = totalQ > 0 ? Math.round(answeredQ / totalQ * 100) : 0;
+        cardsHtml += '<div class="review-card" onclick="openReview(\'' + r.id + '\')">' +
+          '<h4>' + r.customer + '</h4>' +
+          '<div class="meta">' + r.template + ' | ' + r.date + ' | Reviewer: ' + r.reviewer + '</div>' +
+          '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
+          '<div class="meta" style="margin-top:4px">' + answeredQ + '/' + totalQ + ' questions (' + pct + '%)</div>' +
+          '<div class="pillar-toggle" onclick="event.stopPropagation();var d=this.nextElementSibling;d.classList.toggle(\'open\');this.textContent=d.classList.contains(\'open\')?\'▾ Pillar breakdown\':\'▸ Pillar breakdown\';">▸ Pillar breakdown</div>' +
+          '<div class="pillar-details">' + pillarHtml + '</div>' +
+          '<div class="card-actions">' +
+          '<button class="btn btn-sm" onclick="event.stopPropagation();exportReview(\'' + r.id + '\')">Export JSON</button>' +
+          '<button class="btn btn-sm" onclick="event.stopPropagation();showArchInfo(\'' + r.id + '\')">Arch Info</button>' +
+          '<button class="btn btn-sm" onclick="event.stopPropagation();showPrintModal(\'' + r.id + '\')">Print Report</button>' +
+          '<button class="btn btn-sm" onclick="event.stopPropagation();showEmailModal(\'' + r.id + '\')">Email Report</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteReview(\'' + r.id + '\')">Delete</button>' +
+          '<button class="btn btn-sm" onclick="event.stopPropagation();showSavedReports(\'' + r.id + '\')">Saved Reports</button></div></div>';
       });
-      var pct = totalQ > 0 ? Math.round(answeredQ / totalQ * 100) : 0;
-      html += '<div class="review-card" onclick="openReview(\'' + r.id + '\')">' +
-        '<h4>' + r.customer + '</h4>' +
-        '<div class="meta">' + r.template + ' | ' + r.date + ' | Reviewer: ' + r.reviewer + '</div>' +
-        '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
-        '<div class="meta" style="margin-top:4px">' + answeredQ + '/' + totalQ + ' questions (' + pct + '%)</div>' +
-        '<div class="pillar-toggle" onclick="event.stopPropagation();var d=this.nextElementSibling;d.classList.toggle(\'open\');this.textContent=d.classList.contains(\'open\')?\'▾ Pillar breakdown\':\'▸ Pillar breakdown\';">▸ Pillar breakdown</div>' +
-        '<div class="pillar-details">' + pillarHtml + '</div>' +
-        '<div class="card-actions">' +
-        '<button class="btn btn-sm" onclick="event.stopPropagation();exportReview(\'' + r.id + '\')">Export JSON</button>' +
-        '<button class="btn btn-sm" onclick="event.stopPropagation();showArchInfo(\'' + r.id + '\')">Arch Info</button>' +
-        '<button class="btn btn-sm" onclick="event.stopPropagation();showPrintModal(\'' + r.id + '\')">Print Report</button>' +
-        '<button class="btn btn-sm" onclick="event.stopPropagation();showEmailModal(\'' + r.id + '\')">Email Report</button>' +
-        '<button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteReview(\'' + r.id + '\')">Delete</button>' +
-        '<button class="btn btn-sm" onclick="event.stopPropagation();showSavedReports(\'' + r.id + '\')">Saved Reports</button></div></div>';
-    });
+      return cardsHtml;
+    }
+    if (wafrReviews.length > 0) {
+      html += '<h4 style="color:#232f3e;margin:16px 0 8px;border-bottom:2px solid #ff9900;padding-bottom:6px;">Amazon WorkSpaces WAFR (' + wafrReviews.length + ')</h4>';
+      html += renderReviewCards(wafrReviews);
+    }
+    if (orrReviews.length > 0) {
+      html += '<h4 style="color:#232f3e;margin:24px 0 8px;border-bottom:2px solid #0073bb;padding-bottom:6px;">Operational Readiness Review - ORR (' + orrReviews.length + ')</h4>';
+      html += renderReviewCards(orrReviews);
+    }
   }
   html += '</div><div class="home-section"><h3>Templates (' + templates.length + ')</h3>';
   templates.forEach(function(t) {
