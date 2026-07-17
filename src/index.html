@@ -2712,9 +2712,9 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   if (summaryBullets.length === 0) {
     summaryBullets = ['The estate is operationally functional with strengths identified across the review.', 'High-risk items need leadership commitment.', 'Cost is actively managed; right-sizing is the main open lever.'];
   }
-  var bulletY = 1.6;
+  var bulletY = 2.0;
   summaryBullets.slice(0, 4).forEach(function(b) {
-    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 1.6, lineSpacingMultiple: 1.4 });
+    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 2.0, lineSpacingMultiple: 1.4 });
     bulletY += 0.8;
   });
   // KPI stat boxes (right side - 2x2 grid)
@@ -2724,7 +2724,7 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
     { value: String(medRisk), label: 'MEDIUM RISK', accent: AMBER },
     { value: String(bestPractice), label: 'BEST PRACTICE', accent: GREEN }
   ];
-  var kpiPositions = [{ x: 7.5, y: 1.6 }, { x: 10.2, y: 1.6 }, { x: 7.5, y: 3.9 }, { x: 10.2, y: 3.9 }];
+  var kpiPositions = [{ x: 7.5, y: 2.0 }, { x: 10.2, y: 2.0 }, { x: 7.5, y: 4.3 }, { x: 10.2, y: 4.3 }];
   kpiData.forEach(function(kpi, i) {
     var pos = kpiPositions[i];
     slide = s3;
@@ -2935,11 +2935,25 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   var rmColW = 3.0;
   var rmGap = 0.15;
   var rmStartX = 0.5;
+  // Deduplicate: each item only appears in the first column it's assigned to
+  var usedIds = {};
+  function dedupeItems(items) {
+    var result = [];
+    (items || []).forEach(function(r) {
+      var id = typeof r === 'string' ? r : (r.id || r.headline);
+      if (!usedIds[id]) { usedIds[id] = true; result.push(r); }
+    });
+    return result;
+  }
+  var col1Items = dedupeItems(roadmap.week1_2 || roadmap.thisWeek || []);
+  var col2Items = dedupeItems(roadmap.week3_6 || roadmap.thirtyDays || []);
+  var col3Items = dedupeItems(roadmap.week7_12 || roadmap.sixtyDays || []);
+  var col4Items = dedupeItems(roadmap.ninetyDays || (curated.could || []).slice(0, 3).map(function(c) { return { headline: c.headline }; }));
   var rmCols = [
-    { label: 'THIS WEEK', color: RED, items: roadmap.week1_2 || roadmap.thisWeek || [], lead: 'TAM' },
-    { label: '30 DAYS', color: AMBER, items: roadmap.week3_6 || roadmap.thirtyDays || [], lead: 'TAM + SA' },
-    { label: '60 DAYS', color: 'DAA520', items: roadmap.week7_12 || roadmap.sixtyDays || [], lead: 'SA lead' },
-    { label: '90 DAYS', color: GREEN, items: roadmap.ninetyDays || (curated.could || []).slice(0, 3).map(function(c) { return { headline: c.headline }; }), lead: 'SA + CSS' }
+    { label: 'THIS WEEK', color: RED, items: col1Items, lead: 'TAM' },
+    { label: '30 DAYS', color: AMBER, items: col2Items, lead: 'TAM + SA' },
+    { label: '60 DAYS', color: 'DAA520', items: col3Items, lead: 'SA lead' },
+    { label: '90 DAYS', color: GREEN, items: col4Items, lead: 'SA + CSS' }
   ];
   rmCols.forEach(function(col, ci) {
     var cx = rmStartX + ci * (rmColW + rmGap);
