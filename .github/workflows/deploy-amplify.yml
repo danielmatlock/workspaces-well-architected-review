@@ -128,15 +128,25 @@ jobs:
         run: |
           ENV=${{ steps.env.outputs.environment }}
           if [[ "$ENV" == "production" ]]; then
-            FUNCTION_NAME="wafr-email-report"
-          else
-            FUNCTION_NAME="wafr-email-report-dev"
+            echo "Skipping Lambda deploy for production (manual only)"
+            exit 0
           fi
           
-          echo "Deploying Lambda: $FUNCTION_NAME"
+          echo "Deploying dev Lambdas..."
           cd lambda
-          zip /tmp/lambda.zip wafr-email-report.py
+          
+          # Deploy wafr-email-report-dev
+          zip /tmp/lambda-email.zip wafr-email-report.py
           aws lambda update-function-code \
-            --function-name $FUNCTION_NAME \
-            --zip-file fileb:///tmp/lambda.zip \
+            --function-name wafr-email-report-dev \
+            --zip-file fileb:///tmp/lambda-email.zip \
             --region $AWS_REGION
+          echo "✓ Deployed wafr-email-report-dev"
+          
+          # Deploy wafr-explain-dev
+          zip /tmp/lambda-explain.zip wafr-explain.py
+          aws lambda update-function-code \
+            --function-name wafr-explain-dev \
+            --zip-file fileb:///tmp/lambda-explain.zip \
+            --region $AWS_REGION
+          echo "✓ Deployed wafr-explain-dev"
