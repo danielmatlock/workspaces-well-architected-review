@@ -2712,9 +2712,9 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   if (summaryBullets.length === 0) {
     summaryBullets = ['The estate is operationally functional with strengths identified across the review.', 'High-risk items need leadership commitment.', 'Cost is actively managed; right-sizing is the main open lever.'];
   }
-  var bulletY = 2.5;
+  var bulletY = 2.0;
   summaryBullets.slice(0, 4).forEach(function(b) {
-    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 2.5, lineSpacingMultiple: 1.4 });
+    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 2.0, lineSpacingMultiple: 1.4 });
     bulletY += 0.8;
   });
   // KPI stat boxes (right side - 2x2 grid)
@@ -2724,7 +2724,7 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
     { value: String(medRisk), label: 'MEDIUM RISK', accent: AMBER },
     { value: String(bestPractice), label: 'BEST PRACTICE', accent: GREEN }
   ];
-  var kpiPositions = [{ x: 7.5, y: 2.5 }, { x: 10.2, y: 2.5 }, { x: 7.5, y: 4.8 }, { x: 10.2, y: 4.8 }];
+  var kpiPositions = [{ x: 7.5, y: 2.0 }, { x: 10.2, y: 2.0 }, { x: 7.5, y: 4.2 }, { x: 10.2, y: 4.2 }];
   kpiData.forEach(function(kpi, i) {
     var pos = kpiPositions[i];
     slide = s3;
@@ -2971,7 +2971,7 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
     var itemText = col.items.map(function(r) { return typeof r === 'string' ? r : r.headline; }).join('\n');
     s12.addText(itemText || 'TBD', { x: cx + 0.2, y: 2.2, w: rmColW - 0.4, h: 3.0, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top', lineSpacingMultiple: 1.6, bullet: true });
     // Lead footer
-    s12.addText('Lead:  ' + col.lead, { x: cx + 0.2, y: 5.6, w: rmColW - 0.4, fontSize: 10, color: GREY, fontFace: 'Calibri' });
+    s12.addText('Lead:  ' + col.lead, { x: cx + 0.2, y: 5.9, w: rmColW - 0.4, fontSize: 10, color: GREY, fontFace: 'Calibri' });
   });
   // "THE ASK" callout bar at bottom
   s12.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: 6.5, w: 12.3, h: 0.6, fill: { color: SQUID }, rectRadius: 0.03 });
