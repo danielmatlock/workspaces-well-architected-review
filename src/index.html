@@ -2712,19 +2712,17 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   if (summaryBullets.length === 0) {
     summaryBullets = ['The estate is operationally functional with strengths identified across the review.', 'High-risk items need leadership commitment.', 'Cost is actively managed; right-sizing is the main open lever.'];
   }
-  var bulletY = 2.0;
-  summaryBullets.slice(0, 4).forEach(function(b) {
-    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 2.0, lineSpacingMultiple: 1.4 });
-    bulletY += 0.8;
-  });
-  // KPI stat boxes (right side - 2x2 grid)
+  // Single paragraph text block (left side)
+  var summaryText = summaryBullets.join(' ');
+  s3.addText(summaryText, { x: 0.5, y: 1.5, w: 7.0, h: 4.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.5, valign: 'middle' });
+  // KPI stat boxes (right side - 2x2 grid, aligned with text top)
   var kpiData = [
     { value: overallScore + '%', label: 'OVERALL - ' + (overallScore >= 75 ? 'GREEN' : overallScore >= 50 ? 'AMBER' : 'RED'), accent: ragColor(getRag(overallScore)) },
     { value: String(highRisk), label: 'HIGH RISK', accent: RED },
     { value: String(medRisk), label: 'MEDIUM RISK', accent: AMBER },
     { value: String(bestPractice), label: 'BEST PRACTICE', accent: GREEN }
   ];
-  var kpiPositions = [{ x: 7.5, y: 2.0 }, { x: 10.2, y: 2.0 }, { x: 7.5, y: 4.2 }, { x: 10.2, y: 4.2 }];
+  var kpiPositions = [{ x: 7.8, y: 1.5 }, { x: 10.5, y: 1.5 }, { x: 7.8, y: 4.0 }, { x: 10.5, y: 4.0 }];
   kpiData.forEach(function(kpi, i) {
     var pos = kpiPositions[i];
     slide = s3;
