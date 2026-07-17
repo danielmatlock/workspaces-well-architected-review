@@ -1102,7 +1102,8 @@ function renderQuestion() {
   html += '</div>';
   
   document.getElementById('content').innerHTML = html;
-  loadExplanation(q.q, q.best);
+  var review = getReview(state.activeReview);
+  loadExplanation(q.q, q.best, review.templateId || 'workspaces-default');
 }
 
 var explainPanelVisible = true;
@@ -1119,7 +1120,7 @@ function toggleExplainPanel() {
   }
 }
 
-async function loadExplanation(question, bestPractice) {
+async function loadExplanation(question, bestPractice, templateId) {
   var el = document.getElementById('explain-content');
   if (!el) return;
   el.innerHTML = '<div class="explain-loading">Loading AI guidance...</div>';
@@ -1127,7 +1128,7 @@ async function loadExplanation(question, bestPractice) {
     var res = await fetch(ENV.explainEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: question, bestPractice: bestPractice })
+      body: JSON.stringify({ question: question, bestPractice: bestPractice, templateId: templateId || 'workspaces-default' })
     });
     var data = await res.json();
     el.innerHTML = '<div class="explain-text">' + data.explanation.replace(/What to ask the [Cc]ustomer/gi, 'Questions to think about').replace(/\n/g, '<br>').replace(/## /g, '<strong>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') + '</div>';
