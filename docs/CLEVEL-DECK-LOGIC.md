@@ -221,3 +221,103 @@ If the `curateDeck` Lambda call fails (timeout, Bedrock error, JSON parse failur
 | S3 storage (1 PPTX ~300KB) | <$0.001 |
 | SES notification | Free tier |
 | **Total per deck** | **~$0.02** |
+
+## Template-Aware AI Guidance (ORR Integration)
+
+The AI pipeline is template-aware. When a review uses the `orr-default` template, all AI stages adapt their prompts to reference AWS Operational Readiness Review best practices instead of generic WorkSpaces Well-Architected guidance.
+
+### How It Works
+
+The frontend passes `templateId` (from the review object) to both the `generate` and `curateDeck` Lambda actions. The Lambda checks this field and switches prompt strategy accordingly.
+
+```
+Frontend (review.templateId)
+    │
+    ├── templateId == 'orr-default'
+    │       → ORR-specific prompts + ORR_BEST_PRACTICES grounding
+    │
+    └── templateId == 'workspaces-default' (or any other)
+            → Standard WorkSpaces Well-Architected prompts
+```
+
+### ORR Best Practices Grounding
+
+A static `ORR_BEST_PRACTICES` constant is embedded in the Lambda (`wafr-email-report.py`). It covers seven categories drawn from the AWS ORR whitepaper:
+
+| Category | Key Requirements |
+|----------|-----------------|
+| Failure Modeling & Blast Radius | Documented failure model, single points of failure, static stability, bulkhead patterns |
+| Operational Processes | Runbooks, on-call rotation, incident management, change management, capacity planning |
+| Event Management | Alarms tied to customer impact, actionable dashboards, canary monitoring, correlation IDs |
+| Release Quality & Safe Deployment | CI/CD pipeline, progressive rollout, tested rollback, feature flags, backward-compatible migrations |
+| Resilience & Recovery | RTO/RPO defined and tested, DR exercises, backup validation, circuit breakers, graceful degradation |
+| Security & Compliance | Least-privilege IAM, secrets rotation, network segmentation, vulnerability scanning, audit logging |
+| ORR Lifecycle | Design phase ORR, mid-cycle check-in, pre-launch completion, annual re-runs, COE feedback loop |
+
+This reference is injected into prompts as grounding context so Bedrock can assess findings against established ORR standards.
+
+### ORR-Specific Tailored Recommendations (`generate` action)
+
+When `templateId == 'orr-default'`:
+- System prompt frames the AI as assessing operational readiness for production
+- ORR best practices are injected as grounding (in addition to any S3 report context)
+- Recommendations focus on closing operational readiness gaps
+- Further Reading URLs point to operational readiness documentation
+- Tone uses "the team" / "the workload" rather than "the customer" / "the fleet"
+
+### ORR-Specific Curation (`curateDeck` action)
+
+When `templateId == 'orr-default'`:
+
+| Aspect | WorkSpaces Default | ORR Default |
+|--------|-------------------|-------------|
+| Framing | "WorkSpaces Well-Architected Review" | "Operational Readiness Review" |
+| Critical Findings | Board-level business risks | Items causing production incidents, outages, compliance failures |
+| MUST Tier | Preventable crises + quick wins | Pre-launch blockers: missing failure models, no rollback, absent monitoring |
+| SHOULD Tier | Highest-value items this quarter | Operational foundation: capacity planning, runbooks, canary deployments |
+| COULD Tier | Strategic, longer-term | Operational maturity: chaos engineering, game days, automated remediation |
+| Roadmap Week 1-2 | Urgent MUST | Pre-launch blockers |
+| Roadmap Week 3-6 | Remaining MUST + top SHOULD | Monitoring, runbooks, incident process |
+| Roadmap Week 7-12 | SHOULD + COULD | Chaos engineering, game days, automation |
+| Cost Insights | Fleet/billing quantification | "Cost impacts secondary to operational readiness gaps" (unless data exists) |
+| Entity Language | "the estate", "the fleet" | "the team", "the workload", "the application" |
+
+### Data Flow with ORR Template
+
+```
+Frontend: review.templateId = 'orr-default'
+    │
+    ▼
+STAGE 2 (generate): POST /email-report
+    Body includes: { action: 'generate', questions: [...], templateId: 'orr-default' }
+    Lambda injects ORR_BEST_PRACTICES into prompt + switches to ORR framing
+    │
+    ▼
+STAGE 3 (curateDeck): POST /email-report
+    Body includes: { action: 'curateDeck', ..., templateId: 'orr-default' }
+    Lambda uses ORR curation prompt + injects ORR_BEST_PRACTICES as grounding
+    │
+    ▼
+STAGE 4 (PPTX build): Same slide structure, content driven by ORR-curated JSON
+```
+
+### Adding New Templates
+
+To add a new template-specific AI behaviour:
+
+1. Add a system prompt entry in `wafr-explain.py` → `TEMPLATE_PROMPTS['your-template-id']`
+2. Add a best practices constant in `wafr-email-report.py` (e.g., `YOUR_TEMPLATE_BEST_PRACTICES`)
+3. Add an `elif template_id == 'your-template-id'` branch in `generate_tailored_recommendations()`
+4. Add an `elif template_id == 'your-template-id'` branch in the `curateDeck` handler
+5. The frontend automatically passes `templateId` from the review object - no frontend changes needed
+
+### AWS ORR Documentation References
+
+| Resource | URL |
+|----------|-----|
+| ORR Main Guide | https://docs.aws.amazon.com/wellarchitected/latest/operational-readiness-reviews/wa-operational-readiness-reviews.html |
+| The ORR Mechanism | https://docs.aws.amazon.com/wellarchitected/latest/operational-readiness-reviews/the-orr-mechanism.html |
+| The ORR Tool | https://docs.aws.amazon.com/wellarchitected/latest/operational-readiness-reviews/the-orr-tool.html |
+| Gaining Adoption | https://docs.aws.amazon.com/wellarchitected/latest/operational-readiness-reviews/gaining-adoption.html |
+| Example ORR Questions | https://docs.aws.amazon.com/wellarchitected/latest/operational-readiness-reviews/appendix-b-example-orr-questions.html |
+| Well-Architected OPS07-BP02 | https://docs.aws.amazon.com/wellarchitected/2025-02-25/framework/ops_ready_to_support_const_orr.html |
