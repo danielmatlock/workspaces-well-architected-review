@@ -959,13 +959,23 @@ function showReviewDashboard() {
   renderChatWidget();
   var review = getReview(state.activeReview);
   
-  document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
-    '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
-    '<button class="btn btn-primary" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
-    '<button class="btn btn-primary" onclick="showWafrReportModal(\'' + review.id + '\')">WAFR Report</button>' +
-    '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
-    '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
-    '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
+  var isORR = review.templateId === 'orr-default';
+  if (isORR) {
+    document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
+      '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
+      '<button class="btn" onclick="showPrintModal(\'' + review.id + '\')">Print Report</button>' +
+      '<button class="btn btn-primary" onclick="exportOrrReport(\'' + review.id + '\')">ORR Report</button>' +
+      '<button class="btn" onclick="showEmailModal(\'' + review.id + '\')">Email Report</button>' +
+      '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
+  } else {
+    document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
+      '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
+      '<button class="btn btn-primary" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
+      '<button class="btn btn-primary" onclick="showWafrReportModal(\'' + review.id + '\')">WAFR Report</button>' +
+      '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
+      '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
+      '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
+  }
   
   var overall = getOverallScore(review);
   var html = '<div class="overall-score"><div class="big">' + overall + '%</div><div class="label">Overall Score</div>' +
@@ -1057,13 +1067,22 @@ function renderQuestion() {
   var q = pillar.questions[state.activeQuestion];
   var answer = review.answers[q.id] || {};
   
-  document.getElementById('topbar').innerHTML = '<h3>' + pillar.name + '</h3>' +
-    '<div class="topbar-actions"><span style="font-size:13px;color:#5f6b7a">Question ' + (state.activeQuestion + 1) + ' of ' + pillar.questions.length + '</span>' +
-    '<button class="btn btn-primary btn-sm" onclick="showArchInfo(\'' + state.activeReview + '\')">Arch Info</button>' +
-    '<button class="btn btn-sm" onclick="showPrintModal(\'' + state.activeReview + '\')">Print Report</button>' +
-    '<button class="btn btn-primary" onclick="exportSoWhat(\'' + state.activeReview + '\')">So What Report</button>' +
-    '<button class="btn btn-primary btn-sm" onclick="exportCLevelDeck(\'' + state.activeReview + '\')">C-Level Deck</button>' +
-    '<button class="btn btn-sm" onclick="showEmailModal(\'' + state.activeReview + '\')">Email Report</button></div>';
+  var isORR = review.templateId === 'orr-default';
+  if (isORR) {
+    document.getElementById('topbar').innerHTML = '<h3>' + pillar.name + '</h3>' +
+      '<div class="topbar-actions"><span style="font-size:13px;color:#5f6b7a">Question ' + (state.activeQuestion + 1) + ' of ' + pillar.questions.length + '</span>' +
+      '<button class="btn btn-sm" onclick="showPrintModal(\'' + state.activeReview + '\')">Print Report</button>' +
+      '<button class="btn btn-primary" onclick="exportOrrReport(\'' + state.activeReview + '\')">ORR Report</button>' +
+      '<button class="btn btn-sm" onclick="showEmailModal(\'' + state.activeReview + '\')">Email Report</button></div>';
+  } else {
+    document.getElementById('topbar').innerHTML = '<h3>' + pillar.name + '</h3>' +
+      '<div class="topbar-actions"><span style="font-size:13px;color:#5f6b7a">Question ' + (state.activeQuestion + 1) + ' of ' + pillar.questions.length + '</span>' +
+      '<button class="btn btn-primary btn-sm" onclick="showArchInfo(\'' + state.activeReview + '\')">Arch Info</button>' +
+      '<button class="btn btn-sm" onclick="showPrintModal(\'' + state.activeReview + '\')">Print Report</button>' +
+      '<button class="btn btn-primary" onclick="exportSoWhat(\'' + state.activeReview + '\')">So What Report</button>' +
+      '<button class="btn btn-primary btn-sm" onclick="exportCLevelDeck(\'' + state.activeReview + '\')">C-Level Deck</button>' +
+      '<button class="btn btn-sm" onclick="showEmailModal(\'' + state.activeReview + '\')">Email Report</button></div>';
+  }
   
   var scoreClass = '';
   if (answer.score === 'not') scoreClass = ' sel-red';
@@ -1927,7 +1946,7 @@ function loadReportSelectOptions(reviewId, selectId) {
     var reports = payload.reports || [];
     var sel = document.getElementById(selectId);
     if (!sel) return;
-    var typeLabels = { standard: 'WAFR Report', sowhat: 'So What Report', clevel: 'C-Level Deck' };
+    var typeLabels = { standard: 'WAFR Report', sowhat: 'So What Report', clevel: 'C-Level Deck', orr: 'ORR Report' };
     reports.forEach(function(r) {
       var label = (typeLabels[r.reportType] || r.reportType) + ' — ' + (r.timestamp || '').replace('T', ' ').substring(0, 16);
       if (r.extension === 'pptx') label += ' (PPTX)';
@@ -2126,6 +2145,57 @@ function exportSoWhat(id) {
     saveReportToCloud(review.id, 'sowhat', html, 'text/html', 'html', review.customer);
     openReportInNewTab(html);
   });
+}
+
+function exportOrrReport(id) {
+  var review = getReview(id); if (!review) return;
+  var html = generateOrrHTML(review);
+  saveReportToCloud(review.id, 'orr', html, 'text/html', 'html', review.customer);
+  openReportInNewTab(html);
+}
+
+function generateOrrHTML(review) {
+  function sanitizeForHTML(text) {
+    if (!text) return text;
+    return text.replace(/\u2014/g, '&mdash;').replace(/\u2013/g, '&ndash;').replace(/\u2018/g, '&lsquo;').replace(/\u2019/g, '&rsquo;').replace(/\u201C/g, '&ldquo;').replace(/\u201D/g, '&rdquo;').replace(/\u2026/g, '&hellip;').replace(/\u00A0/g, '&nbsp;');
+  }
+  var customerName = sanitizeForHTML(review.customer || 'Review');
+  var overall = getOverallScore(review);
+  var ragLabel = getRag(overall);
+  var ragColor = ragLabel === 'red' ? '#d13212' : ragLabel === 'amber' ? '#f2a20d' : '#1d8102';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ORR Report - ' + customerName + '</title>';
+  html += '<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:1000px;margin:0 auto;padding:40px 20px;color:#1a1a1a;} h1{color:#232f3e;margin-bottom:4px;} .subtitle{color:#5f6b7a;margin-bottom:30px;} .summary-box{background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:30px;display:flex;align-items:center;gap:20px;} .score-circle{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:white;} .pillar-section{margin-bottom:30px;} .pillar-header{background:#232f3e;color:white;padding:12px 16px;border-radius:6px 6px 0 0;font-size:16px;font-weight:600;display:flex;justify-content:space-between;} .q-row{border:1px solid #e0e0e0;border-top:none;padding:14px 16px;} .q-row:last-child{border-radius:0 0 6px 6px;} .q-id{font-weight:700;color:#0073bb;font-size:12px;} .q-text{font-size:14px;margin:4px 0;} .q-notes{background:#f5f5f5;border-left:4px solid #879596;padding:10px;margin-top:8px;border-radius:4px;font-size:13px;color:#3d4f58;} .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;color:white;} .badge-red{background:#d13212;} .badge-amber{background:#f2a20d;} .badge-green{background:#1d8102;} .badge-grey{background:#879596;} .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:12px;color:#5f6b7a;} @media print{.no-print{display:none!important;}}</style></head><body>';
+  html += '<div class="no-print"><button onclick="window.print()">Save as PDF (Cmd+P)</button><button onclick="window.close()" style="margin-left:8px;">Close</button></div>';
+  html += '<h1>Operational Readiness Review - ' + customerName + '</h1>';
+  html += '<div class="subtitle">' + (review.reviewer || '') + ' | ' + (review.date || new Date().toISOString().split('T')[0]) + '</div>';
+
+  // Summary box
+  html += '<div class="summary-box"><div class="score-circle" style="background:' + ragColor + ';">' + overall + '%</div>';
+  html += '<div><div style="font-size:18px;font-weight:600;">Overall Readiness: <span style="color:' + ragColor + ';">' + ragLabel.toUpperCase() + '</span></div>';
+  var totalQ = 0, answered = 0, notImpl = 0;
+  review.pillars.forEach(function(p) { p.questions.forEach(function(q) { totalQ++; var a = review.answers[q.id]; if (a && a.score) { answered++; if (a.score === 'not') notImpl++; } }); });
+  html += '<div style="font-size:13px;color:#5f6b7a;margin-top:4px;">' + answered + ' of ' + totalQ + ' questions assessed | ' + notImpl + ' not implemented</div></div></div>';
+
+  // Pillar sections
+  review.pillars.forEach(function(p, pi) {
+    var ps = getPillarScore(review, pi);
+    var pRag = ps.answered > 0 ? getRag(ps.pct) : 'grey';
+    html += '<div class="pillar-section"><div class="pillar-header"><span>' + p.name + '</span><span class="badge badge-' + pRag + '">' + ps.pct + '% (' + ps.answered + '/' + ps.total + ')</span></div>';
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id] || {};
+      var scoreLabel = a.score === 'fully' ? 'Fully Implemented' : a.score === 'partial' ? 'Partially Implemented' : a.score === 'not' ? 'Not Implemented' : a.score === 'na' ? 'N/A' : 'Not Assessed';
+      var sRag = a.score === 'fully' ? 'green' : a.score === 'partial' ? 'amber' : a.score === 'not' ? 'red' : 'grey';
+      html += '<div class="q-row"><div class="q-id">' + q.id + ' <span class="badge badge-' + sRag + '">' + scoreLabel + '</span></div>';
+      html += '<div class="q-text">' + q.q + '</div>';
+      if (a.notes) html += '<div class="q-notes">' + sanitizeForHTML(a.notes) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '<div class="footer">Generated by AWS WorkSpaces ORR Review Tool | ' + new Date().toISOString().split('T')[0] + '</div></body></html>';
+  return html;
 }
 
 // === C-LEVEL DECK ===
@@ -2968,7 +3038,7 @@ function showSavedReports(id) {
     var reports = payload.reports || [];
     var el = document.getElementById('saved-reports-list');
     if (reports.length === 0) { el.innerHTML = '<p style="color:#5f6b7a;">No saved reports yet. Generate a report and it will automatically save here.</p>'; return; }
-    var typeOrder = { sowhat: 0, clevel: 1, standard: 2 };
+    var typeOrder = { sowhat: 0, orr: 1, clevel: 2, standard: 3 };
     reports.sort(function(a, b) {
       var ta = typeOrder[a.reportType] !== undefined ? typeOrder[a.reportType] : 9;
       var tb = typeOrder[b.reportType] !== undefined ? typeOrder[b.reportType] : 9;
@@ -2978,7 +3048,7 @@ function showSavedReports(id) {
     var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
       '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">Type</th><th style="text-align:left;padding:8px;">Date</th><th style="padding:8px;">Actions</th></tr>';
     reports.forEach(function(r) {
-      var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : 'C-Level Deck';
+      var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : r.reportType === 'orr' ? 'ORR Report' : 'C-Level Deck';
       var ts = r.timestamp.replace('T', ' ').replace(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2})(\d{2})$/, '$1 $2:$3:$4');
       html += '<tr style="border-bottom:1px solid #eee;"><td style="padding:8px;">' + typeLabel + '</td><td style="padding:8px;">' + ts + '</td>' +
         '<td style="padding:8px;text-align:center;white-space:nowrap;">';
@@ -3116,7 +3186,7 @@ async function loadChatContext() {
       reportMeta += 'Total reports generated: ' + reports.length + '\n';
       var typeCounts = {};
       reports.forEach(function(r) {
-        var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : 'C-Level Deck';
+        var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : r.reportType === 'orr' ? 'ORR Report' : 'C-Level Deck';
         typeCounts[typeLabel] = (typeCounts[typeLabel] || 0) + 1;
         var ts = r.timestamp.replace('T', ' ').replace(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2})(\d{2})$/, '$1 $2:$3:$4');
         reportMeta += '- ' + typeLabel + ' | Generated: ' + ts + ' | Extension: ' + r.extension + ' | Size: ' + r.size + ' bytes\n';
