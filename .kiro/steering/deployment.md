@@ -4,7 +4,16 @@ inclusion: auto
 
 # WorkSpaces WAFR Tool - Deployment Process
 
-After any code changes are committed and pushed to GitHub, remind the user to deploy using CloudShell (eu-west-2). The deployment is NOT automatic from GitHub - it requires manual steps.
+After any code changes are committed and pushed to GitHub, the dev environment auto-deploys via GitHub Actions when `src/` or `lambda/` files change on the `dev` branch. Production requires manual CloudShell deployment.
+
+## Auto-Deploy (Dev)
+
+Pushing to the `dev` branch with changes in `src/` or `lambda/` triggers GitHub Actions:
+- Frontend auto-deploys to Amplify `dev` branch
+- Lambdas auto-deploy to `wafr-email-report-dev` and `wafr-explain-dev`
+- Check status: https://github.com/danielmatlock/workspaces-well-architected-review/actions
+
+No CloudShell needed for dev - just `git push` and verify at https://dev.d1p2543h8l2mfc.amplifyapp.com
 
 ## Environments
 
@@ -19,9 +28,9 @@ After any code changes are committed and pushed to GitHub, remind the user to de
 
 ## Workflow
 
-1. **Development:** Work on `dev` branch, push, deploy to dev, test
-2. **Promotion:** When happy, merge `dev` into `main`, deploy to production
-3. **Always deploy dev first** - never deploy untested changes to production
+1. **Development:** Work on `dev` branch, push - GitHub Actions auto-deploys to dev
+2. **Promotion:** When happy, merge `dev` into `main`, then deploy production manually via CloudShell
+3. **Always test in dev first** - production Lambda deploy is manual-only for safety
 
 ## Prerequisites (CloudShell - one-time setup per session)
 
@@ -106,6 +115,7 @@ aws lambda update-function-code --function-name wafr-explain --zip-file fileb://
 - Always `rm -f /tmp/deploy.zip` first to avoid stale contents
 - Always set `GH_TOKEN` at the start of a CloudShell session (repo is private)
 - No local AWS credentials - must use CloudShell
-- After `git push`, always ask: "Ready to deploy via CloudShell?" and specify which environment (dev or prod)
-- Tell the user which files changed so they know which deploy commands to run (frontend, Lambda, or both)
+- After `git push` to dev, confirm auto-deploy is running: check GitHub Actions
+- After `git push` to dev, tell the user to verify at https://dev.d1p2543h8l2mfc.amplifyapp.com
 - For production deploys, confirm the user has tested in dev first
+- Production Lambda deploy requires CloudShell - it is NOT auto-deployed
