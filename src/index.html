@@ -2133,17 +2133,22 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   // ═══ SLIDE 3: Six-Pillar Scorecard ═══
   var s4 = addContentSlide('ASSESSMENT', 'Six-Pillar Scorecard', '4');
   var pillarY = 1.5;
-  pillarScores.forEach(function(p) {
+  // Sort pillars highest score to lowest
+  var sortedPillars = pillarScores.slice().sort(function(a, b) { return b.score - a.score; });
+  // RAG color with 70% green threshold for scorecard
+  function scorecardRag(score) { return score >= 70 ? GREEN : score >= 40 ? AMBER : RED; }
+  sortedPillars.forEach(function(p) {
     var barWidth = 7.0 * p.score / 100;
+    var pColor = scorecardRag(p.score);
     s4.addText(p.name, { x: 0.5, y: pillarY, w: 3.8, h: 0.5, fontSize: 14, bold: true, color: SQUID, fontFace: 'Calibri', valign: 'middle' });
     // Background bar track
     s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.1, w: 7.0, h: 0.35, fill: { color: 'E8E8E8' } });
     // Filled bar
     if (barWidth > 0) {
-      s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.1, w: barWidth, h: 0.35, fill: { color: ragColor(p.rag) } });
+      s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.1, w: barWidth, h: 0.35, fill: { color: pColor } });
     }
     // Score percentage
-    s4.addText(p.score + '%', { x: 11.7, y: pillarY, w: 0.8, h: 0.5, fontSize: 14, bold: true, color: ragColor(p.rag), fontFace: 'Calibri', align: 'center', valign: 'middle' });
+    s4.addText(p.score + '%', { x: 11.7, y: pillarY, w: 0.8, h: 0.5, fontSize: 14, bold: true, color: pColor, fontFace: 'Calibri', align: 'center', valign: 'middle' });
     // Items needing attention
     var itemCount = p.needsAttention || 0;
     if (itemCount > 0) s4.addText(itemCount + ' items', { x: 12.4, y: pillarY, w: 0.8, h: 0.5, fontSize: 10, color: GREY, fontFace: 'Calibri', valign: 'middle' });
