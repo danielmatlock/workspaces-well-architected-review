@@ -1627,6 +1627,7 @@ function generateSoWhatHTML(review, recommendations) {
       html += '<div class="q-card"><div class="q-id">' + q.id + '</div><div class="q-text">' + q.q + '</div>';
       if (rec.observation) html += '<div class="q-obs"><strong>What we found:</strong> ' + sanitizeForHTML(rec.observation) + '</div>';
       if (rec.recommendation) html += '<div class="q-rec"><strong>What to do:</strong> ' + sanitizeForHTML(rec.recommendation).replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+      if (rec.userImpact) html += '<div class="q-obs" style="border-left-color:#0073bb;background:#f0f8ff;"><strong>What this means for users:</strong> ' + sanitizeForHTML(rec.userImpact) + '</div>';
       html += '</div>';
     });
   });

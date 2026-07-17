@@ -32,7 +32,7 @@ def generate_tailored_recommendations(questions_with_notes, reference_context=''
                      + reference_context + "\n\n--- END REFERENCE DATA ---\n\n")
     
     prompt = ("You are an AWS Solutions Architect writing a formal Well-Architected Review report. "
-               "For each question below, produce two things:\n"
+               "For each question below, produce THREE things:\n"
                "1. 'observation': Rewrite the raw customer notes as polished, professional prose. "
                "Fix spelling and grammar, write in full sentences, maintain all factual content, use third-person formal tone (e.g. 'The customer currently manages...'). "
                "Keep it concise (2-4 sentences).\n"
@@ -40,8 +40,12 @@ def generate_tailored_recommendations(questions_with_notes, reference_context=''
                "then 2-3 next-step bullet points starting with '\u2022 ', "
                "then a 'Further Reading:' line with 1-2 real https://docs.aws.amazon.com URLs. "
                "IMPORTANT: You MUST include the Further Reading line for EVERY question. Never omit it.\n"
+               "3. 'userImpact': Explain what this finding means for end users of WorkSpaces (the people who log in and use them daily). "
+               "Focus on tangible impacts: performance changes, required actions (e.g. client updates, password resets), "
+               "downtime, improved experience, or no impact. Write in plain language suitable for non-technical users. "
+               "1-2 sentences. If the finding has no direct end-user impact, state 'No direct impact on end users.'\n"
                + grounding +
-               "Format as JSON: {\"QUESTION-ID\": {\"observation\": \"...\", \"recommendation\": \"...\"}}. "
+               "Format as JSON: {\"QUESTION-ID\": {\"observation\": \"...\", \"recommendation\": \"...\", \"userImpact\": \"...\"}}. "
                "Respond with ONLY valid JSON, no markdown fences.\n\nQuestions:\n" + joined)
 
     try:
