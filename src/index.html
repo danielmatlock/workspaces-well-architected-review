@@ -2149,12 +2149,46 @@ function exportSoWhat(id) {
 
 function exportOrrReport(id) {
   var review = getReview(id); if (!review) return;
-  var html = generateOrrHTML(review);
-  saveReportToCloud(review.id, 'orr', html, 'text/html', 'html', review.customer);
-  openReportInNewTab(html);
+  showGeneratingOverlay();
+  generateOrrTailoredReport(review).then(function() {
+    hideGeneratingOverlay();
+    var html = generateOrrHTML(review, window._lastOrrRecommendations || {});
+    saveReportToCloud(review.id, 'orr', html, 'text/html', 'html', review.customer);
+    openReportInNewTab(html);
+  }).catch(function(e) { hideGeneratingOverlay(); console.error('ORR report error:', e); alert('Error generating ORR report: ' + e.message); });
 }
 
-function generateOrrHTML(review) {
+async function generateOrrTailoredReport(review) {
+  var questionsWithNotes = [];
+  review.pillars.forEach(function(p) {
+    p.questions.forEach(function(q) {
+      var a = review.answers[q.id];
+      if (a && a.notes && a.notes.trim()) {
+        questionsWithNotes.push({ id: q.id, question: q.q, score: a.score || '', notes: a.notes, best: q.best });
+      }
+    });
+  });
+  var recommendations = {};
+  if (questionsWithNotes.length > 0) {
+    var BATCH_SIZE = 5;
+    for (var i = 0; i < questionsWithNotes.length; i += BATCH_SIZE) {
+      var batch = questionsWithNotes.slice(i, i + BATCH_SIZE);
+      try {
+        var res = await fetch(ENV.emailEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'generateOrr', questions: batch })
+        });
+        var data = await res.json();
+        var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+        if (payload.recommendations) Object.assign(recommendations, payload.recommendations);
+      } catch(e) { console.log('ORR generation error (batch ' + (i/BATCH_SIZE+1) + '):', e); }
+    }
+  }
+  window._lastOrrRecommendations = recommendations;
+}
+
+function generateOrrHTML(review, recommendations) {
   function sanitizeForHTML(text) {
     if (!text) return text;
     return text.replace(/\u2014/g, '&mdash;').replace(/\u2013/g, '&ndash;').replace(/\u2018/g, '&lsquo;').replace(/\u2019/g, '&rsquo;').replace(/\u201C/g, '&ldquo;').replace(/\u201D/g, '&rdquo;').replace(/\u2026/g, '&hellip;').replace(/\u00A0/g, '&nbsp;');
@@ -2165,7 +2199,7 @@ function generateOrrHTML(review) {
   var ragColor = ragLabel === 'red' ? '#d13212' : ragLabel === 'amber' ? '#f2a20d' : '#1d8102';
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>ORR Report - ' + customerName + '</title>';
-  html += '<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:1000px;margin:0 auto;padding:40px 20px;color:#1a1a1a;} h1{color:#232f3e;margin-bottom:4px;} .subtitle{color:#5f6b7a;margin-bottom:30px;} .summary-box{background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:30px;display:flex;align-items:center;gap:20px;} .score-circle{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:white;} .pillar-section{margin-bottom:30px;} .pillar-header{background:#232f3e;color:white;padding:12px 16px;border-radius:6px 6px 0 0;font-size:16px;font-weight:600;display:flex;justify-content:space-between;} .q-row{border:1px solid #e0e0e0;border-top:none;padding:14px 16px;} .q-row:last-child{border-radius:0 0 6px 6px;} .q-id{font-weight:700;color:#0073bb;font-size:12px;} .q-text{font-size:14px;margin:4px 0;} .q-notes{background:#f5f5f5;border-left:4px solid #879596;padding:10px;margin-top:8px;border-radius:4px;font-size:13px;color:#3d4f58;} .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;color:white;} .badge-red{background:#d13212;} .badge-amber{background:#f2a20d;} .badge-green{background:#1d8102;} .badge-grey{background:#879596;} .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:12px;color:#5f6b7a;} @media print{.no-print{display:none!important;}}</style></head><body>';
+  html += '<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:1000px;margin:0 auto;padding:40px 20px;color:#1a1a1a;line-height:1.5;} h1{color:#232f3e;margin-bottom:4px;} .subtitle{color:#5f6b7a;margin-bottom:30px;} .summary-box{background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:30px;display:flex;align-items:center;gap:20px;} .score-circle{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:white;flex-shrink:0;} .pillar-section{margin-bottom:30px;} .pillar-header{background:#232f3e;color:white;padding:12px 16px;border-radius:6px 6px 0 0;font-size:16px;font-weight:600;display:flex;justify-content:space-between;align-items:center;} .q-card{border:1px solid #e0e0e0;border-top:none;padding:20px;} .q-card:last-child{border-radius:0 0 6px 6px;} .q-id{font-weight:700;color:#0073bb;font-size:13px;display:flex;align-items:center;gap:8px;} .q-text{font-size:15px;margin:6px 0 14px;font-weight:500;} .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;} .obs-box{background:#f5f5f5;border-left:4px solid #879596;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;} .rec-box{background:#f0f4ff;border-left:4px solid #0073bb;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;} .rec-box a{color:#0073bb;} .target-box{background:#f0fff0;border-left:4px solid #1d8102;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;} .steps-box{background:#fff8f0;border-left:4px solid #f2a20d;padding:12px;margin-bottom:8px;border-radius:4px;font-size:14px;} .steps-box ol{margin:4px 0 0 16px;padding:0;} .steps-box li{margin-bottom:4px;} .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;color:white;} .badge-red{background:#d13212;} .badge-amber{background:#f2a20d;} .badge-green{background:#1d8102;} .badge-grey{background:#879596;} .priority-critical{background:#d13212;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;} .priority-high{background:#f2a20d;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;} .priority-medium{background:#0073bb;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;} .priority-low{background:#879596;color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;} .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:12px;color:#5f6b7a;} @media print{.no-print{display:none!important;}}</style></head><body>';
   html += '<div class="no-print"><button onclick="window.print()">Save as PDF (Cmd+P)</button><button onclick="window.close()" style="margin-left:8px;">Close</button></div>';
   html += '<h1>Operational Readiness Review - ' + customerName + '</h1>';
   html += '<div class="subtitle">' + (review.reviewer || '') + ' | ' + (review.date || new Date().toISOString().split('T')[0]) + '</div>';
@@ -2173,9 +2207,9 @@ function generateOrrHTML(review) {
   // Summary box
   html += '<div class="summary-box"><div class="score-circle" style="background:' + ragColor + ';">' + overall + '%</div>';
   html += '<div><div style="font-size:18px;font-weight:600;">Overall Readiness: <span style="color:' + ragColor + ';">' + ragLabel.toUpperCase() + '</span></div>';
-  var totalQ = 0, answered = 0, notImpl = 0;
-  review.pillars.forEach(function(p) { p.questions.forEach(function(q) { totalQ++; var a = review.answers[q.id]; if (a && a.score) { answered++; if (a.score === 'not') notImpl++; } }); });
-  html += '<div style="font-size:13px;color:#5f6b7a;margin-top:4px;">' + answered + ' of ' + totalQ + ' questions assessed | ' + notImpl + ' not implemented</div></div></div>';
+  var totalQ = 0, answered = 0, notImpl = 0, critical = 0;
+  review.pillars.forEach(function(p) { p.questions.forEach(function(q) { totalQ++; var a = review.answers[q.id]; if (a && a.score) { answered++; if (a.score === 'not') notImpl++; } var rec = recommendations[q.id]; if (rec && rec.priority === 'Critical') critical++; }); });
+  html += '<div style="font-size:13px;color:#5f6b7a;margin-top:4px;">' + answered + ' of ' + totalQ + ' areas assessed | ' + notImpl + ' not implemented' + (critical > 0 ? ' | <span style="color:#d13212;font-weight:600;">' + critical + ' critical</span>' : '') + '</div></div></div>';
 
   // Pillar sections
   review.pillars.forEach(function(p, pi) {
@@ -2184,17 +2218,40 @@ function generateOrrHTML(review) {
     html += '<div class="pillar-section"><div class="pillar-header"><span>' + p.name + '</span><span class="badge badge-' + pRag + '">' + ps.pct + '% (' + ps.answered + '/' + ps.total + ')</span></div>';
     p.questions.forEach(function(q) {
       var a = review.answers[q.id] || {};
+      var rec = recommendations[q.id] || {};
       var scoreLabel = a.score === 'fully' ? 'Fully Implemented' : a.score === 'partial' ? 'Partially Implemented' : a.score === 'not' ? 'Not Implemented' : a.score === 'na' ? 'N/A' : 'Not Assessed';
       var sRag = a.score === 'fully' ? 'green' : a.score === 'partial' ? 'amber' : a.score === 'not' ? 'red' : 'grey';
-      html += '<div class="q-row"><div class="q-id">' + q.id + ' <span class="badge badge-' + sRag + '">' + scoreLabel + '</span></div>';
+      var priorityClass = rec.priority ? 'priority-' + rec.priority.toLowerCase() : '';
+
+      html += '<div class="q-card"><div class="q-id"><span class="badge badge-' + sRag + '">' + scoreLabel + '</span> ' + q.id;
+      if (rec.priority) html += ' <span class="' + priorityClass + '">' + rec.priority + '</span>';
+      html += '</div>';
       html += '<div class="q-text">' + q.q + '</div>';
-      if (a.notes) html += '<div class="q-notes">' + sanitizeForHTML(a.notes) + '</div>';
+
+      if (rec.observation) {
+        html += '<div class="section-label" style="color:#5f6b7a;">Observation</div>';
+        html += '<div class="obs-box">' + sanitizeForHTML(rec.observation) + '</div>';
+      }
+      if (rec.recommendation) {
+        html += '<div class="section-label" style="color:#0073bb;">Recommendation</div>';
+        html += '<div class="rec-box">' + sanitizeForHTML(rec.recommendation).replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+      }
+      if (rec.targetState) {
+        html += '<div class="section-label" style="color:#1d8102;">Target State (Green)</div>';
+        html += '<div class="target-box">' + sanitizeForHTML(rec.targetState) + '</div>';
+      }
+      if (rec.stepsToGreen && rec.stepsToGreen.length > 0) {
+        html += '<div class="section-label" style="color:#b7791b;">Steps to Reach Green</div>';
+        html += '<div class="steps-box"><ol>';
+        rec.stepsToGreen.forEach(function(step) { html += '<li>' + sanitizeForHTML(step.replace(/^\d+\.\s*/, '')) + '</li>'; });
+        html += '</ol></div>';
+      }
       html += '</div>';
     });
     html += '</div>';
   });
 
-  html += '<div class="footer">Generated by AWS WorkSpaces ORR Review Tool | ' + new Date().toISOString().split('T')[0] + '</div></body></html>';
+  html += '<div class="footer">Generated by AWS ORR Review Tool | ' + new Date().toISOString().split('T')[0] + '</div></body></html>';
   return html;
 }
 

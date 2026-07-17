@@ -15,7 +15,161 @@ SENDER = os.environ.get('SENDER_EMAIL', 'danmmat@amazon.co.uk')
 MODEL_ID = os.environ.get('MODEL_ID', 'eu.anthropic.claude-haiku-4-5-20251001-v1:0')
 REPORTS_BUCKET = os.environ.get('REPORTS_BUCKET', 'wafr-reports-danmmat-9219112')
 
-def generate_tailored_recommendations(questions_with_notes, reference_context=''):
+# ─── ORR Best Practices Reference ───────────────────────────────────────────────
+# Condensed from AWS Operational Readiness Reviews whitepaper and Well-Architected
+# Framework OPS07-BP02. Injected as grounding context when templateId is orr-default.
+ORR_BEST_PRACTICES = """
+AWS OPERATIONAL READINESS REVIEW (ORR) BEST PRACTICES REFERENCE
+
+PURPOSE: The ORR helps teams validate they can safely operate workloads by preventing
+recurrence of known failure modes. It drives smaller, fewer, and shorter incidents.
+
+═══ 1. FAILURE MODELING & BLAST RADIUS ═══
+• Every service MUST have a documented failure model covering: component/dependency,
+  failure type, service impact, and customer impact.
+• Address outage scenarios at largest blast radius unit (cell, AZ, Region) plus total
+  infrastructure outage.
+• Identify single points of failure and document mitigations.
+• Define static stability - the system should continue operating if a dependency fails.
+• Implement bulkhead patterns to isolate failures (cells, shuffle sharding).
+• Quantify blast radius for every change type (deployment, config, data).
+
+═══ 2. OPERATIONAL PROCESSES ═══
+• Runbooks MUST exist for every operational scenario (deploy, rollback, failover, scaling).
+• On-call rotation MUST be staffed with trained engineers who have access to all systems.
+• Incident management process MUST define severity levels, escalation paths, and
+  communication templates.
+• Change management MUST include pre/post deployment validation, canary analysis, and
+  automatic rollback triggers.
+• Capacity planning MUST account for peak load + headroom (typically 2x normal).
+• Dependency management MUST document all upstream/downstream services, their SLAs,
+  and fallback behaviour when unavailable.
+
+═══ 3. EVENT MANAGEMENT (MONITORING & ALERTING) ═══
+• Every critical path MUST have alarms with defined thresholds tied to customer impact.
+• Dashboards MUST show real-time health at service, dependency, and customer-experience level.
+• Alarms MUST route to on-call with actionable runbook links (not just "something is wrong").
+• Canary monitoring MUST validate customer-facing workflows continuously.
+• Log aggregation MUST support rapid root-cause analysis (structured logs, correlation IDs).
+• Metrics MUST cover: availability, latency (p50/p99), error rates, saturation, and
+  dependency health.
+• Alarm fatigue MUST be managed - every alarm should be actionable or removed.
+
+═══ 4. RELEASE QUALITY & SAFE DEPLOYMENT ═══
+• CI/CD pipeline MUST include: unit tests, integration tests, and deployment validation.
+• Deployments MUST use progressive rollout (canary, linear, blue/green) with automatic
+  rollback on alarm.
+• One-box/canary stage MUST bake for sufficient duration before wider rollout.
+• Rollback MUST be tested and executable within minutes (not just theoretically possible).
+• Feature flags SHOULD decouple deployment from release.
+• Database migrations MUST be backward-compatible (no breaking schema changes in-place).
+• Deploy frequency SHOULD be high (small batches reduce blast radius per change).
+
+═══ 5. RESILIENCE & RECOVERY ═══
+• RTO (Recovery Time Objective) and RPO (Recovery Point Objective) MUST be defined and tested.
+• Disaster recovery procedures MUST be exercised regularly (game days, chaos engineering).
+• Data backup and restore MUST be validated (not just configured).
+• Multi-AZ or multi-Region architecture SHOULD be used for critical workloads.
+• Circuit breakers and retry with jitter MUST protect against cascade failures.
+• Graceful degradation MUST be designed for non-critical features.
+
+═══ 6. SECURITY & COMPLIANCE READINESS ═══
+• Least-privilege IAM MUST be enforced for all service roles and human access.
+• Secrets rotation MUST be automated (no long-lived credentials).
+• Network segmentation MUST isolate workload from untrusted traffic.
+• Vulnerability scanning MUST run in CI/CD pipeline.
+• Audit logging MUST capture all administrative actions (CloudTrail, VPC Flow Logs).
+• Compliance controls MUST be codified and continuously validated.
+
+═══ 7. ORR LIFECYCLE INTEGRATION ═══
+• ORR MUST run during design phase (architecture questions).
+• ORR MUST run during development (testing and operational readiness questions).
+• ORR MUST run pre-launch (full checklist completion + risk mitigation plan).
+• ORR MUST run periodically post-launch (at least annually) to catch drift.
+• Lessons learned from incidents (COE/post-mortem) MUST feed back into ORR questions.
+• New best practices MUST be incorporated as they emerge from operational experience.
+
+═══ KEY PRINCIPLE ═══
+The ORR is NOT a blocking gate - it is a self-service mechanism that helps teams
+identify and mitigate operational risks proactively. The goal is to surface risks
+early so they can be addressed before they become customer-impacting incidents.
+"""
+
+def generate_orr_recommendations(questions_with_notes, reference_context=''):
+    """Generate detailed ORR recommendations with observation, recommendation, target state, and steps to green."""
+    if not questions_with_notes:
+        return {}
+    prompt_items = []
+    for item in questions_with_notes:
+        prompt_items.append("ID: " + item['id'] + "\nQuestion: " + item['question'] + "\nScore: " + item['score'] + "\nReviewer Notes: " + item['notes'] + "\nBest Practice: " + item['best'])
+    joined = "\n\n".join(prompt_items)
+    
+    grounding = ''
+    if reference_context:
+        grounding = ("\n\nREFERENCE DATA (use as source of truth, do not invent findings):\n"
+                     + reference_context + "\n--- END REFERENCE DATA ---\n\n")
+    
+    orr_grounding = ("\n\nORR BEST PRACTICES REFERENCE:\n" + ORR_BEST_PRACTICES + "\n--- END ORR REFERENCE ---\n\n")
+    
+    prompt = (
+        "You are a senior AWS Solutions Architect conducting a formal Operational Readiness Review (ORR). "
+        "The ORR validates whether a workload is ready for production operation by assessing operational "
+        "maturity against proven best practices.\n\n"
+        "For each question below, produce a JSON object with these FIVE fields:\n\n"
+        "1. 'observation': A professional summary of the current state based on the reviewer notes. "
+        "Fix spelling/grammar, write in third-person formal tone (e.g. 'The team currently...'), "
+        "2-4 sentences. Be specific about what IS in place.\n\n"
+        "2. 'recommendation': Structured guidance to improve. Format as:\n"
+        "   - Brief acknowledgement of current readiness posture (1 sentence)\n"
+        "   - 3-4 actionable bullet points starting with '\u2022 ' that address specific gaps\n"
+        "   - Reference relevant ORR domains (failure modeling, operational processes, event management, "
+        "release quality, resilience, security)\n"
+        "   - End with 'Further Reading:' followed by 1-2 real https://docs.aws.amazon.com URLs\n\n"
+        "3. 'targetState': Describe what FULLY IMPLEMENTED looks like for this specific question. "
+        "This is the green-state vision - what the team should be aiming for. 2-3 sentences, concrete and measurable.\n\n"
+        "4. 'stepsToGreen': An ordered list of 3-5 specific steps the team must take to move from their "
+        "current state to fully implemented (green). Each step should be actionable and sequenced logically. "
+        "Format as an array of strings, each starting with a number: ['1. First step...', '2. Second step...', ...]\n\n"
+        "5. 'priority': Rate the urgency: 'Critical' (blocks production readiness), 'High' (significant risk), "
+        "'Medium' (improvement needed), or 'Low' (nice to have). Base this on the gap between current state and best practice.\n\n"
+        + orr_grounding + grounding +
+        "Format as JSON: {\"QUESTION-ID\": {\"observation\": \"...\", \"recommendation\": \"...\", "
+        "\"targetState\": \"...\", \"stepsToGreen\": [\"1. ...\", \"2. ...\"], \"priority\": \"...\"}}. "
+        "Respond with ONLY valid JSON, no markdown fences.\n\nQuestions:\n" + joined)
+
+    try:
+        response = bedrock.invoke_model(
+            modelId=MODEL_ID,
+            contentType='application/json',
+            accept='application/json',
+            body=json.dumps({
+                'anthropic_version': 'bedrock-2023-05-31',
+                'max_tokens': 8192,
+                'messages': [{'role': 'user', 'content': prompt}]
+            })
+        )
+        result = json.loads(response['body'].read())
+        text = result['content'][0]['text'].strip()
+        text = re.sub(r'^```(?:json)?\s*', '', text)
+        text = re.sub(r'\s*```$', '', text)
+        # Extract just the JSON object
+        brace_count = 0
+        json_end = 0
+        for ci, ch in enumerate(text):
+            if ch == '{': brace_count += 1
+            elif ch == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    json_end = ci + 1
+                    break
+        if json_end > 0:
+            text = text[:json_end]
+        return json.loads(text)
+    except Exception as e:
+        return {"_error": str(e)}
+
+
+def generate_tailored_recommendations(questions_with_notes, reference_context='', template_id='workspaces-default'):
     if not questions_with_notes:
         return {}
     prompt_items = []
@@ -31,18 +185,38 @@ def generate_tailored_recommendations(questions_with_notes, reference_context=''
                      "Cross-reference your recommendations against these reports to ensure accuracy and reduce hallucinations.\n\n"
                      + reference_context + "\n\n--- END REFERENCE DATA ---\n\n")
     
-    prompt = ("You are an AWS Solutions Architect writing a formal Well-Architected Review report. "
-               "For each question below, produce two things:\n"
-               "1. 'observation': Rewrite the raw customer notes as polished, professional prose. "
-               "Fix spelling and grammar, write in full sentences, maintain all factual content, use third-person formal tone (e.g. 'The customer currently manages...'). "
-               "Keep it concise (2-4 sentences).\n"
-               "2. 'recommendation': Structured as: a brief acknowledgement of current state (1-2 sentences), "
-               "then 2-3 next-step bullet points starting with '\u2022 ', "
-               "then a 'Further Reading:' line with 1-2 real https://docs.aws.amazon.com URLs. "
-               "IMPORTANT: You MUST include the Further Reading line for EVERY question. Never omit it.\n"
-               + grounding +
-               "Format as JSON: {\"QUESTION-ID\": {\"observation\": \"...\", \"recommendation\": \"...\"}}. "
-               "Respond with ONLY valid JSON, no markdown fences.\n\nQuestions:\n" + joined)
+    # ORR-specific prompt framing
+    if template_id == 'orr-default':
+        orr_grounding = ("\n\nORR BEST PRACTICES REFERENCE (use to ground your recommendations):\n"
+                         + ORR_BEST_PRACTICES + "\n--- END ORR REFERENCE ---\n\n")
+        prompt = (
+            "You are an AWS Solutions Architect writing a formal Operational Readiness Review (ORR) report. "
+            "The ORR assesses whether a workload is ready for production operation. "
+            "For each question below, produce two things:\n"
+            "1. 'observation': Rewrite the raw reviewer notes as polished, professional prose. "
+            "Fix spelling and grammar, write in full sentences, maintain all factual content, use third-person formal tone (e.g. 'The team currently manages...'). "
+            "Keep it concise (2-4 sentences).\n"
+            "2. 'recommendation': Structured as: a brief acknowledgement of current operational readiness state (1-2 sentences), "
+            "then 2-3 next-step bullet points starting with '\u2022 ', focusing on operational readiness gaps and how to close them. "
+            "Reference the ORR best practices where relevant (failure modeling, operational processes, event management, release quality, resilience). "
+            "Then a 'Further Reading:' line with 1-2 real https://docs.aws.amazon.com URLs related to operational readiness. "
+            "IMPORTANT: You MUST include the Further Reading line for EVERY question. Never omit it.\n"
+            + orr_grounding + grounding +
+            "Format as JSON: {\"QUESTION-ID\": {\"observation\": \"...\", \"recommendation\": \"...\"}}. "
+            "Respond with ONLY valid JSON, no markdown fences.\n\nQuestions:\n" + joined)
+    else:
+        prompt = ("You are an AWS Solutions Architect writing a formal Well-Architected Review report. "
+                   "For each question below, produce two things:\n"
+                   "1. 'observation': Rewrite the raw customer notes as polished, professional prose. "
+                   "Fix spelling and grammar, write in full sentences, maintain all factual content, use third-person formal tone (e.g. 'The customer currently manages...'). "
+                   "Keep it concise (2-4 sentences).\n"
+                   "2. 'recommendation': Structured as: a brief acknowledgement of current state (1-2 sentences), "
+                   "then 2-3 next-step bullet points starting with '\u2022 ', "
+                   "then a 'Further Reading:' line with 1-2 real https://docs.aws.amazon.com URLs. "
+                   "IMPORTANT: You MUST include the Further Reading line for EVERY question. Never omit it.\n"
+                   + grounding +
+                   "Format as JSON: {\"QUESTION-ID\": {\"observation\": \"...\", \"recommendation\": \"...\"}}. "
+                   "Respond with ONLY valid JSON, no markdown fences.\n\nQuestions:\n" + joined)
 
     try:
         response = bedrock.invoke_model(
@@ -143,6 +317,7 @@ def handler(event, context):
             reference_context = body.get('referenceContext', '')
             is_arch_analysis = body.get('isArchAnalysis', False)
             review_id = body.get('reviewId', '')
+            template_id = body.get('templateId', 'workspaces-default')
             
             # If arch analysis, load context from S3 instead of request body
             if is_arch_analysis and review_id and not reference_context:
@@ -208,8 +383,18 @@ def handler(event, context):
                 except Exception as e:
                     recommendations = {"ARCH-ANALYSIS": {"observation": "Architecture analysis unavailable.", "recommendation": "Error: " + str(e)}}
             else:
-                recommendations = generate_tailored_recommendations(questions_with_notes, reference_context)
+                recommendations = generate_tailored_recommendations(questions_with_notes, reference_context, template_id)
             
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'recommendations': recommendations})
+            }
+        
+        if action == 'generateOrr':
+            questions_with_notes = body.get('questions', [])
+            reference_context = body.get('referenceContext', '')
+            recommendations = generate_orr_recommendations(questions_with_notes, reference_context)
             return {
                 'statusCode': 200,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
@@ -314,6 +499,7 @@ def handler(event, context):
             pillar_scores = body.get('pillarScores', [])
             customer_name = body.get('customerName', 'Customer')
             reference_context = body.get('referenceContext', '')
+            template_id = body.get('templateId', 'workspaces-default')
 
             findings_text = []
             for f in findings:
@@ -333,7 +519,71 @@ def handler(event, context):
                     + reference_context[:20000] + "\n--- END REFERENCE DATA ---\n\n"
                 )
 
-            curation_prompt = f"""You are an AWS Solutions Architect preparing a C-level executive briefing from a WorkSpaces Well-Architected Review.
+            # ORR-specific curation prompt
+            if template_id == 'orr-default':
+                orr_context = (
+                    "\n\nORR BEST PRACTICES REFERENCE (use to assess operational readiness gaps):\n"
+                    + ORR_BEST_PRACTICES + "\n--- END ORR REFERENCE ---\n\n"
+                )
+                curation_prompt = f"""You are an AWS Solutions Architect preparing a C-level executive briefing from an Operational Readiness Review (ORR).
+
+The ORR assesses whether this workload is operationally ready for production. It covers failure modeling,
+operational processes, event management, release quality, resilience, and security readiness.
+
+CUSTOMER: {customer_name}
+OVERALL SCORE: {overall_score}%
+CATEGORY SCORES:
+{pillar_summary}
+{orr_context}{grounding}
+FINDINGS:
+{joined_findings}
+
+YOUR TASK: Curate these ORR findings into a boardroom-ready narrative focused on operational risk and production readiness. Do NOT map mechanically (RED=MUST, AMBER=SHOULD, GREEN=COULD). Instead, curate intelligently based on operational impact:
+
+RULES:
+1. CRITICAL FINDINGS: Select exactly 4 items that pose the highest operational risk — things that could cause production incidents, extended outages, or compliance failures. For each, provide a business-framed headline (e.g. "No Tested Disaster Recovery Plan" not "How do you validate recovery...") and a 2-3 sentence consequence explanation focusing on operational impact (incident duration, blast radius, customer impact, compliance exposure).
+2. MUST tier: Items that must be resolved before launch OR immediately if already in production. Focus on: missing failure models, no rollback capability, absent monitoring/alerting, no incident management process, untested recovery. Usually 3-5 items max.
+3. SHOULD tier: The 4-6 highest-value operational improvements for this quarter. Focus on: capacity planning gaps, incomplete runbooks, missing canary deployments, alarm fatigue, dependency risks without fallbacks.
+4. COULD tier: Strategic operational maturity items. 4-6 items max. Focus on: chaos engineering, advanced observability, multi-region readiness, automated remediation, game day exercises.
+5. For each item in any tier, provide: the original ID, a business-framed headline (5-8 words, no "How do you..."), and a one-sentence action summary.
+6. NEVER present already-implemented items (scored "fully") as gaps or quick wins.
+7. Cost optimisation: Only relevant if operational gaps have cost implications (e.g. over-provisioning due to missing auto-scaling, lack of right-sizing). Otherwise write "Cost impacts are secondary to operational readiness gaps identified above."
+8. 90-Day Roadmap: Assign curated items to Week 1-2 (urgent pre-launch blockers), Week 3-6 (operational foundation: monitoring, runbooks, incident process), Week 7-12 (operational maturity: chaos engineering, game days, automation).
+
+WORDING RULES (CRITICAL - apply to ALL text you generate):
+9. NEVER use the words "customer", "the customer", or "Customer-1" in any output text. These are BANNED. Use the organisation name "{customer_name}", or "the team", "the workload", "the application", or address the subject directly.
+10. Rewrite "Customer recognizes the need to X" as "X is not yet in place" or "The workload currently lacks X". State what IS and what it RISKS operationally. Use executive voice.
+11. Keep all text concise — headlines 5-8 words, actions max 2 sentences, consequences max 3 sentences. This is a scannable exec deck, not a report.
+12. executiveSummary must be exactly 3-4 SHORT sentences (max 30 words each). State operational readiness posture, key risks to production stability, and recommended focus areas.
+
+Respond with ONLY valid JSON in this exact structure:
+{{
+  "criticalFindings": [
+    {{"id": "ORR-01", "headline": "No Tested Disaster Recovery Plan", "consequence": "2-3 sentence operational consequence", "rag": "red"}}
+  ],
+  "must": [
+    {{"id": "ORR-01", "headline": "Short operational headline", "action": "One sentence action", "effort": "low|medium|high", "isQuickWin": true}}
+  ],
+  "should": [
+    {{"id": "...", "headline": "...", "action": "...", "effort": "low|medium|high"}}
+  ],
+  "could": [
+    {{"id": "...", "headline": "...", "action": "...", "effort": "medium|high"}}
+  ],
+  "costInsights": {{
+    "hasData": false,
+    "summary": "Cost assessment focused on operational efficiency in 2-3 sentences",
+    "items": [{{"id": "...", "headline": "...", "insight": "..."}}]
+  }},
+  "roadmap": {{
+    "week1_2": [{{"id": "...", "headline": "..."}}],
+    "week3_6": [{{"id": "...", "headline": "..."}}],
+    "week7_12": [{{"id": "...", "headline": "..."}}]
+  }},
+  "executiveSummary": "A 3-4 sentence executive summary stating operational readiness posture, key risks to production stability, and recommended focus areas."
+}}"""
+            else:
+                curation_prompt = f"""You are an AWS Solutions Architect preparing a C-level executive briefing from a WorkSpaces Well-Architected Review.
 
 CUSTOMER: {customer_name}
 OVERALL SCORE: {overall_score}%
