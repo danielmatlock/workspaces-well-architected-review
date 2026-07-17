@@ -2711,10 +2711,10 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   if (summaryBullets.length === 0) {
     summaryBullets = ['The estate is operationally functional with strengths identified across the review.', 'High-risk items need leadership commitment.', 'Cost is actively managed; right-sizing is the main open lever.'];
   }
-  var bulletY = 1.5;
+  var bulletY = 1.6;
   summaryBullets.slice(0, 4).forEach(function(b) {
-    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 1.5, lineSpacingMultiple: 1.4 });
-    bulletY += 0.7;
+    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 1.6, lineSpacingMultiple: 1.4 });
+    bulletY += 0.8;
   });
   // KPI stat boxes (right side - 2x2 grid)
   var kpiData = [
@@ -2723,7 +2723,7 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
     { value: String(medRisk), label: 'MEDIUM RISK', accent: AMBER },
     { value: String(bestPractice), label: 'BEST PRACTICE', accent: GREEN }
   ];
-  var kpiPositions = [{ x: 7.5, y: 1.5 }, { x: 10.2, y: 1.5 }, { x: 7.5, y: 3.8 }, { x: 10.2, y: 3.8 }];
+  var kpiPositions = [{ x: 7.5, y: 1.6 }, { x: 10.2, y: 1.6 }, { x: 7.5, y: 3.9 }, { x: 10.2, y: 3.9 }];
   kpiData.forEach(function(kpi, i) {
     var pos = kpiPositions[i];
     slide = s3;
@@ -2938,7 +2938,7 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
     { label: 'THIS WEEK', color: RED, items: roadmap.week1_2 || roadmap.thisWeek || [], lead: 'TAM' },
     { label: '30 DAYS', color: AMBER, items: roadmap.week3_6 || roadmap.thirtyDays || [], lead: 'TAM + SA' },
     { label: '60 DAYS', color: 'DAA520', items: roadmap.week7_12 || roadmap.sixtyDays || [], lead: 'SA lead' },
-    { label: '90 DAYS', color: GREEN, items: roadmap.ninetyDays || [], lead: 'SA + CSS' }
+    { label: '90 DAYS', color: GREEN, items: roadmap.ninetyDays || (curated.could || []).slice(0, 3).map(function(c) { return { headline: c.headline }; }), lead: 'SA + CSS' }
   ];
   rmCols.forEach(function(col, ci) {
     var cx = rmStartX + ci * (rmColW + rmGap);
