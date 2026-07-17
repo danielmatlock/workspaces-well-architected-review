@@ -2163,8 +2163,8 @@ async function generateOrrTailoredReport(review) {
   review.pillars.forEach(function(p) {
     p.questions.forEach(function(q) {
       var a = review.answers[q.id];
-      if (a && a.notes && a.notes.trim()) {
-        questionsWithNotes.push({ id: q.id, question: q.q, score: a.score || '', notes: a.notes, best: q.best });
+      if (a && a.score) {
+        questionsWithNotes.push({ id: q.id, question: q.q, score: a.score || '', notes: a.notes || 'No additional notes provided.', best: q.best });
       }
     });
   });
