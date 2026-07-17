@@ -2043,277 +2043,351 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   var AMBER = 'FF9900';
   var GREEN = '1D8102';
   var GREY = '5F6B7A';
-  var BLUE = '0073BB';
   var customer = review.customer || 'Customer';
   var today = review.date || new Date().toISOString().split('T')[0];
 
-  // Helper: content slide with dark header bar + orange stripe
-  function addContentSlide(title) {
-    var slide = pptx.addSlide();
-    slide.background = { color: WHITE };
-    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: SQUID } });
-    slide.addText(title, { x: 0.5, y: 0, w: 12, h: 0.9, fontSize: 20, bold: true, color: WHITE, fontFace: 'Calibri', valign: 'middle' });
-    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0.9, w: 13.33, h: 0.05, fill: { color: ORANGE } });
-    return slide;
-  }
-
-  // Helper: title slide (dark background)
-  function addTitleSlide(title, subtitle) {
-    var slide = pptx.addSlide();
-    slide.background = { color: SQUID };
-    slide.addText(title, { x: 0.8, y: 2.5, w: 11, fontSize: 36, bold: true, color: WHITE, fontFace: 'Calibri' });
-    if (subtitle) slide.addText(subtitle, { x: 0.8, y: 3.4, w: 11, fontSize: 18, color: ORANGE, fontFace: 'Calibri' });
-    slide.addText('AWS Well-Architected Review', { x: 0.8, y: 0.4, fontSize: 12, color: GREY, fontFace: 'Calibri' });
-    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 7.0, w: 13.33, h: 0.08, fill: { color: ORANGE } });
-    return slide;
-  }
-
   function ragColor(rag) { return rag === 'green' ? GREEN : rag === 'amber' ? AMBER : RED; }
-  function effortBadge(effort) { return effort === 'low' ? '⚡ Low effort' : effort === 'medium' ? '⚙️ Medium effort' : '🏗️ High effort'; }
 
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 1: Cover
-  // ═══════════════════════════════════════════════════════════
-  addTitleSlide(customer + '\nWorkSpaces Well-Architected Review', 'C-Level Executive Briefing | ' + today);
+  // Helper: content slide with dark header + orange stripe + footer
+  function addContentSlide(kicker, title, slideNum) {
+    var slide = pptx.addSlide();
+    slide.background = { color: LIGHT_BG };
+    // Dark header bar
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0, w: 13.33, h: 1.1, fill: { color: SQUID } });
+    // Kicker text (small orange caps)
+    if (kicker) slide.addText(kicker, { x: 0.5, y: 0.15, w: 12, h: 0.3, fontSize: 10, bold: true, color: ORANGE, fontFace: 'Calibri', letterSpacing: 1 });
+    // Title
+    slide.addText(title, { x: 0.5, y: 0.4, w: 12, h: 0.6, fontSize: 22, bold: true, color: WHITE, fontFace: 'Calibri', valign: 'middle' });
+    // Orange stripe below header
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 1.1, w: 13.33, h: 0.06, fill: { color: ORANGE } });
+    // Footer
+    slide.addText('Amazon WorkSpaces Well-Architected Review - Executive Briefing', { x: 0.5, y: 7.25, w: 8, h: 0.3, fontSize: 8, color: GREY, fontFace: 'Calibri' });
+    if (slideNum) slide.addText(kicker + ' - ' + slideNum + ' / 13', { x: 9, y: 7.25, w: 4, h: 0.3, fontSize: 8, color: GREY, fontFace: 'Calibri', align: 'right' });
+    return slide;
+  }
 
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 2: How to Read This Deck
-  // ═══════════════════════════════════════════════════════════
-  var s2 = addContentSlide('How to Read This Deck');
-  s2.addText('Findings are organised as a Must / Should / Could conversation, flowing from most impactful (least effort) to impactful (more effort):', { x: 0.5, y: 1.2, w: 12, fontSize: 13, color: SQUID, fontFace: 'Calibri' });
-  // Tier cards with coloured left spines
-  var tierY = 1.8;
-  var tiers = [
-    { label: 'MUST', color: RED, desc: 'Urgent board-level risks and quick wins. Address immediately.' },
-    { label: 'SHOULD', color: AMBER, desc: 'High-value work to resource this quarter. Meaningful risk reduction.' },
-    { label: 'COULD', color: GREEN, desc: 'Strategic improvements. More effort, longer-term benefit.' }
-  ];
-  tiers.forEach(function(t) {
-    s2.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: tierY, w: 0.12, h: 0.9, fill: { color: t.color } });
-    s2.addShape(pptx.shapes.RECTANGLE, { x: 0.62, y: tierY, w: 11.8, h: 0.9, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-    s2.addText(t.label, { x: 0.9, y: tierY + 0.15, w: 2, fontSize: 16, bold: true, color: t.color, fontFace: 'Calibri' });
-    s2.addText(t.desc, { x: 2.8, y: tierY + 0.2, w: 9.4, fontSize: 13, color: SQUID, fontFace: 'Calibri' });
-    tierY += 1.1;
-  });
-  s2.addText('Flow: Most impactful / least effort  →  Impactful / more effort', { x: 0.5, y: 5.2, w: 12, fontSize: 11, italic: true, color: GREY, fontFace: 'Calibri' });
+  // Helper: effort pill badge
+  function addEffortBadge(slide, x, y, effort) {
+    var colors = { low: '2E7D32', medium: 'F59E0B', high: 'C62828' };
+    var labels = { low: 'Low', medium: 'Medium', high: 'High' };
+    var fillColor = colors[effort] || GREY;
+    var label = labels[effort] || effort || '';
+    slide.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: x, y: y, w: 1.0, h: 0.3, fill: { color: fillColor }, rectRadius: 0.15 });
+    slide.addText(label, { x: x, y: y, w: 1.0, h: 0.3, fontSize: 10, bold: true, color: WHITE, fontFace: 'Calibri', align: 'center', valign: 'middle' });
+  }
 
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 3: Executive Summary
-  // ═══════════════════════════════════════════════════════════
+  // ═══ SLIDE 1: Cover (dark background with orange left accent) ═══
+  var s1 = pptx.addSlide();
+  s1.background = { color: SQUID };
+  // Orange left accent bar
+  s1.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0, w: 0.12, h: 7.5, fill: { color: ORANGE } });
+  s1.addText('AWS  -  WELL-ARCHITECTED FRAMEWORK REVIEW', { x: 0.8, y: 1.2, w: 11, h: 0.4, fontSize: 11, bold: true, color: ORANGE, fontFace: 'Calibri', letterSpacing: 2 });
+  s1.addText('Amazon WorkSpaces\nWell-Architected Review', { x: 0.8, y: 2.0, w: 11, fontSize: 36, bold: true, color: WHITE, fontFace: 'Calibri', lineSpacingMultiple: 1.2 });
+  // Orange horizontal rule
+  s1.addShape(pptx.shapes.RECTANGLE, { x: 0.8, y: 3.8, w: 4.5, h: 0.05, fill: { color: ORANGE } });
+  s1.addText('Executive Briefing', { x: 0.8, y: 4.1, w: 11, fontSize: 18, color: 'CCCCCC', fontFace: 'Calibri' });
+  s1.addText('A Must / Should / Could conversation', { x: 0.8, y: 4.6, w: 11, fontSize: 14, color: WHITE, fontFace: 'Calibri' });
+  // Must/Should/Could colored
+  s1.addText('Prepared by the AWS account team (CSS - TAM - SA lead)  -  ' + today, { x: 0.8, y: 6.5, w: 11, fontSize: 10, color: GREY, fontFace: 'Calibri' });
+
+  // ═══ SLIDE 2: How to Read (hidden - using Prioritisation slide directly) ═══
+  // Merged into Slide 6 per manual deck structure
+
+  // ═══ SLIDE 2: Executive Summary ═══
   var mustCount = (curated.must || []).length;
   var shouldCount = (curated.should || []).length;
   var couldCount = (curated.could || []).length;
-  var s3 = addContentSlide('Executive Summary');
-  // KPI stat cards row
-  var kpiData = [
-    { value: overallScore + '%', label: 'Overall Score', color: ragColor(getRag(overallScore)) },
-    { value: String(mustCount), label: 'Must (Critical)', color: RED },
-    { value: String(shouldCount), label: 'Should (Quarter)', color: AMBER },
-    { value: String(couldCount), label: 'Could (Strategic)', color: GREEN }
-  ];
-  var kpiX = 0.5;
-  kpiData.forEach(function(kpi) {
-    s3.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: kpiX, y: 1.2, w: 3.0, h: 1.5, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.03 });
-    s3.addText(kpi.value, { x: kpiX, y: 1.45, w: 3.0, fontSize: 36, bold: true, color: kpi.color, align: 'center', fontFace: 'Calibri' });
-    s3.addText(kpi.label, { x: kpiX, y: 2.2, w: 3.0, fontSize: 11, color: GREY, align: 'center', fontFace: 'Calibri' });
-    kpiX += 3.2;
-  });
-  // Executive summary text (concise)
+  var highRisk = mustCount;
+  var medRisk = shouldCount;
+  var bestPractice = couldCount;
+  var s3 = addContentSlide('EXECUTIVE SUMMARY', 'Where the estate stands today', '3');
+  // Summary bullets (left side)
+  var summaryBullets = [];
   if (curated.executiveSummary) {
-    s3.addText(curated.executiveSummary, { x: 0.5, y: 3.1, w: 12.3, h: 2.8, fontSize: 13, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.5, valign: 'top' });
+    summaryBullets = curated.executiveSummary.split('\n').filter(function(l) { return l.trim(); });
   }
+  if (summaryBullets.length === 0) {
+    summaryBullets = ['The estate is operationally functional with strengths identified across the review.', 'High-risk items need leadership commitment.', 'Cost is actively managed; right-sizing is the main open lever.'];
+  }
+  // Single paragraph text block (left side)
+  var summaryText = summaryBullets.join(' ');
+  s3.addText(summaryText, { x: 0.5, y: 1.5, w: 7.0, h: 4.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.5, valign: 'middle' });
+  // KPI stat boxes (right side - 2x2 grid, aligned with text top)
+  var kpiData = [
+    { value: overallScore + '%', label: 'OVERALL - ' + (overallScore >= 75 ? 'GREEN' : overallScore >= 50 ? 'AMBER' : 'RED'), accent: ragColor(getRag(overallScore)) },
+    { value: String(highRisk), label: 'HIGH RISK', accent: RED },
+    { value: String(medRisk), label: 'MEDIUM RISK', accent: AMBER },
+    { value: String(bestPractice), label: 'BEST PRACTICE', accent: GREEN }
+  ];
+  var kpiPositions = [{ x: 7.8, y: 1.5 }, { x: 10.5, y: 1.5 }, { x: 7.8, y: 4.0 }, { x: 10.5, y: 4.0 }];
+  kpiData.forEach(function(kpi, i) {
+    var pos = kpiPositions[i];
+    slide = s3;
+    slide.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: pos.x, y: pos.y, w: 2.5, h: 2.0, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.03 });
+    // Colored left accent on card
+    slide.addShape(pptx.shapes.RECTANGLE, { x: pos.x, y: pos.y, w: 0.08, h: 2.0, fill: { color: kpi.accent } });
+    slide.addText(kpi.value, { x: pos.x, y: pos.y + 0.3, w: 2.5, fontSize: 32, bold: true, color: SQUID, fontFace: 'Calibri', align: 'center' });
+    slide.addText(kpi.label, { x: pos.x, y: pos.y + 1.3, w: 2.5, fontSize: 9, color: GREY, fontFace: 'Calibri', align: 'center' });
+  });
 
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 4: Six-Pillar Scorecard with RAG bars
-  // ═══════════════════════════════════════════════════════════
-  var s4 = addContentSlide('Six-Pillar Scorecard');
-  var pillarY = 1.3;
+  // ═══ SLIDE 3: Six-Pillar Scorecard ═══
+  var s4 = addContentSlide('ASSESSMENT', 'Six-Pillar Scorecard', '4');
+  var pillarY = 1.5;
   pillarScores.forEach(function(p) {
     var barWidth = 7.0 * p.score / 100;
-    s4.addText(p.name, { x: 0.5, y: pillarY, w: 3.8, fontSize: 13, color: SQUID, fontFace: 'Calibri', valign: 'middle' });
-    // Background bar
-    s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.05, w: 7.0, h: 0.4, fill: { color: 'E8E8E8' }, line: { type: 'none' } });
+    s4.addText(p.name, { x: 0.5, y: pillarY, w: 3.8, h: 0.5, fontSize: 14, bold: true, color: SQUID, fontFace: 'Calibri', valign: 'middle' });
+    // Background bar track
+    s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.1, w: 7.0, h: 0.35, fill: { color: 'E8E8E8' } });
     // Filled bar
     if (barWidth > 0) {
-      s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.05, w: barWidth, h: 0.4, fill: { color: ragColor(p.rag) }, line: { type: 'none' } });
+      s4.addShape(pptx.shapes.RECTANGLE, { x: 4.5, y: pillarY + 0.1, w: barWidth, h: 0.35, fill: { color: ragColor(p.rag) } });
     }
-    s4.addText(p.score + '%', { x: 11.7, y: pillarY, w: 1, fontSize: 13, bold: true, color: ragColor(p.rag), fontFace: 'Calibri', align: 'center', valign: 'middle' });
-    pillarY += 0.75;
+    // Score percentage
+    s4.addText(p.score + '%', { x: 11.7, y: pillarY, w: 0.8, h: 0.5, fontSize: 14, bold: true, color: ragColor(p.rag), fontFace: 'Calibri', align: 'center', valign: 'middle' });
+    // Items needing attention
+    var itemCount = p.needsAttention || 0;
+    if (itemCount > 0) s4.addText(itemCount + ' items', { x: 12.4, y: pillarY, w: 0.8, h: 0.5, fontSize: 10, color: GREY, fontFace: 'Calibri', valign: 'middle' });
+    pillarY += 0.85;
   });
+  // Footer note
+  s4.addText('All pillars AMBER - no RED. The ' + highRisk + ' High-risk items are where leadership commitment is needed.', { x: 0.5, y: 6.5, w: 12, fontSize: 12, italic: true, color: SQUID, fontFace: 'Calibri' });
 
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 5: Critical Findings (4 business-framed cards)
-  // ═══════════════════════════════════════════════════════════
-  var s5 = addContentSlide('Critical Findings');
-  var cfY = 1.2;
-  (curated.criticalFindings || []).slice(0, 4).forEach(function(cf) {
+  // ═══ SLIDE 4: Critical Findings (2x2 card grid) ═══
+  var s5 = addContentSlide('BOARD ATTENTION', 'The Critical Findings', '5');
+  var critFindings = (curated.criticalFindings || []).slice(0, 4);
+  var cardPositions = [{ x: 0.5, y: 1.4 }, { x: 6.9, y: 1.4 }, { x: 0.5, y: 4.2 }, { x: 6.9, y: 4.2 }];
+  critFindings.forEach(function(cf, i) {
+    var pos = cardPositions[i];
+    var cardW = 6.1;
+    var cardH = 2.5;
     var cardColor = cf.rag === 'green' ? GREEN : cf.rag === 'amber' ? AMBER : RED;
-    // Coloured left spine
-    s5.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: cfY, w: 0.1, h: 1.35, fill: { color: cardColor } });
     // Card background
-    s5.addShape(pptx.shapes.RECTANGLE, { x: 0.6, y: cfY, w: 12.2, h: 1.35, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
+    s5.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: pos.x, y: pos.y, w: cardW, h: cardH, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.04 });
+    // Colored top accent bar
+    s5.addShape(pptx.shapes.RECTANGLE, { x: pos.x, y: pos.y, w: cardW, h: 0.08, fill: { color: cardColor } });
     // Headline
-    s5.addText(cf.id + '  —  ' + cf.headline, { x: 0.9, y: cfY + 0.1, w: 11.5, h: 0.4, fontSize: 13, bold: true, color: cardColor, fontFace: 'Calibri', valign: 'top' });
-    // Consequence
-    s5.addText(cf.consequence, { x: 0.9, y: cfY + 0.55, w: 11.5, h: 0.7, fontSize: 10, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3, valign: 'top' });
-    cfY += 1.5;
+    s5.addText(cf.headline || cf.id, { x: pos.x + 0.4, y: pos.y + 0.3, w: cardW - 0.8, h: 0.5, fontSize: 14, bold: true, color: SQUID, fontFace: 'Calibri' });
+    // Finding ID
+    s5.addText(cf.id, { x: pos.x + 0.4, y: pos.y + 0.75, w: cardW - 0.8, h: 0.3, fontSize: 10, bold: true, color: cardColor, fontFace: 'Calibri' });
+    // Consequence / description
+    s5.addText(cf.consequence || '', { x: pos.x + 0.4, y: pos.y + 1.1, w: cardW - 0.8, h: 1.2, fontSize: 11, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.4, valign: 'top' });
   });
 
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 6: Prioritisation Framework (3 tier cards)
-  // ═══════════════════════════════════════════════════════════
-  var s6 = addContentSlide('Prioritisation Framework');
-  var colX = [0.5, 4.6, 8.7];
-  var colColors = [RED, AMBER, GREEN];
-  var colLabels = ['MUST (' + mustCount + ')', 'SHOULD (' + shouldCount + ')', 'COULD (' + couldCount + ')'];
-  var colItems = [curated.must || [], curated.should || [], curated.could || []];
-  for (var ci = 0; ci < 3; ci++) {
-    s6.addText(colLabels[ci], { x: colX[ci], y: 1.3, w: 3.9, fontSize: 14, bold: true, color: colColors[ci], align: 'center', fontFace: 'Calibri' });
-    // Coloured left spine + card
-    s6.addShape(pptx.shapes.RECTANGLE, { x: colX[ci], y: 1.5, w: 0.08, h: 5.0, fill: { color: colColors[ci] } });
-    s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: colX[ci] + 0.08, y: 1.5, w: 3.82, h: 5.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.03 });
-    var itemText = colItems[ci].slice(0, 6).map(function(item) { return '• ' + item.headline; }).join('\n');
-    s6.addText(itemText, { x: colX[ci] + 0.3, y: 1.7, w: 3.4, h: 4.6, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top', lineSpacingMultiple: 1.5 });
-  }
-  s6.addText('← Highest assurance / least effort          Impactful / more effort →', { x: 1, y: 6.8, w: 11, fontSize: 10, italic: true, color: GREY, align: 'center', fontFace: 'Calibri' });
-
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 7: MUST — Quick Wins
-  // ═══════════════════════════════════════════════════════════
-  var mustQuickWins = (curated.must || []).filter(function(m) { return m.isQuickWin; });
-  var mustCrises = (curated.must || []).filter(function(m) { return !m.isQuickWin; });
-  if (mustQuickWins.length > 0) {
-    var s7 = addContentSlide('MUST — Quick Wins');
-    var qwY = 1.4;
-    mustQuickWins.slice(0, 5).forEach(function(item) {
-      s7.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: qwY, w: 0.08, h: 1.0, fill: { color: RED } });
-      s7.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: qwY, w: 12.2, h: 1.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-      s7.addText(item.headline, { x: 0.9, y: qwY + 0.12, w: 9.5, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
-      s7.addText(item.action, { x: 0.9, y: qwY + 0.5, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-      s7.addText(effortBadge(item.effort), { x: 10.6, y: qwY + 0.3, w: 2.0, fontSize: 10, color: GREEN, fontFace: 'Calibri', align: 'center' });
-      qwY += 1.15;
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 8: MUST — Avoidable Crises
-  // ═══════════════════════════════════════════════════════════
-  if (mustCrises.length > 0) {
-    var s8 = addContentSlide('MUST — Avoidable Crises');
-    var acY = 1.4;
-    mustCrises.slice(0, 5).forEach(function(item) {
-      s8.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: acY, w: 0.08, h: 1.0, fill: { color: RED } });
-      s8.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: acY, w: 12.2, h: 1.0, fill: { color: 'FDF3F1' }, line: { color: RED, width: 0.5 } });
-      s8.addText(item.headline, { x: 0.9, y: acY + 0.12, w: 10, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
-      s8.addText(item.action, { x: 0.9, y: acY + 0.5, w: 10, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-      s8.addText(effortBadge(item.effort), { x: 10.6, y: acY + 0.3, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
-      acY += 1.15;
-    });
-  } else if (mustQuickWins.length === 0) {
-    // If no quick wins were split out, show all MUSTs on one slide
-    var s7b = addContentSlide('MUST — Immediate Actions');
-    var maY = 1.4;
-    (curated.must || []).slice(0, 6).forEach(function(item) {
-      s7b.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: maY, w: 0.08, h: 1.0, fill: { color: RED } });
-      s7b.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: maY, w: 12.2, h: 1.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-      s7b.addText(item.headline, { x: 0.9, y: maY + 0.12, w: 9.5, fontSize: 13, bold: true, color: RED, fontFace: 'Calibri' });
-      s7b.addText(item.action, { x: 0.9, y: maY + 0.5, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-      s7b.addText(effortBadge(item.effort), { x: 10.6, y: maY + 0.3, w: 2.0, fontSize: 10, color: GREEN, fontFace: 'Calibri', align: 'center' });
-      maY += 1.15;
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 9: SHOULD — Plan This Quarter
-  // ═══════════════════════════════════════════════════════════
-  var s9 = addContentSlide('SHOULD — Plan This Quarter');
-  var shY = 1.4;
-  (curated.should || []).slice(0, 5).forEach(function(item) {
-    s9.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: shY, w: 0.08, h: 1.0, fill: { color: AMBER } });
-    s9.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: shY, w: 12.2, h: 1.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-    s9.addText(item.headline, { x: 0.9, y: shY + 0.12, w: 9.5, fontSize: 13, bold: true, color: '8B6914', fontFace: 'Calibri' });
-    s9.addText(item.action, { x: 0.9, y: shY + 0.5, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-    s9.addText(effortBadge(item.effort), { x: 10.6, y: shY + 0.3, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
-    shY += 1.15;
-  });
-
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 10: COULD — Strategic Improvements
-  // ═══════════════════════════════════════════════════════════
-  var s10 = addContentSlide('COULD — Strategic Improvements');
-  var coY = 1.4;
-  (curated.could || []).slice(0, 5).forEach(function(item) {
-    s10.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: coY, w: 0.08, h: 1.0, fill: { color: GREEN } });
-    s10.addShape(pptx.shapes.RECTANGLE, { x: 0.58, y: coY, w: 12.2, h: 1.0, fill: { color: LIGHT_BG }, line: { color: 'E1E4E8', width: 0.5 } });
-    s10.addText(item.headline, { x: 0.9, y: coY + 0.12, w: 9.5, fontSize: 13, bold: true, color: GREEN, fontFace: 'Calibri' });
-    s10.addText(item.action, { x: 0.9, y: coY + 0.5, w: 9.5, fontSize: 11, color: SQUID, fontFace: 'Calibri' });
-    s10.addText(effortBadge(item.effort), { x: 10.6, y: coY + 0.3, w: 2.0, fontSize: 10, color: GREY, fontFace: 'Calibri', align: 'center' });
-    coY += 1.15;
-  });
-
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 11: Cost Optimisation Opportunities
-  // ═══════════════════════════════════════════════════════════
-  var s11 = addContentSlide('Cost Optimisation Opportunities');
-  var costData = curated.costInsights || {};
-  if (costData.summary) {
-    s11.addText(costData.summary, { x: 0.5, y: 1.2, w: 12, h: 1.2, fontSize: 11, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3, valign: 'top' });
-  }
-  var costItems = costData.items || [];
-  var costY = 2.5;
-  costItems.slice(0, 3).forEach(function(item) {
-    s11.addText('• ' + item.headline, { x: 0.5, y: costY, w: 12, fontSize: 12, bold: true, color: SQUID, fontFace: 'Calibri' });
-    s11.addText(item.insight, { x: 0.8, y: costY + 0.3, w: 11.5, h: 0.55, fontSize: 10, color: GREY, fontFace: 'Calibri', valign: 'top' });
-    costY += 0.95;
-  });
-  // "Needs more research" callout if no hard data
-  if (!costData.hasData) {
-    var calloutY = costY + 0.3;
-    s11.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: calloutY, w: 12, h: 0.7, fill: { color: 'FFFBE6' }, line: { color: AMBER, width: 1, dashType: 'dash' }, rectRadius: 0.03 });
-    s11.addText('Note: Precise cost savings require fleet inventory and billing data. Figures above are directional only.', { x: 0.8, y: calloutY + 0.15, w: 11.4, fontSize: 10, italic: true, color: '8B6914', fontFace: 'Calibri' });
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 12: 90-Day Roadmap
-  // ═══════════════════════════════════════════════════════════
-  var s12 = addContentSlide('90-Day Roadmap');
-  var roadmap = curated.roadmap || {};
-  var roadRows = [[
-    { text: 'Timeframe', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
-    { text: 'Actions', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
-    { text: 'Tier', options: { bold: true, color: WHITE, fill: { color: SQUID } } }
-  ]];
-  var w12 = (roadmap.week1_2 || []).map(function(r) { return r.headline; }).join('\n') || 'N/A';
-  var w36 = (roadmap.week3_6 || []).map(function(r) { return r.headline; }).join('\n') || 'N/A';
-  var w712 = (roadmap.week7_12 || []).map(function(r) { return r.headline; }).join('\n') || 'N/A';
-  roadRows.push([{ text: 'Week 1-2' }, { text: w12 }, { text: 'MUST', options: { color: RED, bold: true } }]);
-  roadRows.push([{ text: 'Week 3-6' }, { text: w36 }, { text: 'MUST/SHOULD', options: { color: AMBER, bold: true } }]);
-  roadRows.push([{ text: 'Week 7-12' }, { text: w712 }, { text: 'SHOULD/COULD', options: { color: GREEN, bold: true } }]);
-  s12.addTable(roadRows, { x: 0.5, y: 1.3, w: 12, fontSize: 10, fontFace: 'Calibri', border: { type: 'solid', pt: 0.5, color: 'E1E4E8' }, rowH: 1.3, colW: [1.8, 8.5, 2], color: SQUID });
-  s12.addText('Note: Timelines are indicative. Detailed effort estimates require fleet inventory and billing data.', { x: 0.5, y: 6.9, w: 12, fontSize: 9, italic: true, color: GREY, fontFace: 'Calibri' });
-
-  // ═══════════════════════════════════════════════════════════
-  // SLIDE 13: Closing
-  // ═══════════════════════════════════════════════════════════
-  var sClose = addContentSlide('Discussion & Next Steps');
-  var nextStepsY = 1.3;
-  var nextSteps = [
-    { label: 'Agree priorities', desc: 'Confirm the Must / Should / Could tiering and assign executive sponsors for each workstream' },
-    { label: 'Allocate resources', desc: 'Identify team members and budget for Week 1-2 MUST items (protocol migration + OS migration planning)' },
-    { label: 'Schedule kick-off', desc: 'Arrange remediation planning sessions within 2 weeks for critical findings' },
-    { label: 'Follow-up review', desc: 'Schedule 90-day reassessment to track progress against the roadmap and update scoring' }
+  // ═══ SLIDE 5: Must / Should / Could Framework (3 equal columns) ═══
+  var s6 = addContentSlide('RECOMMENDATION', 'Must / Should / Could', '6');
+  var colW = 3.9;
+  var colGap = 0.2;
+  var colStartX = 0.5;
+  var colData = [
+    { label: 'MUST', color: RED, subtitle: 'Do now - least effort, highest assurance', items: curated.must || [] },
+    { label: 'SHOULD', color: AMBER, subtitle: 'This quarter - medium effort, high value', items: curated.should || [] },
+    { label: 'COULD', color: GREEN, subtitle: 'Strategic - more effort / planning', items: curated.could || [] }
   ];
-  nextSteps.forEach(function(step, idx) {
-    sClose.addText((idx + 1) + '.', { x: 0.5, y: nextStepsY, w: 0.4, fontSize: 14, bold: true, color: ORANGE, fontFace: 'Calibri' });
-    sClose.addText(step.label, { x: 1.0, y: nextStepsY, w: 11, fontSize: 14, bold: true, color: SQUID, fontFace: 'Calibri' });
-    sClose.addText(step.desc, { x: 1.0, y: nextStepsY + 0.4, w: 11, fontSize: 11, color: GREY, fontFace: 'Calibri' });
-    nextStepsY += 1.1;
+  colData.forEach(function(col, ci) {
+    var cx = colStartX + ci * (colW + colGap);
+    // Card background
+    s6.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: cx, y: 1.4, w: colW, h: 5.2, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.04 });
+    // Colored header band
+    s6.addShape(pptx.shapes.RECTANGLE, { x: cx, y: 1.4, w: colW, h: 0.7, fill: { color: col.color }, rectRadius: 0.04 });
+    s6.addText(col.label, { x: cx, y: 1.4, w: colW, h: 0.7, fontSize: 18, bold: true, color: WHITE, fontFace: 'Calibri', align: 'center', valign: 'middle' });
+    // Subtitle
+    s6.addText(col.subtitle, { x: cx + 0.3, y: 2.2, w: colW - 0.6, h: 0.4, fontSize: 10, italic: true, color: GREY, fontFace: 'Calibri', align: 'center' });
+    // Bullet items
+    var itemText = col.items.slice(0, 5).map(function(item) { return item.headline; }).join('\n');
+    s6.addText(itemText, { x: cx + 0.4, y: 2.7, w: colW - 0.8, h: 3.6, fontSize: 12, color: SQUID, fontFace: 'Calibri', valign: 'top', lineSpacingMultiple: 1.8, bullet: true });
   });
-  sClose.addText('Questions / Discussion', { x: 0.5, y: 5.8, w: 12, fontSize: 16, bold: true, color: SQUID, fontFace: 'Calibri' });
-  sClose.addText('Next review target: ' + (function() { var d = new Date(today); d.setDate(d.getDate() + 90); return d.toISOString().split('T')[0]; })() + '  |  Reviewer: ' + (review.reviewer || 'TAM'), { x: 0.5, y: 6.3, w: 12, fontSize: 12, color: GREY, fontFace: 'Calibri' });
+  // Flow arrow annotation
+  s6.addShape(pptx.shapes.RECTANGLE, { x: 0.5, y: 6.8, w: 12.3, h: 0.35, fill: { color: SQUID } });
+  s6.addText('MOST IMPACTFUL / LEAST EFFORT', { x: 0.8, y: 6.8, w: 5, h: 0.35, fontSize: 9, bold: true, color: WHITE, fontFace: 'Calibri', valign: 'middle' });
+  s6.addText('IMPACTFUL / MORE EFFORT', { x: 8, y: 6.8, w: 4.5, h: 0.35, fontSize: 9, bold: true, color: WHITE, fontFace: 'Calibri', align: 'right', valign: 'middle' });
+
+  // ═══ SLIDE 6: MUST - Quick Wins (2x2 card grid with effort badges) ═══
+  var mustQuickWins = (curated.must || []).filter(function(m) { return m.isQuickWin; });
+  if (mustQuickWins.length === 0) mustQuickWins = (curated.must || []).filter(function(m) { return (m.effort || '').toLowerCase() === 'low'; });
+  if (mustQuickWins.length > 0) {
+    var s7 = addContentSlide('MUST - QUICK WINS', 'Quick Wins - Immediate Operational Improvement', '7');
+    var qwPositions = [{ x: 0.5, y: 1.4 }, { x: 6.9, y: 1.4 }, { x: 0.5, y: 4.2 }, { x: 6.9, y: 4.2 }];
+    mustQuickWins.slice(0, 4).forEach(function(item, i) {
+      var pos = qwPositions[i];
+      var cW = 6.1;
+      var cH = 2.5;
+      // Card
+      s7.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: pos.x, y: pos.y, w: cW, h: cH, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.04 });
+      // Green top accent (quick win = low effort)
+      s7.addShape(pptx.shapes.RECTANGLE, { x: pos.x, y: pos.y, w: cW, h: 0.08, fill: { color: GREEN } });
+      // Headline
+      s7.addText(item.headline, { x: pos.x + 0.4, y: pos.y + 0.3, w: cW - 0.8, h: 0.5, fontSize: 14, bold: true, color: SQUID, fontFace: 'Calibri' });
+      // ID
+      s7.addText(item.id || '', { x: pos.x + 0.4, y: pos.y + 0.75, w: cW - 0.8, h: 0.3, fontSize: 10, bold: true, color: ORANGE, fontFace: 'Calibri' });
+      // Action text
+      s7.addText(item.action || item.consequence || '', { x: pos.x + 0.4, y: pos.y + 1.1, w: cW - 0.8, h: 0.9, fontSize: 11, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3, valign: 'top' });
+      // Effort badge
+      addEffortBadge(s7, pos.x + cW - 1.3, pos.y + cH - 0.5, item.effort || 'low');
+    });
+  }
+
+  // ═══ SLIDE 7: MUST - Avoidable Crises (side-by-side dark cards) ═══
+  var mustCrises = (curated.must || []).filter(function(m) { return !m.isQuickWin && (m.effort || '').toLowerCase() !== 'low'; });
+  if (mustCrises.length === 0) mustCrises = (curated.must || []).filter(function(m) { return !m.isQuickWin; });
+  if (mustCrises.length > 0) {
+    var s8 = addContentSlide('MUST - PLAN NOW', 'Prevent the Avoidable Crises', '8');
+    var crisisCards = mustCrises.slice(0, 2);
+    crisisCards.forEach(function(item, i) {
+      var cx = i === 0 ? 0.5 : 6.9;
+      var cW = 6.1;
+      var cH = 4.0;
+      // Dark card background
+      s8.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: cx, y: 1.4, w: cW, h: cH, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.04 });
+      // Red top accent
+      s8.addShape(pptx.shapes.RECTANGLE, { x: cx, y: 1.4, w: cW, h: 0.08, fill: { color: RED } });
+      // Headline
+      s8.addText(item.headline, { x: cx + 0.4, y: 1.7, w: cW - 0.8, h: 0.5, fontSize: 15, bold: true, color: SQUID, fontFace: 'Calibri' });
+      // ID
+      s8.addText(item.id || '', { x: cx + 0.4, y: 2.15, w: cW - 0.8, h: 0.3, fontSize: 10, bold: true, color: RED, fontFace: 'Calibri' });
+      // Action bullets
+      var actionText = item.action || item.consequence || '';
+      s8.addText(actionText, { x: cx + 0.4, y: 2.5, w: cW - 0.8, h: 2.3, fontSize: 12, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.5, valign: 'top', bullet: true });
+      // Effort badge
+      addEffortBadge(s8, cx + cW - 1.3, 1.4 + cH - 0.5, item.effort || 'high');
+    });
+    // "Needs more research" callout
+    s8.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: 5.8, w: 12.3, h: 0.7, fill: { color: 'FFFBE6' }, line: { color: AMBER, width: 1 }, rectRadius: 0.03 });
+    s8.addText('NEEDS MORE RESEARCH:  cost impact depends on bundle mix and licensing - quantify against fleet data.', { x: 0.8, y: 5.85, w: 11.7, h: 0.6, fontSize: 11, bold: false, color: '8B6914', fontFace: 'Calibri', valign: 'middle' });
+  }
+
+  // ═══ SLIDE 8: SHOULD - Plan This Quarter (3x2 card grid) ═══
+  var s9 = addContentSlide('SHOULD - THIS QUARTER', 'Optimise & Modernise', '9');
+  var shouldItems = (curated.should || []).slice(0, 6);
+  var shouldPositions = [
+    { x: 0.5, y: 1.4 }, { x: 4.6, y: 1.4 }, { x: 8.7, y: 1.4 },
+    { x: 0.5, y: 4.2 }, { x: 4.6, y: 4.2 }, { x: 8.7, y: 4.2 }
+  ];
+  shouldItems.forEach(function(item, i) {
+    var pos = shouldPositions[i];
+    var cW = 3.9;
+    var cH = 2.5;
+    // Card
+    s9.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: pos.x, y: pos.y, w: cW, h: cH, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.04 });
+    // Amber left accent
+    s9.addShape(pptx.shapes.RECTANGLE, { x: pos.x, y: pos.y, w: 0.08, h: cH, fill: { color: AMBER } });
+    // Headline
+    s9.addText(item.headline, { x: pos.x + 0.3, y: pos.y + 0.2, w: cW - 0.6, h: 0.5, fontSize: 12, bold: true, color: SQUID, fontFace: 'Calibri' });
+    // Action
+    s9.addText(item.action || '', { x: pos.x + 0.3, y: pos.y + 0.7, w: cW - 0.6, h: 1.3, fontSize: 10, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3, valign: 'top' });
+    // Effort badge
+    addEffortBadge(s9, pos.x + cW - 1.3, pos.y + cH - 0.5, item.effort || 'medium');
+  });
+
+  // ═══ SLIDE 9: COULD - Strategic Improvements (2x2 card grid) ═══
+  var s10 = addContentSlide('COULD - STRATEGIC', 'Strategic & Longer Horizon', '10');
+  var couldItems = (curated.could || []).slice(0, 4);
+  var couldPositions = [{ x: 0.5, y: 1.4 }, { x: 6.9, y: 1.4 }, { x: 0.5, y: 4.2 }, { x: 6.9, y: 4.2 }];
+  couldItems.forEach(function(item, i) {
+    var pos = couldPositions[i];
+    var cW = 6.1;
+    var cH = 2.5;
+    // Card
+    s10.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: pos.x, y: pos.y, w: cW, h: cH, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.04 });
+    // Green top accent
+    s10.addShape(pptx.shapes.RECTANGLE, { x: pos.x, y: pos.y, w: cW, h: 0.08, fill: { color: GREEN } });
+    // Headline
+    s10.addText(item.headline, { x: pos.x + 0.4, y: pos.y + 0.3, w: cW - 0.8, h: 0.5, fontSize: 14, bold: true, color: SQUID, fontFace: 'Calibri' });
+    // Action
+    s10.addText(item.action || item.consequence || '', { x: pos.x + 0.4, y: pos.y + 0.85, w: cW - 0.8, h: 1.2, fontSize: 11, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.3, valign: 'top' });
+    // Effort badge
+    addEffortBadge(s10, pos.x + cW - 1.3, pos.y + cH - 0.5, item.effort || 'high');
+  });
+
+  // ═══ SLIDE 10: Cost Optimisation (table + callout sidebar) ═══
+  var s11 = addContentSlide('THE NUMBERS', 'Cost Optimisation Opportunities', '11');
+  var costData = curated.costInsights || {};
+  var costItems = costData.items || [];
+  // Build table rows
+  var tableRows = [[
+    { text: 'Opportunity', options: { bold: true, color: WHITE, fill: { color: SQUID } } },
+    { text: 'Expected Benefit', options: { bold: true, color: WHITE, fill: { color: SQUID }, align: 'center' } },
+    { text: 'Effort', options: { bold: true, color: WHITE, fill: { color: SQUID }, align: 'center' } }
+  ]];
+  costItems.slice(0, 6).forEach(function(item) {
+    var benefitColor = GREEN;
+    tableRows.push([
+      { text: item.headline || '' },
+      { text: item.insight || item.benefit || '', options: { color: benefitColor, bold: true, align: 'center' } },
+      { text: (item.effort || 'Medium').charAt(0).toUpperCase() + (item.effort || 'medium').slice(1), options: { align: 'center' } }
+    ]);
+  });
+  s11.addTable(tableRows, { x: 0.5, y: 1.4, w: 8.5, fontSize: 11, fontFace: 'Calibri', border: { type: 'solid', pt: 0.5, color: 'E1E4E8' }, rowH: 0.55, colW: [3.5, 3.0, 2.0], color: SQUID, autoPage: false });
+  // "Needs more research" sidebar callout
+  var calloutX = 9.3;
+  s11.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: calloutX, y: 1.4, w: 3.5, h: 4.5, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.04 });
+  s11.addText('Needs more research', { x: calloutX + 0.3, y: 2.0, w: 2.9, fontSize: 13, bold: true, color: AMBER, fontFace: 'Calibri' });
+  var researchNote = costData.summary || 'Actual savings from right-sizing require fleet inventory + utilisation data.';
+  s11.addText(researchNote, { x: calloutX + 0.3, y: 2.6, w: 2.9, h: 2.8, fontSize: 10, color: SQUID, fontFace: 'Calibri', lineSpacingMultiple: 1.4, valign: 'top' });
+
+  // ═══ SLIDE 11: 90-Day Roadmap (4 equal columns) ═══
+  var s12 = addContentSlide('EXECUTION', '90-Day Roadmap & Next Steps', '12');
+  var roadmap = curated.roadmap || {};
+  var rmColW = 3.0;
+  var rmGap = 0.15;
+  var rmStartX = 0.5;
+  // Deduplicate: each item only appears in the first column it's assigned to
+  var usedKeys = {};
+  function getDedupeKey(item) {
+    var text = typeof item === 'string' ? item : (item.headline || item.id || '');
+    // Normalise: lowercase, strip punctuation, take first 4 words for fuzzy match
+    return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 4).join(' ');
+  }
+  function dedupeItems(items) {
+    var result = [];
+    (items || []).forEach(function(r) {
+      var key = getDedupeKey(r);
+      if (key && !usedKeys[key]) { usedKeys[key] = true; result.push(r); }
+    });
+    return result;
+  }
+  var col1Items = dedupeItems(roadmap.week1_2 || roadmap.thisWeek || []);
+  var col2Items = dedupeItems(roadmap.week3_6 || roadmap.thirtyDays || []);
+  var col3Items = dedupeItems(roadmap.week7_12 || roadmap.sixtyDays || []);
+  var col4Items = dedupeItems(roadmap.ninetyDays || (curated.could || []).slice(0, 3).map(function(c) { return { headline: c.headline }; }));
+  var rmCols = [
+    { label: 'THIS WEEK', color: RED, items: col1Items, lead: 'TAM' },
+    { label: '30 DAYS', color: AMBER, items: col2Items, lead: 'TAM + SA' },
+    { label: '60 DAYS', color: 'DAA520', items: col3Items, lead: 'SA lead' },
+    { label: '90 DAYS', color: GREEN, items: col4Items, lead: 'SA + CSS' }
+  ];
+  rmCols.forEach(function(col, ci) {
+    var cx = rmStartX + ci * (rmColW + rmGap);
+    // Card
+    s12.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: cx, y: 1.4, w: rmColW, h: 4.8, fill: { color: WHITE }, line: { color: 'E1E4E8', width: 0.5 }, rectRadius: 0.04 });
+    // Colored header
+    s12.addShape(pptx.shapes.RECTANGLE, { x: cx, y: 1.4, w: rmColW, h: 0.6, fill: { color: col.color } });
+    s12.addText(col.label, { x: cx, y: 1.4, w: rmColW, h: 0.6, fontSize: 14, bold: true, color: WHITE, fontFace: 'Calibri', align: 'center', valign: 'middle' });
+    // Items
+    var itemText = col.items.map(function(r) { return typeof r === 'string' ? r : r.headline; }).join('\n');
+    s12.addText(itemText || 'TBD', { x: cx + 0.2, y: 2.2, w: rmColW - 0.4, h: 3.0, fontSize: 11, color: SQUID, fontFace: 'Calibri', valign: 'top', lineSpacingMultiple: 1.6, bullet: true });
+    // Lead footer
+    s12.addText('Lead:  ' + col.lead, { x: cx + 0.2, y: 5.9, w: rmColW - 0.4, fontSize: 10, color: GREY, fontFace: 'Calibri' });
+  });
+  // "THE ASK" callout bar at bottom
+  s12.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.5, y: 6.5, w: 12.3, h: 0.6, fill: { color: SQUID }, rectRadius: 0.03 });
+  s12.addText('THE ASK:', { x: 0.8, y: 6.5, w: 1.5, h: 0.6, fontSize: 11, bold: true, color: ORANGE, fontFace: 'Calibri', valign: 'middle' });
+  s12.addText('Endorse the MUST tier today  -  resource the SHOULD tier this quarter  -  next review target Q4 ' + (new Date(today).getFullYear()), { x: 2.2, y: 6.5, w: 10, h: 0.6, fontSize: 11, color: WHITE, fontFace: 'Calibri', valign: 'middle' });
+
+  // ═══ SLIDE 12: Closing (dark background) ═══
+  var sClose = pptx.addSlide();
+  sClose.background = { color: SQUID };
+  // Orange left accent
+  sClose.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0, w: 0.12, h: 7.5, fill: { color: ORANGE } });
+  sClose.addText('DISCUSSION', { x: 0.8, y: 1.5, w: 11, h: 0.3, fontSize: 11, bold: true, color: ORANGE, fontFace: 'Calibri', letterSpacing: 2 });
+  sClose.addText('Where do we start?', { x: 0.8, y: 2.0, w: 11, fontSize: 34, bold: true, color: WHITE, fontFace: 'Calibri' });
+  sClose.addText('Approve the MUST quick wins now - they harden operations quickly - and commit to planning the two avoidable crises.', { x: 0.8, y: 3.2, w: 10, fontSize: 14, color: 'CCCCCC', fontFace: 'Calibri', lineSpacingMultiple: 1.5 });
+  // Orange divider
+  sClose.addShape(pptx.shapes.RECTANGLE, { x: 0.8, y: 4.5, w: 4.5, h: 0.04, fill: { color: ORANGE } });
+  sClose.addText('CSS - TAM - Solutions Architect lead  -  Amazon WorkSpaces account team', { x: 0.8, y: 4.8, w: 11, fontSize: 11, color: GREY, fontFace: 'Calibri' });
+  sClose.addText('Thank you', { x: 0.8, y: 5.5, w: 11, fontSize: 18, bold: true, color: WHITE, fontFace: 'Calibri' });
 
   // Write and save
-  var filename = 'WAFR_Executive_Briefing_' + customer.replace(/[^a-zA-Z0-9]/g, '_') + '_' + today + '.pptx';
+  var filename = deckFilename || 'WAFR_Executive_Briefing_' + customer.replace(/[^a-zA-Z0-9]/g, '_') + '_' + today + '.pptx';
   pptx.write('base64').then(function(base64) {
     saveReportToCloud(review.id, 'clevel', base64, 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx', review.customer);
     if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, filename, true, '');
