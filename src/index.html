@@ -2712,9 +2712,9 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   if (summaryBullets.length === 0) {
     summaryBullets = ['The estate is operationally functional with strengths identified across the review.', 'High-risk items need leadership commitment.', 'Cost is actively managed; right-sizing is the main open lever.'];
   }
-  var bulletY = 2.0;
+  var bulletY = 2.5;
   summaryBullets.slice(0, 4).forEach(function(b) {
-    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 2.0, lineSpacingMultiple: 1.4 });
+    s3.addText(b, { x: 0.5, y: bulletY, w: 6.5, fontSize: 13, color: SQUID, fontFace: 'Calibri', bold: bulletY === 2.5, lineSpacingMultiple: 1.4 });
     bulletY += 0.8;
   });
   // KPI stat boxes (right side - 2x2 grid)
@@ -2724,7 +2724,7 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
     { value: String(medRisk), label: 'MEDIUM RISK', accent: AMBER },
     { value: String(bestPractice), label: 'BEST PRACTICE', accent: GREEN }
   ];
-  var kpiPositions = [{ x: 7.5, y: 2.0 }, { x: 10.2, y: 2.0 }, { x: 7.5, y: 4.3 }, { x: 10.2, y: 4.3 }];
+  var kpiPositions = [{ x: 7.5, y: 2.5 }, { x: 10.2, y: 2.5 }, { x: 7.5, y: 4.8 }, { x: 10.2, y: 4.8 }];
   kpiData.forEach(function(kpi, i) {
     var pos = kpiPositions[i];
     slide = s3;
@@ -2936,12 +2936,17 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   var rmGap = 0.15;
   var rmStartX = 0.5;
   // Deduplicate: each item only appears in the first column it's assigned to
-  var usedIds = {};
+  var usedKeys = {};
+  function getDedupeKey(item) {
+    var text = typeof item === 'string' ? item : (item.headline || item.id || '');
+    // Normalise: lowercase, strip punctuation, take first 4 words for fuzzy match
+    return text.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).slice(0, 4).join(' ');
+  }
   function dedupeItems(items) {
     var result = [];
     (items || []).forEach(function(r) {
-      var id = typeof r === 'string' ? r : (r.id || r.headline);
-      if (!usedIds[id]) { usedIds[id] = true; result.push(r); }
+      var key = getDedupeKey(r);
+      if (key && !usedKeys[key]) { usedKeys[key] = true; result.push(r); }
     });
     return result;
   }
