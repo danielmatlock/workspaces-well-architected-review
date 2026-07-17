@@ -1131,7 +1131,15 @@ async function loadExplanation(question, bestPractice, templateId) {
       body: JSON.stringify({ question: question, bestPractice: bestPractice, templateId: templateId || 'workspaces-default' })
     });
     var data = await res.json();
-    el.innerHTML = '<div class="explain-text">' + data.explanation.replace(/What to ask the [Cc]ustomer/gi, 'Questions to think about').replace(/\n/g, '<br>').replace(/## /g, '<strong>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') + '</div>';
+    el.innerHTML = '<div class="explain-text">' + data.explanation
+      .replace(/What to ask the [Cc]ustomer/gi, 'Questions to think about')
+      .replace(/\n/g, '<br>')
+      .replace(/#{1,3} (.*?)(<br>|$)/g, '<strong>$1</strong>$2')
+      .replace(/\*\*(\d+\..+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*\*([^*]{1,50}:)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*\*/g, '')
+      .replace(/- /g, '&bull; ')
+      .replace(/\* /g, '&bull; ') + '</div>';
   } catch(e) {
     el.innerHTML = '<div class="explain-error">Could not load guidance. Check network connection.</div>';
   }
