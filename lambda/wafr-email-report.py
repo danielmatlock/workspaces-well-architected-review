@@ -1937,10 +1937,8 @@ ARCHITECTURE DOCUMENTATION:
                 "- 'title': Short descriptive title\n"
                 "- 'pillar': WAF pillar (Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimisation, Sustainability)\n"
                 "- 'observation': Detailed professional summary of current state (3-5 sentences). Include specific numbers and configuration details from the evidence. Use third person.\n"
-                "- 'recommendation': Start with a brief current-state acknowledgement, then 3-4 actionable bullet points. "
-                "You MUST end every recommendation with 'Further Reading:' followed by 2 real AWS documentation URLs. "
-                "Use full URLs like https://docs.aws.amazon.com/workspaces/latest/adminguide/ or https://docs.aws.amazon.com/wellarchitected/latest/framework/. "
-                "NEVER omit the Further Reading URLs - this is mandatory for every finding.\n"
+                "- 'recommendation': Start with a brief current-state acknowledgement, then 3-4 actionable bullet points where EACH bullet ends with a relevant AWS docs URL in parentheses (e.g. '... (https://docs.aws.amazon.com/workspaces/latest/adminguide/encrypt-workspaces.html)'). "
+                "Every recommendation MUST contain at least 2 clickable https://docs.aws.amazon.com URLs embedded within the text.\n"
                 "- 'targetState': What fully implemented looks like (2-3 sentences, concrete and measurable)\n"
                 "- 'priority': Critical/High/Medium/Low\n"
                 "- 'rag': red (critical gap), amber (partial), green (good)\n\n"
@@ -1959,7 +1957,7 @@ ARCHITECTURE DOCUMENTATION:
                     accept='application/json',
                     body=json.dumps({
                         'anthropic_version': 'bedrock-2023-05-31',
-                        'max_tokens': 6000,
+                        'max_tokens': 8000,
                         'messages': [{'role': 'user', 'content': prompt}]
                     })
                 )
