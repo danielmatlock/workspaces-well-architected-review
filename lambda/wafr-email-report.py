@@ -1879,6 +1879,29 @@ ARCHITECTURE DOCUMENTATION:
                 'body': json.dumps({'status': 'started', 'message': 'Analysis started. Poll autoWafrStatus for results.'})
             }
 
+        if action == 'autoWafrSaveEvidence':
+            # Save evidence to S3 and invoke the async processor
+            review_id = body.get('reviewId', '')
+            evidence_data = body.get('evidenceData', {})
+            evidence_key = f"{review_id}/autowafr_evidence.json"
+            job_key = f"{review_id}/autowafr_job.json"
+            # Mark job as processing
+            s3.put_object(Bucket=REPORTS_BUCKET, Key=job_key, Body=json.dumps({'status': 'processing'}).encode('utf-8'), ContentType='application/json')
+            # Save evidence
+            s3.put_object(Bucket=REPORTS_BUCKET, Key=evidence_key, Body=json.dumps(evidence_data).encode('utf-8'), ContentType='application/json')
+            # Invoke self async for Bedrock processing
+            lambda_client = boto3.client('lambda', region_name='eu-west-2')
+            lambda_client.invoke(
+                FunctionName=context.function_name,
+                InvocationType='Event',
+                Payload=json.dumps({'body': json.dumps({'action': 'autoWafrProcess', 'reviewId': review_id})}).encode('utf-8')
+            )
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'status': 'started', 'message': 'Analysis started. Poll autoWafrStatus for results.'})
+            }
+
         if action == 'autoWafrProcess':
             # Async processor: reads evidence from S3, runs Bedrock, saves result to S3
             review_id = body.get('reviewId', '')

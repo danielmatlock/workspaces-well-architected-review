@@ -3080,25 +3080,25 @@ async function runAutoWafr(id) {
     }
 
     // Update overlay
-    document.querySelector('.modal p').textContent = 'Scan complete. Generating AI assessment with Bedrock (this takes 60-90 seconds)...';
+    document.querySelector('.modal p').textContent = 'Scan complete. Saving evidence and starting AI analysis...';
 
-    // Step 2: Fire the full autoWafr analysis - Lambda saves result to S3
-    // If API Gateway times out, Lambda keeps running and saves to S3 anyway
-    fetch(ENV.emailEndpoint, {
+    // Step 2: Save evidence to S3 at the fixed key the processor expects
+    await fetch(ENV.emailEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        action: 'autoWafr',
-        roleArn: conn.roleArn,
-        externalId: conn.externalId || '',
-        region: conn.region || 'eu-west-2',
-        reviewId: id
+        action: 'autoWafrSaveEvidence',
+        reviewId: id,
+        evidenceData: { evidence_text: Object.entries(evidence).map(function(e) { return '=== ' + e[0].toUpperCase() + ' ===\n' + e[1]; }).join('\n'), summary: summary, review_id: id }
       })
-    }).catch(function() {}); // Ignore timeout - Lambda still runs
+    });
 
-    // Step 3: Poll for result every 5 seconds
+    // Step 3: Evidence saved and async processor triggered. Start polling.
+    document.querySelector('.modal p').textContent = 'Generating AI assessment with Bedrock (this takes 60-90 seconds)...';
+
+    // Step 4: Poll for result every 5 seconds
     var pollCount = 0;
-    var maxPolls = 30; // 150 seconds max wait
+    var maxPolls = 36; // 180 seconds max wait
     var pollInterval = setInterval(async function() {
       pollCount++;
       if (pollCount > maxPolls) {
