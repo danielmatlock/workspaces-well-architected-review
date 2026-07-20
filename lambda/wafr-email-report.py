@@ -1922,24 +1922,47 @@ ARCHITECTURE DOCUMENTATION:
 
         if action == 'autoWafrAnalyse':
             # Auto WAFR Step 2: Send scan evidence to Bedrock for analysis
+            # Accepts a 'focus' parameter to split across multiple calls
             evidence = body.get('evidence', {})
             summary_data = body.get('summary', {})
+            focus = body.get('focus', 'all')  # 'security_reliability' or 'ops_cost_perf' or 'all'
             evidence_text = "\n".join([f"=== {k.upper()} ===\n{v}" for k, v in evidence.items()])
 
-            # Add summary context
             if summary_data:
                 evidence_text = f"=== FLEET SUMMARY ===\nWorkSpaces: {summary_data.get('workspaceCount', 0)}, Protocols: {summary_data.get('protocols', {})}, Running modes: {summary_data.get('runningModes', {})}, Encrypted: {summary_data.get('encryptedCount', 0)}, Monthly cost: {summary_data.get('monthlyCost', 'N/A')}\n\n" + evidence_text
 
+            if focus == 'security_reliability':
+                pillar_instruction = "Focus ONLY on Security, Reliability, and Networking findings. Ignore cost, performance, and operational topics."
+                include_not_assessed = False
+            elif focus == 'ops_cost_perf':
+                pillar_instruction = "Focus ONLY on Operational Excellence, Cost Optimisation, Performance Efficiency, and Sustainability findings. Ignore security and reliability topics."
+                include_not_assessed = True
+            else:
+                pillar_instruction = "Cover all Well-Architected pillars."
+                include_not_assessed = True
+
+            not_assessed_instruction = ""
+            if include_not_assessed:
+                not_assessed_instruction = "Also produce 'notAssessed' array: areas NOT determinable from scan. Each: {\"area\": \"...\", \"reason\": \"...\"}.\n"
+
             prompt = (
-                "You are an AWS Solutions Architect reviewing an Amazon WorkSpaces environment. "
-                "Based on the scan evidence below, produce a JSON assessment.\n\n"
-                "For each finding: 'title', 'pillar' (WAF pillar), "
-                "'observation' (2 sentences), 'recommendation' (2-3 bullets + 1 AWS docs URL), "
-                "'targetState' (1 sentence), 'priority' (Critical/High/Medium/Low), 'rag' (red/amber/green).\n\n"
-                "Also: 'notAssessed' array: [{area, reason}]. 'executiveSummary' (2 sentences).\n\n"
-                "JSON ONLY:\n"
-                "{\"executiveSummary\":\"\",\"findings\":[{\"title\":\"\",\"pillar\":\"\",\"observation\":\"\",\"recommendation\":\"\",\"targetState\":\"\",\"priority\":\"\",\"rag\":\"\"}],\"notAssessed\":[{\"area\":\"\",\"reason\":\"\"}]}\n\n"
-                "EVIDENCE:\n" + evidence_text[:10000]
+                "You are a senior AWS Solutions Architect conducting a Well-Architected Review of an Amazon WorkSpaces environment. "
+                "Based on the scan evidence below, produce a detailed assessment.\n\n"
+                + pillar_instruction + "\n\n"
+                "For each finding, produce a JSON object with:\n"
+                "- 'title': Short descriptive title\n"
+                "- 'pillar': WAF pillar name\n"
+                "- 'observation': Professional summary of current state (3-4 sentences with specific numbers)\n"
+                "- 'recommendation': Brief acknowledgement then 3-4 actionable bullet points. "
+                "End with 'Further Reading:' followed by 1-2 real https://docs.aws.amazon.com URLs. ALWAYS include URLs.\n"
+                "- 'targetState': What fully implemented looks like (2 sentences)\n"
+                "- 'priority': Critical/High/Medium/Low\n"
+                "- 'rag': red/amber/green\n\n"
+                + not_assessed_instruction +
+                "Produce 'executiveSummary' (2-3 sentences).\n\n"
+                "JSON ONLY, no markdown:\n"
+                "{\"executiveSummary\":\"\",\"findings\":[{...}]" + (",\"notAssessed\":[{...}]" if include_not_assessed else "") + "}\n\n"
+                "EVIDENCE:\n" + evidence_text[:15000]
             )
 
             try:

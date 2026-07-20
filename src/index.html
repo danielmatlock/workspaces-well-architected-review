@@ -3081,27 +3081,50 @@ async function runAutoWafr(id) {
     // Update overlay
     document.querySelector('.modal p').textContent = 'Scan complete. Generating AI assessment with Bedrock...';
 
-    // Step 2: Send evidence to Bedrock for analysis (<30s)
-    var evidenceText = Object.entries(evidence).map(function(e) { return e[0] + ': ' + e[1]; }).join('\n');
-    var analyseRes = await fetch(ENV.emailEndpoint, {
+    // Step 2a: Send evidence to Bedrock for security/reliability analysis
+    var analyseRes1 = await fetch(ENV.emailEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'autoWafrAnalyse',
         evidence: evidence,
-        summary: summary
+        summary: summary,
+        focus: 'security_reliability'
       })
     });
-    var analyseData = await analyseRes.json();
-    var analysePayload = typeof analyseData.body === 'string' ? JSON.parse(analyseData.body) : analyseData;
+    var analyseData1 = await analyseRes1.json();
+    var payload1 = typeof analyseData1.body === 'string' ? JSON.parse(analyseData1.body) : analyseData1;
 
-    if (analysePayload.error) {
+    document.querySelector('.modal p').textContent = 'Security analysis complete. Generating operational assessment...';
+
+    // Step 2b: Send evidence to Bedrock for ops/cost/perf analysis
+    var analyseRes2 = await fetch(ENV.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'autoWafrAnalyse',
+        evidence: evidence,
+        summary: summary,
+        focus: 'ops_cost_perf'
+      })
+    });
+    var analyseData2 = await analyseRes2.json();
+    var payload2 = typeof analyseData2.body === 'string' ? JSON.parse(analyseData2.body) : analyseData2;
+
+    // Merge both analyses
+    var mergedAnalysis = {
+      executiveSummary: (payload1.analysis || {}).executiveSummary || (payload2.analysis || {}).executiveSummary || '',
+      findings: ((payload1.analysis || {}).findings || []).concat((payload2.analysis || {}).findings || []),
+      notAssessed: (payload2.analysis || {}).notAssessed || []
+    };
+
+    if (mergedAnalysis.findings.length === 0 && (payload1.error || payload2.error)) {
       hideGeneratingOverlay();
-      alert('Auto WAFR analysis failed: ' + analysePayload.error);
+      alert('Auto WAFR analysis failed: ' + (payload1.error || payload2.error || 'No findings generated'));
       return;
     }
 
-    var html = generateAutoWafrHTML(review, analysePayload.analysis || {}, summary);
+    var html = generateAutoWafrHTML(review, mergedAnalysis, summary);
     hideGeneratingOverlay();
     saveReportToCloud(review.id, 'autowafr', html, 'text/html', 'html', review.customer);
     openReportInNewTab(html);
