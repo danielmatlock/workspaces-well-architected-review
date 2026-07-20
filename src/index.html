@@ -985,7 +985,7 @@ function showReviewDashboard() {
       '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
   } else {
     var isConnected = review.awsConnection && review.awsConnection.roleArn;
-    var connDot = isConnected ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1d8102;border:2px solid white;margin-right:5px;"></span>' : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d13212;border:2px solid white;margin-right:5px;"></span>';
+    var connDot = isConnected ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1d8102;border:2px solid white;margin-right:6px;"></span>' : '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d13212;border:2px solid white;margin-right:6px;"></span>';
     document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
       '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
       '<button class="btn btn-primary" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
