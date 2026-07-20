@@ -842,6 +842,8 @@ function showNewReviewModal() {
 function closeModal(e) {
   if (!e || e.target.classList.contains('modal-overlay')) {
     document.getElementById('modal-root').innerHTML = '';
+    // Refresh dashboard topbar to update connection status dot
+    if (state.view === 'dashboard' && state.activeReview) { showReviewDashboard(); }
   }
 }
 
