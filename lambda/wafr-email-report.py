@@ -1300,10 +1300,31 @@ ARCHITECTURE DOCUMENTATION:
             # ─── MAP FINDINGS TO REVIEW QUESTIONS ─────────────────────────
             findings = map_scan_to_findings(scan_data)
 
+            # Build raw evidence summary for Auto WAFR analysis
+            raw_evidence = {}
+            raw_evidence['fleet'] = f"Total WorkSpaces: {scan_data.get('workspaceCount', 0)}. Protocols: {scan_data.get('protocols', {})}. Running modes: {scan_data.get('runningModes', {})}. Bundle types: {len(scan_data.get('bundles', {}))} distinct. Encryption: {scan_data.get('encryptedCount', 0)}/{scan_data.get('workspaceCount', 0)} encrypted."
+            if scan_data.get('directories'):
+                dir_details = [f"Type: {d.get('type')}, Name: {d.get('name')}, Status: {d.get('status')}, RADIUS/MFA: {d.get('radiusStatus', 'None')}" for d in scan_data['directories']]
+                raw_evidence['directories'] = f"{len(scan_data['directories'])} directories: " + "; ".join(dir_details)
+            if scan_data.get('wsDirectories'):
+                ws_dir_details = [f"ID: {wd.get('directoryId')}, Type: {wd.get('directoryType')}, IP Groups: {wd.get('ipGroupIds', [])}, Self-service: {wd.get('selfServicePermissions', {})}" for wd in scan_data['wsDirectories']]
+                raw_evidence['directorySettings'] = "; ".join(ws_dir_details)
+            if scan_data.get('ipGroups') is not None:
+                if scan_data['ipGroups']:
+                    raw_evidence['ipAccessGroups'] = f"{len(scan_data['ipGroups'])} IP Access Group(s): " + "; ".join([f"{g.get('groupName', 'unnamed')} with {len(g.get('UserRules', []))} rules" for g in scan_data['ipGroups']])
+                else:
+                    raw_evidence['ipAccessGroups'] = "No IP Access Control Groups configured. Any network can connect."
+            if scan_data.get('azCount') is not None:
+                raw_evidence['networking'] = f"AZ spread: {scan_data.get('azCount', 0)} AZs ({scan_data.get('azList', [])}). NAT Gateways: {scan_data.get('natGateways', 0)}."
+            if scan_data.get('workspacesAlarms') is not None:
+                raw_evidence['monitoring'] = f"WorkSpaces-specific CloudWatch alarms: {scan_data.get('workspacesAlarms', 0)}."
+            if scan_data.get('monthlyCost') is not None:
+                raw_evidence['cost'] = f"Monthly WorkSpaces cost: ${scan_data.get('monthlyCost', 0)} {scan_data.get('costCurrency', 'USD')}."
+
             return {
                 'statusCode': 200,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-                'body': json.dumps({'findings': findings, 'summary': {
+                'body': json.dumps({'findings': findings, 'rawEvidence': raw_evidence, 'summary': {
                     'workspaceCount': scan_data.get('workspaceCount', 0),
                     'directoryCount': len(scan_data.get('directories', [])),
                     'protocols': scan_data.get('protocols', {}),

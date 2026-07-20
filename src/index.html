@@ -3065,13 +3065,14 @@ async function runAutoWafr(id) {
       return;
     }
 
-    // Build evidence text from the scan findings
-    var evidence = {};
+    // Build evidence from raw scan data
+    var evidence = scanPayload.rawEvidence || {};
     var summary = scanPayload.summary || {};
+    // Also include individual finding evidence for extra context
     if (scanPayload.findings) {
       Object.keys(scanPayload.findings).forEach(function(qId) {
         var f = scanPayload.findings[qId];
-        if (f.evidence) evidence[qId] = f.evidence;
+        if (f.evidence && !evidence[qId]) evidence[qId] = f.evidence;
       });
     }
 
