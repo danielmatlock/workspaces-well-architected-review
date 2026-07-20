@@ -981,6 +981,7 @@ function showReviewDashboard() {
       '<button class="btn" onclick="showPrintModal(\'' + review.id + '\')">Print Report</button>' +
       '<button class="btn btn-primary" onclick="exportOrrReport(\'' + review.id + '\')">ORR Report</button>' +
       '<button class="btn" onclick="showEmailModal(\'' + review.id + '\')">Email Report</button>' +
+      '<button class="btn" onclick="showConnectAccountModal(\'' + review.id + '\')">Connect Account</button>' +
       '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
   } else {
     document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
@@ -989,6 +990,7 @@ function showReviewDashboard() {
       '<button class="btn btn-primary" onclick="showWafrReportModal(\'' + review.id + '\')">WAFR Report</button>' +
       '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
       '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
+      '<button class="btn" onclick="showConnectAccountModal(\'' + review.id + '\')">Connect Account</button>' +
       '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
   }
   
@@ -3020,6 +3022,138 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
     if (notifyEmail) sendDeckNotification(notifyEmail, review.customer, filename, false, e.message);
     alert('Error saving PowerPoint: ' + e.message);
   });
+}
+
+// === CONNECT AWS ACCOUNT ===
+function showConnectAccountModal(reviewId) {
+  var review = getReview(reviewId);
+  var existingConnection = review.awsConnection || {};
+  var externalId = existingConnection.externalId || ('wafr-' + reviewId.replace('review-', '').slice(0, 8) + '-' + Date.now().toString(36));
+  
+  var statusHtml = '';
+  if (existingConnection.roleArn) {
+    statusHtml = '<div style="background:#f0fff0;border:1px solid #1d8102;border-radius:4px;padding:10px;margin-bottom:16px;">' +
+      '<strong style="color:#1d8102;">Connected</strong> - ' + existingConnection.roleArn.split('/')[0].split(':')[4] + ' (' + (existingConnection.region || 'eu-west-2') + ')' +
+      '<br><span style="font-size:11px;color:#5f6b7a;">Last scanned: ' + (existingConnection.lastScan || 'Never') + '</span></div>';
+  }
+
+  document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
+    '<div class="modal" onclick="event.stopPropagation()" style="width:700px;max-width:90vw;">' +
+    '<h3>Connect AWS Account</h3>' +
+    '<p style="color:#5f6b7a;font-size:13px;margin-bottom:16px;">Connect to the customer\'s AWS account to automatically scan their WorkSpaces environment and pre-populate review findings.</p>' +
+    statusHtml +
+    '<div style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:4px;padding:12px;margin-bottom:16px;">' +
+    '<strong style="font-size:12px;">Step 1:</strong> <span style="font-size:12px;">Deploy the CloudFormation template in the customer\'s account:</span>' +
+    '<div style="margin-top:8px;"><button class="btn btn-sm" onclick="copyToClipboard(\'https://github.com/danielmatlock/workspaces-well-architected-review/blob/dev/cfn/wafr-readonly-role.yaml\')">Copy Template URL</button>' +
+    ' <a href="https://github.com/danielmatlock/workspaces-well-architected-review/blob/dev/cfn/wafr-readonly-role.yaml" target="_blank" style="font-size:12px;">View Template</a></div>' +
+    '<div style="margin-top:8px;font-size:12px;"><strong>External ID to use:</strong> <code id="external-id-display" style="background:#fff;padding:2px 6px;border:1px solid #ddd;border-radius:3px;user-select:all;">' + externalId + '</code>' +
+    ' <button class="btn btn-sm" onclick="copyToClipboard(\'' + externalId + '\')">Copy</button></div></div>' +
+    '<div style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:4px;padding:12px;margin-bottom:16px;">' +
+    '<strong style="font-size:12px;">Step 2:</strong> <span style="font-size:12px;">Paste the Role ARN from the CloudFormation output:</span>' +
+    '<div class="form-group" style="margin-top:8px;margin-bottom:0;">' +
+    '<input id="connect-role-arn" type="text" placeholder="arn:aws:iam::123456789012:role/WAFRReviewToolReadOnly" value="' + (existingConnection.roleArn || '') + '" style="width:100%;padding:8px;font-size:13px;border:1px solid #e1e4e8;border-radius:4px;font-family:monospace;">' +
+    '</div></div>' +
+    '<div class="form-group"><label>Account Region</label>' +
+    '<select id="connect-region" style="width:100%;padding:6px;font-size:13px;">' +
+    '<option value="eu-west-1"' + (existingConnection.region === 'eu-west-1' ? ' selected' : '') + '>eu-west-1 (Ireland)</option>' +
+    '<option value="eu-west-2"' + ((existingConnection.region === 'eu-west-2' || !existingConnection.region) ? ' selected' : '') + '>eu-west-2 (London)</option>' +
+    '<option value="eu-central-1"' + (existingConnection.region === 'eu-central-1' ? ' selected' : '') + '>eu-central-1 (Frankfurt)</option>' +
+    '<option value="us-east-1"' + (existingConnection.region === 'us-east-1' ? ' selected' : '') + '>us-east-1 (N. Virginia)</option>' +
+    '<option value="us-west-2"' + (existingConnection.region === 'us-west-2' ? ' selected' : '') + '>us-west-2 (Oregon)</option>' +
+    '<option value="ap-southeast-1"' + (existingConnection.region === 'ap-southeast-1' ? ' selected' : '') + '>ap-southeast-1 (Singapore)</option>' +
+    '<option value="ap-southeast-2"' + (existingConnection.region === 'ap-southeast-2' ? ' selected' : '') + '>ap-southeast-2 (Sydney)</option>' +
+    '<option value="ap-northeast-1"' + (existingConnection.region === 'ap-northeast-1' ? ' selected' : '') + '>ap-northeast-1 (Tokyo)</option>' +
+    '</select></div>' +
+    '<div id="connect-status" style="font-size:12px;margin-top:8px;"></div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn" onclick="closeModal()">Cancel</button> ' +
+    (existingConnection.roleArn ? '<button class="btn" onclick="disconnectAccount(\'' + reviewId + '\')">Disconnect</button> ' : '') +
+    '<button class="btn btn-primary" onclick="connectAndScan(\'' + reviewId + '\', \'' + externalId + '\')">Connect & Scan</button></div></div></div>';
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(function() {
+    alert('Copied to clipboard');
+  }).catch(function() {
+    prompt('Copy this value:', text);
+  });
+}
+
+function disconnectAccount(reviewId) {
+  if (!confirm('Disconnect this AWS account? Existing scan data will remain in the review.')) return;
+  var review = getReview(reviewId);
+  delete review.awsConnection;
+  updateReview(review);
+  closeModal();
+  showReviewDashboard();
+}
+
+async function connectAndScan(reviewId, externalId) {
+  var roleArn = document.getElementById('connect-role-arn').value.trim();
+  var region = document.getElementById('connect-region').value;
+  var statusEl = document.getElementById('connect-status');
+
+  if (!roleArn) { statusEl.innerHTML = '<span style="color:#d13212;">Please enter the Role ARN.</span>'; return; }
+  if (!roleArn.match(/^arn:aws:iam::\d{12}:role\/.+$/)) { statusEl.innerHTML = '<span style="color:#d13212;">Invalid ARN format. Expected: arn:aws:iam::123456789012:role/RoleName</span>'; return; }
+
+  statusEl.innerHTML = '<span style="color:#0073bb;">Connecting and scanning... this may take 30-60 seconds.</span>';
+
+  try {
+    var res = await fetch(ENV.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'scanAccount',
+        roleArn: roleArn,
+        externalId: externalId,
+        region: region,
+        reviewId: reviewId
+      })
+    });
+    var data = await res.json();
+    var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+
+    if (payload.error) {
+      statusEl.innerHTML = '<span style="color:#d13212;">Error: ' + payload.error + '</span>';
+      return;
+    }
+
+    // Save connection details
+    var review = getReview(reviewId);
+    review.awsConnection = {
+      roleArn: roleArn,
+      externalId: externalId,
+      region: region,
+      lastScan: new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0],
+      accountId: roleArn.split(':')[4]
+    };
+
+    // Auto-populate answers from scan data
+    if (payload.findings) {
+      var populated = 0;
+      Object.keys(payload.findings).forEach(function(qId) {
+        var finding = payload.findings[qId];
+        if (!review.answers[qId]) review.answers[qId] = {};
+        // Only populate if not already answered
+        if (!review.answers[qId].notes || review.answers[qId].notes.trim() === '') {
+          review.answers[qId].notes = finding.evidence || '';
+          populated++;
+        }
+        if (!review.answers[qId].score && finding.score) {
+          review.answers[qId].score = finding.score;
+          populated++;
+        }
+      });
+      statusEl.innerHTML = '<span style="color:#1d8102;">Scan complete. ' + populated + ' fields populated from ' + Object.keys(payload.findings).length + ' findings.</span>';
+    } else {
+      statusEl.innerHTML = '<span style="color:#1d8102;">Connected successfully. No findings to populate.</span>';
+    }
+
+    updateReview(review);
+    setTimeout(function() { closeModal(); showReviewDashboard(); }, 2000);
+  } catch(e) {
+    statusEl.innerHTML = '<span style="color:#d13212;">Connection failed: ' + (e.message || e) + '</span>';
+  }
 }
 
 // === SAVED REPORTS ===

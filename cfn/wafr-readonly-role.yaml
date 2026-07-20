@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Creates a read-only IAM role for the AWS WorkSpaces WAFR Review Tool.
+  This role allows the tool to query your WorkSpaces environment, Directory Services,
+  networking, CloudWatch metrics, and Cost Explorer data to auto-populate review findings.
+  No write access is granted - this role can only read/describe resources.
+
+Parameters:
+  ExternalId:
+    Type: String
+    Description: >
+      External ID provided by the WAFR Review Tool when connecting your account.
+      This prevents confused deputy attacks. You will find this in the tool's
+      'Connect Account' dialog.
+    MinLength: 8
+    MaxLength: 64
+    AllowedPattern: '[a-zA-Z0-9\-]+'
+    ConstraintDescription: Must be 8-64 alphanumeric characters or hyphens.
+
+  TrustedAccountId:
+    Type: String
+    Default: '590183747733'
+    Description: >
+      AWS Account ID of the WAFR Review Tool (do not change unless instructed).
+    AllowedPattern: '[0-9]{12}'
+
+Resources:
+  WAFRReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: WAFRReviewToolReadOnly
+      Description: Read-only access for the AWS WorkSpaces WAFR Review Tool to query environment data.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${TrustedAccountId}:root'
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref ExternalId
+      Policies:
+        - PolicyName: WAFRReadOnlyPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: WorkSpacesReadOnly
+                Effect: Allow
+                Action:
+                  - 'workspaces:DescribeWorkspaces'
+                  - 'workspaces:DescribeWorkspaceDirectories'
+                  - 'workspaces:DescribeWorkspaceBundles'
+                  - 'workspaces:DescribeWorkspaceImages'
+                  - 'workspaces:DescribeWorkspacesConnectionStatus'
+                  - 'workspaces:DescribeIpGroups'
+                  - 'workspaces:DescribeTags'
+                  - 'workspaces:DescribeWorkspaceSnapshots'
+                  - 'workspaces:ListAvailableManagementCidrRanges'
+                Resource: '*'
+              - Sid: DirectoryServicesReadOnly
+                Effect: Allow
+                Action:
+                  - 'ds:DescribeDirectories'
+                  - 'ds:DescribeConditionalForwarders'
+                  - 'ds:DescribeTrusts'
+                  - 'ds:DescribeEventTopics'
+                  - 'ds:DescribeSnapshots'
+                  - 'ds:GetDirectoryLimits'
+                  - 'ds:ListTagsForResource'
+                Resource: '*'
+              - Sid: NetworkingReadOnly
+                Effect: Allow
+                Action:
+                  - 'ec2:DescribeVpcs'
+                  - 'ec2:DescribeSubnets'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:DescribeNetworkInterfaces'
+                  - 'ec2:DescribeRouteTables'
+                  - 'ec2:DescribeNatGateways'
+                  - 'ec2:DescribeVpcEndpoints'
+                Resource: '*'
+              - Sid: MonitoringReadOnly
+                Effect: Allow
+                Action:
+                  - 'cloudwatch:GetMetricData'
+                  - 'cloudwatch:ListMetrics'
+                  - 'cloudwatch:DescribeAlarms'
+                  - 'cloudwatch:GetMetricStatistics'
+                  - 'logs:DescribeLogGroups'
+                  - 'logs:FilterLogEvents'
+                Resource: '*'
+              - Sid: CostReadOnly
+                Effect: Allow
+                Action:
+                  - 'ce:GetCostAndUsage'
+                  - 'ce:GetCostForecast'
+                  - 'ce:GetReservationUtilization'
+                  - 'ce:GetSavingsPlansUtilization'
+                Resource: '*'
+              - Sid: PatchComplianceReadOnly
+                Effect: Allow
+                Action:
+                  - 'ssm:DescribeInstanceInformation'
+                  - 'ssm:ListComplianceItems'
+                  - 'ssm:ListComplianceSummaries'
+                  - 'ssm:DescribePatchGroupState'
+                Resource: '*'
+              - Sid: EncryptionReadOnly
+                Effect: Allow
+                Action:
+                  - 'kms:DescribeKey'
+                  - 'kms:ListKeys'
+                  - 'kms:ListAliases'
+                  - 'kms:GetKeyPolicy'
+                  - 'kms:GetKeyRotationStatus'
+                Resource: '*'
+              - Sid: TaggingReadOnly
+                Effect: Allow
+                Action:
+                  - 'tag:GetResources'
+                  - 'tag:GetTagKeys'
+                  - 'tag:GetTagValues'
+                Resource: '*'
+
+Outputs:
+  RoleArn:
+    Description: >
+      Paste this Role ARN into the WAFR Review Tool 'Connect Account' dialog.
+    Value: !GetAtt WAFRReadOnlyRole.Arn
+    Export:
+      Name: WAFRReviewToolRoleArn
+
+  ExternalIdUsed:
+    Description: External ID configured for this role (must match the tool).
+    Value: !Ref ExternalId

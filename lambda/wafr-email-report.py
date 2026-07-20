@@ -169,6 +169,138 @@ def generate_orr_recommendations(questions_with_notes, reference_context=''):
         return {"_error": str(e)}
 
 
+def map_scan_to_findings(scan_data):
+    """Map raw AWS API scan data to WAFR review question findings with evidence and auto-scores."""
+    findings = {}
+    ws_count = scan_data.get('workspaceCount', 0)
+    protocols = scan_data.get('protocols', {})
+    running_modes = scan_data.get('runningModes', {})
+    directories = scan_data.get('directories', [])
+    ws_dirs = scan_data.get('wsDirectories', [])
+    ip_groups = scan_data.get('ipGroups', [])
+    encrypted_count = scan_data.get('encryptedCount', 0)
+    az_count = scan_data.get('azCount', 0)
+    nat_count = scan_data.get('natGateways', 0)
+    alarms_count = scan_data.get('workspacesAlarms', 0)
+    monthly_cost = scan_data.get('monthlyCost', 'N/A')
+    bundles = scan_data.get('bundles', {})
+
+    # ─── OPS-WS-04: Monitoring ───
+    if alarms_count > 2:
+        findings['OPS-WS-04'] = {'score': 'fully', 'evidence': f'CloudWatch monitoring active with {alarms_count} WorkSpaces-related alarms configured. Metrics are being tracked.'}
+    elif alarms_count > 0:
+        findings['OPS-WS-04'] = {'score': 'partial', 'evidence': f'Basic monitoring in place with {alarms_count} alarm(s). Consider expanding to cover Unhealthy, SessionLaunchTime, InSessionLatency, and ConnectionFailure metrics.'}
+    else:
+        findings['OPS-WS-04'] = {'score': 'not', 'evidence': f'No WorkSpaces-specific CloudWatch alarms detected. Fleet of {ws_count} WorkSpaces has no proactive health monitoring.'}
+
+    # ─── OPS-WS-06: Tagging ───
+    # (Would need tag:GetResources call - mark as needing manual review)
+    findings['OPS-WS-06'] = {'score': '', 'evidence': f'Fleet: {ws_count} WorkSpaces across {len(bundles)} bundle type(s). Tagging compliance requires manual review of tag policies and enforcement.'}
+
+    # ─── OPS-WS-11: PCoIP to DCV Migration ───
+    pcoip_count = protocols.get('PCOIP', 0) + protocols.get('PCoIP', 0)
+    dcv_count = protocols.get('WSP', 0) + protocols.get('DCV', 0)
+    total_proto = pcoip_count + dcv_count
+    if total_proto > 0:
+        if pcoip_count == 0:
+            findings['OPS-WS-11'] = {'score': 'fully', 'evidence': f'All {dcv_count} WorkSpaces are on Amazon DCV protocol. PCoIP migration complete.'}
+        elif dcv_count > 0:
+            findings['OPS-WS-11'] = {'score': 'partial', 'evidence': f'Mixed protocol fleet: {dcv_count} on DCV, {pcoip_count} still on PCoIP ({round(pcoip_count/total_proto*100)}% remaining to migrate).'}
+        else:
+            findings['OPS-WS-11'] = {'score': 'not', 'evidence': f'Entire fleet ({pcoip_count} WorkSpaces) on PCoIP. No DCV migration has begun. PCoIP is legacy and approaching end-of-support.'}
+
+    # ─── SEC-WS-01: Directory Integration ───
+    if directories:
+        dir_info = []
+        for d in directories:
+            dir_info.append(f"{d['type']} ({d['name']}) - Status: {d.get('status', 'N/A')}")
+        findings['SEC-WS-01'] = {'score': 'partial', 'evidence': f'Directory services configured: {"; ".join(dir_info)}. Directory health and least-privilege assessment requires manual review.'}
+    else:
+        findings['SEC-WS-01'] = {'score': '', 'evidence': 'No directories found via API. May require manual verification.'}
+
+    # ─── SEC-WS-02: MFA ───
+    mfa_configured = any(d.get('radiusStatus') not in ['None', None, ''] for d in directories)
+    if mfa_configured:
+        findings['SEC-WS-02'] = {'score': 'partial', 'evidence': f'RADIUS/MFA configuration detected on directory. Verify MFA is enforced for all connections and fallback procedures exist.'}
+    else:
+        findings['SEC-WS-02'] = {'score': 'not', 'evidence': f'No RADIUS/MFA configuration detected on any directory ({len(directories)} directories scanned). MFA is not enforced for WorkSpaces connections.'}
+
+    # ─── SEC-WS-03: Device Access Controls ───
+    if ip_groups and len(ip_groups) > 0:
+        total_rules = sum(len(g.get('UserRules', [])) for g in ip_groups)
+        findings['SEC-WS-03'] = {'score': 'partial', 'evidence': f'{len(ip_groups)} IP Access Control Group(s) configured with {total_rules} total rules. Verify groups are attached to directories and cover all required network ranges.'}
+    else:
+        findings['SEC-WS-03'] = {'score': 'not', 'evidence': 'No IP Access Control Groups configured. Any device from any network can connect to WorkSpaces (subject to credentials only).'}
+
+    # ─── SEC-WS-04: Data at Rest Encryption ───
+    if ws_count > 0:
+        enc_pct = round(encrypted_count / ws_count * 100)
+        if enc_pct >= 95:
+            findings['SEC-WS-04'] = {'score': 'fully', 'evidence': f'{encrypted_count}/{ws_count} WorkSpaces have volume encryption enabled ({enc_pct}%). Encryption covers root and/or user volumes using KMS.'}
+        elif enc_pct > 0:
+            findings['SEC-WS-04'] = {'score': 'partial', 'evidence': f'{encrypted_count}/{ws_count} WorkSpaces have volume encryption ({enc_pct}%). {ws_count - encrypted_count} WorkSpaces have unencrypted volumes.'}
+        else:
+            findings['SEC-WS-04'] = {'score': 'not', 'evidence': f'No WorkSpaces have volume encryption enabled (0/{ws_count}). Data at rest is not protected by KMS encryption.'}
+
+    # ─── SEC-WS-07: Network Security ───
+    evidence_parts = []
+    if az_count >= 2:
+        evidence_parts.append(f'WorkSpaces subnets span {az_count} Availability Zones')
+    else:
+        evidence_parts.append(f'WorkSpaces in single AZ only')
+    if nat_count > 0:
+        evidence_parts.append(f'{nat_count} NAT Gateway(s) detected')
+    else:
+        evidence_parts.append('No NAT Gateways detected - WorkSpaces may have direct internet access or no egress')
+    findings['SEC-WS-07'] = {'score': 'partial' if nat_count > 0 else 'not', 'evidence': '. '.join(evidence_parts) + '.'}
+
+    # ─── REL-WS-01: VPC/Subnet Resilience ───
+    if az_count >= 2:
+        findings['REL-WS-01'] = {'score': 'fully', 'evidence': f'WorkSpaces subnets configured across {az_count} Availability Zones ({", ".join(scan_data.get("azList", []))}). Multi-AZ resilience is in place.'}
+    elif az_count == 1:
+        findings['REL-WS-01'] = {'score': 'not', 'evidence': f'WorkSpaces deployed in a single Availability Zone only. No AZ-level resilience - an AZ failure would affect all WorkSpaces.'}
+
+    # ─── REL-WS-02: Directory HA ───
+    if directories:
+        managed_ad = [d for d in directories if d['type'] in ['MicrosoftAD', 'SharedMicrosoftAD']]
+        if managed_ad:
+            findings['REL-WS-02'] = {'score': 'fully', 'evidence': f'AWS Managed Microsoft AD deployed ({managed_ad[0]["name"]}). Managed AD provides multi-AZ domain controllers by default.'}
+        else:
+            ad_connector = [d for d in directories if d['type'] == 'ADConnector']
+            if ad_connector:
+                findings['REL-WS-02'] = {'score': 'partial', 'evidence': f'AD Connector in use ({ad_connector[0]["name"]}). HA depends on the on-premises domain controllers it targets. Verify multiple DCs are configured.'}
+
+    # ─── COST-WS-01: Running Mode Optimisation ───
+    autostop = running_modes.get('AUTO_STOP', 0)
+    alwayson = running_modes.get('ALWAYS_ON', 0)
+    if ws_count > 0:
+        autostop_pct = round(autostop / ws_count * 100)
+        findings['COST-WS-01'] = {'score': 'partial' if autostop_pct > 50 else 'not', 'evidence': f'Running modes: {autostop} AutoStop ({autostop_pct}%), {alwayson} AlwaysOn ({100 - autostop_pct}%). Monthly WorkSpaces cost: {monthly_cost} {scan_data.get("costCurrency", "USD")}. Review whether AutoStop/AlwaysOn assignment matches actual usage patterns (breakeven ~80 hours/month).'}
+
+    # ─── COST-WS-04: Bundle Right-Sizing ───
+    if len(bundles) == 1:
+        findings['COST-WS-04'] = {'score': 'not', 'evidence': f'Single bundle type in use for all {ws_count} WorkSpaces. No persona-based right-sizing. All users receive the same compute regardless of workload requirements.'}
+    elif len(bundles) <= 3:
+        findings['COST-WS-04'] = {'score': 'partial', 'evidence': f'{len(bundles)} bundle types in use across {ws_count} WorkSpaces. Some differentiation exists but verify bundles are matched to user personas based on utilisation data.'}
+    else:
+        findings['COST-WS-04'] = {'score': 'fully', 'evidence': f'{len(bundles)} bundle types in use across {ws_count} WorkSpaces. Bundle diversity suggests persona-based sizing is in place.'}
+
+    # ─── PERF-WS-01: Protocol Selection ───
+    if total_proto > 0:
+        if pcoip_count == 0:
+            findings['PERF-WS-01'] = {'score': 'fully', 'evidence': f'All WorkSpaces on Amazon DCV - the strategic protocol with superior features (bidirectional audio/video, 4K, certificate-based auth).'}
+        elif dcv_count > pcoip_count:
+            findings['PERF-WS-01'] = {'score': 'partial', 'evidence': f'Majority on DCV ({dcv_count}) but {pcoip_count} still on PCoIP. DCV migration is underway.'}
+        else:
+            findings['PERF-WS-01'] = {'score': 'not', 'evidence': f'Majority ({pcoip_count}/{total_proto}) on PCoIP (legacy). DCV offers better performance, lower bandwidth, and is the strategic direction.'}
+
+    # ─── SUS-WS-01: Resource Provisioning ───
+    if ws_count > 0 and autostop > 0:
+        findings['SUS-WS-01'] = {'score': 'partial' if autostop_pct >= 70 else 'not', 'evidence': f'{autostop_pct}% of fleet uses AutoStop mode. Stopped WorkSpaces consume minimal resources. Target: majority of fleet on AutoStop unless specific always-on requirement justified.'}
+
+    return findings
+
+
 def generate_tailored_recommendations(questions_with_notes, reference_context='', template_id='workspaces-default'):
     if not questions_with_notes:
         return {}
@@ -968,6 +1100,218 @@ ARCHITECTURE DOCUMENTATION:
                 'statusCode': 200,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
                 'body': json.dumps({'context': combined, 'documentCount': len(context_parts)})
+            }
+
+        if action == 'scanAccount':
+            role_arn = body['roleArn']
+            external_id = body['externalId']
+            target_region = body.get('region', 'eu-west-2')
+            review_id = body.get('reviewId', '')
+
+            # Assume the cross-account role
+            sts = boto3.client('sts', region_name='eu-west-2')
+            try:
+                assumed = sts.assume_role(
+                    RoleArn=role_arn,
+                    RoleSessionName='WAFRReviewToolScan',
+                    ExternalId=external_id,
+                    DurationSeconds=3600
+                )
+            except Exception as e:
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': f'Failed to assume role: {str(e)}. Check the Role ARN, External ID, and trust policy.'})
+                }
+
+            creds = assumed['Credentials']
+            session_kwargs = {
+                'aws_access_key_id': creds['AccessKeyId'],
+                'aws_secret_access_key': creds['SecretAccessKey'],
+                'aws_session_token': creds['SessionToken'],
+                'region_name': target_region
+            }
+
+            # Create clients with assumed credentials
+            ws_client = boto3.client('workspaces', **session_kwargs)
+            ds_client = boto3.client('ds', **session_kwargs)
+            ec2_client = boto3.client('ec2', **session_kwargs)
+            cw_client = boto3.client('cloudwatch', **session_kwargs)
+            ce_client = boto3.client('ce', region_name='us-east-1',
+                aws_access_key_id=creds['AccessKeyId'],
+                aws_secret_access_key=creds['SecretAccessKey'],
+                aws_session_token=creds['SessionToken'])
+
+            findings = {}
+            scan_data = {}
+
+            # ─── WORKSPACES FLEET ─────────────────────────────────────────
+            try:
+                all_workspaces = []
+                paginator = ws_client.get_paginator('describe_workspaces')
+                for page in paginator.paginate():
+                    all_workspaces.extend(page.get('Workspaces', []))
+                scan_data['workspaces'] = all_workspaces
+                scan_data['workspaceCount'] = len(all_workspaces)
+
+                # Protocol analysis
+                protocols = {}
+                bundles_used = {}
+                running_modes = {}
+                encrypted_count = 0
+                for ws in all_workspaces:
+                    proto = ws.get('WorkspaceProperties', {}).get('Protocols', ['PCOIP'])
+                    for p in (proto if isinstance(proto, list) else [proto]):
+                        protocols[p] = protocols.get(p, 0) + 1
+                    bundle = ws.get('BundleId', 'Unknown')
+                    bundles_used[bundle] = bundles_used.get(bundle, 0) + 1
+                    mode = ws.get('WorkspaceProperties', {}).get('RunningMode', 'AUTO_STOP')
+                    running_modes[mode] = running_modes.get(mode, 0) + 1
+                    if ws.get('RootVolumeEncryptionEnabled') or ws.get('UserVolumeEncryptionEnabled'):
+                        encrypted_count += 1
+
+                scan_data['protocols'] = protocols
+                scan_data['bundles'] = bundles_used
+                scan_data['runningModes'] = running_modes
+                scan_data['encryptedCount'] = encrypted_count
+            except Exception as e:
+                scan_data['workspacesError'] = str(e)
+
+            # ─── DIRECTORIES ──────────────────────────────────────────────
+            try:
+                dirs_response = ds_client.describe_directories()
+                directories = dirs_response.get('DirectoryDescriptions', [])
+                scan_data['directories'] = []
+                for d in directories:
+                    scan_data['directories'].append({
+                        'id': d.get('DirectoryId'),
+                        'name': d.get('Name'),
+                        'type': d.get('Type'),
+                        'size': d.get('Size'),
+                        'edition': d.get('Edition', 'N/A'),
+                        'status': d.get('Stage'),
+                        'vpcId': d.get('VpcSettings', {}).get('VpcId'),
+                        'subnetIds': d.get('VpcSettings', {}).get('SubnetIds', []),
+                        'dnsIpAddrs': d.get('DnsIpAddrs', []),
+                        'radiusStatus': d.get('RadiusSettings', {}).get('RadiusStatus', 'None'),
+                        'ssoEnabled': d.get('SsoEnabled', False)
+                    })
+            except Exception as e:
+                scan_data['directoriesError'] = str(e)
+
+            # ─── WORKSPACES DIRECTORIES (IP Access, Device Settings) ──────
+            try:
+                ws_dirs = ws_client.describe_workspace_directories()
+                scan_data['wsDirectories'] = []
+                for wd in ws_dirs.get('Directories', []):
+                    scan_data['wsDirectories'].append({
+                        'directoryId': wd.get('DirectoryId'),
+                        'directoryType': wd.get('DirectoryType'),
+                        'state': wd.get('State'),
+                        'ipGroupIds': wd.get('ipGroupIds', []),
+                        'selfServicePermissions': wd.get('SelfservicePermissions', {}),
+                        'workspaceAccessProperties': wd.get('WorkspaceAccessProperties', {}),
+                        'workspaceCreationProperties': wd.get('WorkspaceCreationProperties', {})
+                    })
+            except Exception as e:
+                scan_data['wsDirectoriesError'] = str(e)
+
+            # ─── IP ACCESS GROUPS ─────────────────────────────────────────
+            try:
+                ip_groups = ws_client.describe_ip_groups()
+                scan_data['ipGroups'] = ip_groups.get('Result', [])
+            except Exception as e:
+                scan_data['ipGroupsError'] = str(e)
+
+            # ─── VPC / NETWORKING ─────────────────────────────────────────
+            try:
+                # Get VPCs used by directories
+                vpc_ids = set()
+                for d in scan_data.get('directories', []):
+                    if d.get('vpcId'):
+                        vpc_ids.add(d['vpcId'])
+                if vpc_ids:
+                    vpcs = ec2_client.describe_vpcs(VpcIds=list(vpc_ids))
+                    scan_data['vpcs'] = vpcs.get('Vpcs', [])
+                    # Get subnets
+                    subnet_ids = set()
+                    for d in scan_data.get('directories', []):
+                        subnet_ids.update(d.get('subnetIds', []))
+                    if subnet_ids:
+                        subnets = ec2_client.describe_subnets(SubnetIds=list(subnet_ids))
+                        scan_data['subnets'] = subnets.get('Subnets', [])
+                        # Check AZ spread
+                        azs = set(s['AvailabilityZone'] for s in scan_data['subnets'])
+                        scan_data['azCount'] = len(azs)
+                        scan_data['azList'] = list(azs)
+                    # NAT Gateways
+                    nats = ec2_client.describe_nat_gateways(
+                        Filter=[{'Name': 'vpc-id', 'Values': list(vpc_ids)}]
+                    )
+                    scan_data['natGateways'] = len(nats.get('NatGateways', []))
+            except Exception as e:
+                scan_data['networkingError'] = str(e)
+
+            # ─── CLOUDWATCH METRICS ───────────────────────────────────────
+            try:
+                from datetime import datetime, timedelta
+                end_time = datetime.utcnow()
+                start_time = end_time - timedelta(days=7)
+                # Check for Unhealthy WorkSpaces metric
+                unhealthy = cw_client.get_metric_statistics(
+                    Namespace='AWS/WorkSpaces',
+                    MetricName='Unhealthy',
+                    StartTime=start_time,
+                    EndTime=end_time,
+                    Period=86400,
+                    Statistics=['Maximum']
+                )
+                scan_data['unhealthyMetric'] = unhealthy.get('Datapoints', [])
+                # Check existing alarms for WorkSpaces
+                alarms = cw_client.describe_alarms(
+                    AlarmNamePrefix='WorkSpaces',
+                    MaxRecords=50
+                )
+                ws_alarms = [a for a in alarms.get('MetricAlarms', []) if 'WorkSpaces' in a.get('Namespace', '') or 'workspaces' in a.get('AlarmName', '').lower()]
+                scan_data['workspacesAlarms'] = len(ws_alarms)
+            except Exception as e:
+                scan_data['monitoringError'] = str(e)
+
+            # ─── COST EXPLORER ────────────────────────────────────────────
+            try:
+                from datetime import datetime, timedelta
+                end_date = datetime.utcnow().strftime('%Y-%m-%d')
+                start_date = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+                cost_response = ce_client.get_cost_and_usage(
+                    TimePeriod={'Start': start_date, 'End': end_date},
+                    Granularity='MONTHLY',
+                    Metrics=['UnblendedCost'],
+                    Filter={'Dimensions': {'Key': 'SERVICE', 'Values': ['Amazon WorkSpaces']}}
+                )
+                total_cost = 0
+                for result in cost_response.get('ResultsByTime', []):
+                    total_cost += float(result.get('Total', {}).get('UnblendedCost', {}).get('Amount', 0))
+                scan_data['monthlyCost'] = round(total_cost, 2)
+                scan_data['costCurrency'] = cost_response.get('ResultsByTime', [{}])[0].get('Total', {}).get('UnblendedCost', {}).get('Unit', 'USD') if cost_response.get('ResultsByTime') else 'USD'
+            except Exception as e:
+                scan_data['costError'] = str(e)
+
+            # ─── MAP FINDINGS TO REVIEW QUESTIONS ─────────────────────────
+            findings = map_scan_to_findings(scan_data)
+
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'findings': findings, 'summary': {
+                    'workspaceCount': scan_data.get('workspaceCount', 0),
+                    'directoryCount': len(scan_data.get('directories', [])),
+                    'protocols': scan_data.get('protocols', {}),
+                    'runningModes': scan_data.get('runningModes', {}),
+                    'azCount': scan_data.get('azCount', 0),
+                    'monthlyCost': scan_data.get('monthlyCost', 'N/A'),
+                    'encryptedCount': scan_data.get('encryptedCount', 0),
+                    'alarmCount': scan_data.get('workspacesAlarms', 0)
+                }})
             }
 
         return {
