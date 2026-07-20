@@ -166,31 +166,35 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
   - Green/red status dot on button shows connection state
   - Connection details saved to review (persisted to DynamoDB)
 - **Auto WAFR** button (blue) - one-click environment scan + AI-powered report
-  - Scans 20+ data sources from the connected AWS account:
+  - Scans 27 data sources from the connected AWS account:
     - Fleet: WorkSpaces count, protocols, running modes, encryption, states
+    - Pools: WorkSpaces Pools (non-persistent), capacity config
     - Identity: Directories (AD Connector/Managed AD), MFA/RADIUS, SSO
     - Networking: VPCs, subnets, AZs, NAT Gateways, VPC Endpoints, Security Groups, Route Tables
+    - Network Logging: VPC Flow Logs (traffic audit posture)
     - Security: Encryption status, IP Access Control Groups, open SGs flagged
+    - Threat Detection: GuardDuty enabled/status
     - Monitoring: CloudWatch alarms, dashboards, log groups, active metrics
     - Auditing: CloudTrail trails, logging status, multi-region, log validation
     - Cost: 90-day spend breakdown by month
+    - Capacity: Service Quotas (WorkSpaces limit vs usage headroom)
     - Utilisation: Connection status (identifies WorkSpaces unused 30+ days)
     - Images: Custom images, OS version, age
     - Bundles: Custom bundle compute specs
     - Governance: Tagging compliance (sampled)
     - Automation: EventBridge rules (WorkSpaces-related)
-    - Backup/DR: AWS Backup plans, connection aliases
+    - Backup/DR: AWS Backup plans, connection aliases (cross-region)
     - Patching: SSM managed instances, patch compliance
     - IAM: WorkSpaces-related roles, BYOL/tenancy config
-    - Client: Reconnect settings, log upload
+    - Client: Reconnect settings, log upload, custom branding
     - Snapshots: Rebuild/restore availability
     - Config: AWS Config compliance rules
   - Bedrock generates comprehensive assessment with:
     - Executive summary for leadership
-    - Findings by WAF pillar (Observation, Recommendation, Target State, Priority, RAG)
+    - Findings by WAF pillar (Observation, Recommendation, Target State, Steps to Green, Priority, RAG)
     - AWS documentation links per finding
     - "Areas Not Assessed" section with suggested manual actions
-  - Two-call architecture to avoid API Gateway 30s timeout (scan then analyse)
+  - Async architecture: Lambda self-invokes (InvocationType=Event) for Bedrock analysis, saves result to S3, frontend polls every 5s until complete. No API Gateway timeout constraints.
   - Report saved to S3 as `autowafr` type
 
 ### ORR-Specific Features
