@@ -1932,17 +1932,22 @@ ARCHITECTURE DOCUMENTATION:
 
             prompt = (
                 "You are a senior AWS Solutions Architect conducting a Well-Architected Review of an Amazon WorkSpaces environment. "
-                "Below is evidence from an automated AWS account scan. Based ONLY on this evidence, produce a concise assessment.\n\n"
-                "For each finding, produce: 'title' (short), 'pillar' (WAF pillar name), "
-                "'observation' (2-3 sentences, current state), 'recommendation' (1 sentence + 2-3 bullets + one AWS docs URL), "
-                "'targetState' (1-2 sentences, what green looks like), 'priority' (Critical/High/Medium/Low), "
-                "'rag' (red/amber/green).\n\n"
-                "Also produce 'notAssessed' array: areas NOT determinable from scan (e.g. patching, GPO, runbooks, app delivery, DR testing). "
-                "Each: {'area': '...', 'reason': '...'}.\n\n"
-                "Produce 'executiveSummary' (2-3 sentences for leadership).\n\n"
+                "Below is evidence from an automated AWS account scan. Based ONLY on this evidence, produce a detailed assessment.\n\n"
+                "For each finding, produce a JSON object with:\n"
+                "- 'title': Short descriptive title\n"
+                "- 'pillar': WAF pillar (Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimisation, Sustainability)\n"
+                "- 'observation': Detailed professional summary of current state (3-5 sentences). Include specific numbers and configuration details from the evidence. Use third person.\n"
+                "- 'recommendation': Start with a brief current-state acknowledgement, then 3-4 actionable bullet points. "
+                "End with 'Further Reading:' followed by 1-2 real https://docs.aws.amazon.com URLs specifically relevant to this finding. "
+                "IMPORTANT: Always include the Further Reading URLs.\n"
+                "- 'targetState': What fully implemented looks like (2-3 sentences, concrete and measurable)\n"
+                "- 'priority': Critical/High/Medium/Low\n"
+                "- 'rag': red (critical gap), amber (partial), green (good)\n\n"
+                "Also produce 'notAssessed' array: areas NOT determinable from scan. Each: {'area': '...', 'reason': '...', 'suggestedAction': '...'}.\n\n"
+                "Produce 'executiveSummary' (3-4 sentences for leadership audience).\n\n"
                 "JSON ONLY, no markdown:\n"
                 "{\"executiveSummary\": \"...\", \"findings\": [{\"title\":\"\",\"pillar\":\"\",\"observation\":\"\",\"recommendation\":\"\",\"targetState\":\"\",\"priority\":\"\",\"rag\":\"\"}], "
-                "\"notAssessed\": [{\"area\":\"\",\"reason\":\"\"}]}\n\n"
+                "\"notAssessed\": [{\"area\":\"\",\"reason\":\"\",\"suggestedAction\":\"\"}]}\n\n"
                 "EVIDENCE:\n" + evidence_text[:20000]
             )
 
@@ -1953,7 +1958,7 @@ ARCHITECTURE DOCUMENTATION:
                     accept='application/json',
                     body=json.dumps({
                         'anthropic_version': 'bedrock-2023-05-31',
-                        'max_tokens': 4096,
+                        'max_tokens': 6000,
                         'messages': [{'role': 'user', 'content': prompt}]
                     })
                 )

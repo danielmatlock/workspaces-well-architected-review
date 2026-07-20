@@ -3213,7 +3213,7 @@ function generateAutoWafrHTML(review, analysis, summary) {
     html += '<div class="not-assessed"><h2>Areas Not Assessed</h2>';
     html += '<p style="font-size:13px;color:#5f6b7a;margin-bottom:12px;">The following areas could not be determined from the automated account scan and require manual review:</p>';
     notAssessed.forEach(function(na) {
-      html += '<div class="na-item"><span class="na-area">' + sanitize(na.area || '') + '</span><br><span class="na-reason">' + sanitize(na.reason || '') + '</span></div>';
+      html += '<div class="na-item"><span class="na-area">' + sanitize(na.area || '') + '</span><br><span class="na-reason">' + sanitize(na.reason || '') + '</span>' + (na.suggestedAction ? '<br><span style="color:#0073bb;font-size:12px;font-style:italic;">Suggested: ' + sanitize(na.suggestedAction) + '</span>' : '') + '</div>';
     });
     html += '</div>';
   }
