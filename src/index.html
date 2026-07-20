@@ -3080,50 +3080,56 @@ async function runAutoWafr(id) {
     }
 
     // Update overlay
-    document.querySelector('.modal p').textContent = 'Scan complete. Generating AI assessment with Bedrock...';
+    document.querySelector('.modal p').textContent = 'Scan complete. Generating AI assessment with Bedrock (this takes 60-90 seconds)...';
 
-    // Step 2a: Send evidence to Bedrock for security/reliability analysis
-    var analyseUrl = ENV.emailEndpoint;
-    // Split analysis into 3 fast calls by pillar focus
-    var focusGroups = ['security', 'ops_reliability', 'cost_perf_sustainability'];
-    var allFindings = [];
-    var notAssessed = [];
-    var execSummary = '';
-    
-    for (var fi = 0; fi < focusGroups.length; fi++) {
-      if (fi === 1) document.querySelector('.modal p').textContent = 'Security complete. Analysing operations & reliability...';
-      if (fi === 2) document.querySelector('.modal p').textContent = 'Almost done. Analysing cost & performance...';
-      var analyseRes = await fetch(analyseUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'autoWafrAnalyse',
-          evidence: evidence,
-          summary: summary,
-          focus: focusGroups[fi]
-        })
-      });
-      var analyseData = await analyseRes.json();
-      var payload = typeof analyseData.body === 'string' ? JSON.parse(analyseData.body) : analyseData;
-      if (payload.analysis) {
-        allFindings = allFindings.concat(payload.analysis.findings || []);
-        if (payload.analysis.notAssessed) notAssessed = notAssessed.concat(payload.analysis.notAssessed);
-        if (payload.analysis.executiveSummary && !execSummary) execSummary = payload.analysis.executiveSummary;
+    // Step 2: Fire the full autoWafr analysis - Lambda saves result to S3
+    // If API Gateway times out, Lambda keeps running and saves to S3 anyway
+    fetch(ENV.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'autoWafr',
+        roleArn: conn.roleArn,
+        externalId: conn.externalId || '',
+        region: conn.region || 'eu-west-2',
+        reviewId: id
+      })
+    }).catch(function() {}); // Ignore timeout - Lambda still runs
+
+    // Step 3: Poll for result every 5 seconds
+    var pollCount = 0;
+    var maxPolls = 30; // 150 seconds max wait
+    var pollInterval = setInterval(async function() {
+      pollCount++;
+      if (pollCount > maxPolls) {
+        clearInterval(pollInterval);
+        hideGeneratingOverlay();
+        alert('Auto WAFR: Timed out. The report may still be generating - check Saved Reports in a minute.');
+        return;
       }
-    }
+      document.querySelector('.modal p').textContent = 'Generating AI assessment... (' + (pollCount * 5) + 's)';
+      try {
+        var statusRes = await fetch(ENV.emailEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'autoWafrStatus', reviewId: id })
+        });
+        var statusData = await statusRes.json();
+        var statusPayload = typeof statusData.body === 'string' ? JSON.parse(statusData.body) : statusData;
 
-    var mergedAnalysis = { executiveSummary: execSummary, findings: allFindings, notAssessed: notAssessed };
-
-    if (allFindings.length === 0) {
-      hideGeneratingOverlay();
-      alert('Auto WAFR: No findings generated. Check the account connection.');
-      return;
-    }
-
-    var html = generateAutoWafrHTML(review, mergedAnalysis, summary);
-    hideGeneratingOverlay();
-    saveReportToCloud(review.id, 'autowafr', html, 'text/html', 'html', review.customer);
-    openReportInNewTab(html);
+        if (statusPayload.status === 'complete') {
+          clearInterval(pollInterval);
+          var html = generateAutoWafrHTML(review, statusPayload.analysis || {}, statusPayload.summary || {});
+          hideGeneratingOverlay();
+          saveReportToCloud(review.id, 'autowafr', html, 'text/html', 'html', review.customer);
+          openReportInNewTab(html);
+        } else if (statusPayload.status === 'error') {
+          clearInterval(pollInterval);
+          hideGeneratingOverlay();
+          alert('Auto WAFR failed: ' + (statusPayload.error || 'Unknown error'));
+        }
+      } catch(e) { /* polling error - keep trying */ }
+    }, 5000);
   } catch(e) {
     hideGeneratingOverlay();
     alert('Auto WAFR error: ' + (e.message || e));

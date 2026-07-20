@@ -1855,7 +1855,8 @@ ARCHITECTURE DOCUMENTATION:
                 "- 'title': Short descriptive title (e.g. 'Protocol Migration', 'Volume Encryption')\n"
                 "- 'pillar': Which Well-Architected pillar (Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimisation, Sustainability)\n"
                 "- 'observation': Professional summary of current state (2-4 sentences, third person)\n"
-                "- 'recommendation': Actionable guidance - brief acknowledgement then 2-4 bullet points starting with bullet, then Further Reading with 1-2 AWS docs URLs\n"
+                "- 'recommendation': Actionable guidance - brief acknowledgement then 2-4 bullet points starting with bullet char. "
+                "End with 'Further Reading:' followed by 2 real https://docs.aws.amazon.com URLs. NEVER omit the Further Reading URLs.\n"
                 "- 'targetState': What fully implemented (green) looks like for this area (2-3 sentences)\n"
                 "- 'stepsToGreen': Array of 3-5 ordered steps to reach green state\n"
                 "- 'priority': 'Critical', 'High', 'Medium', or 'Low'\n"
@@ -1904,20 +1905,25 @@ ARCHITECTURE DOCUMENTATION:
             except Exception as e:
                 analysis = {'executiveSummary': f'Analysis error: {str(e)}', 'findings': [], 'notAssessed': []}
 
+            # Save result to S3 so it can be polled (in case API Gateway times out)
+            result_data = json.dumps({
+                'analysis': analysis,
+                'summary': {
+                    'workspaceCount': len(all_workspaces) if 'all_workspaces' in dir() else 0,
+                    'protocols': protocols if 'protocols' in dir() else {},
+                    'runningModes': running_modes if 'running_modes' in dir() else {},
+                    'encryptedCount': encrypted_count if 'encrypted_count' in dir() else 0,
+                    'directoryCount': len(directories) if 'directories' in dir() else 0
+                },
+                'status': 'complete'
+            })
+            job_key = f"{review_id}/autowafr_job.json"
+            s3.put_object(Bucket=REPORTS_BUCKET, Key=job_key, Body=result_data.encode('utf-8'), ContentType='application/json')
+
             return {
                 'statusCode': 200,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-                'body': json.dumps({
-                    'analysis': analysis,
-                    'evidence': evidence,
-                    'summary': {
-                        'workspaceCount': len(all_workspaces) if 'all_workspaces' in dir() else 0,
-                        'protocols': protocols if 'protocols' in dir() else {},
-                        'runningModes': running_modes if 'running_modes' in dir() else {},
-                        'encryptedCount': encrypted_count if 'encrypted_count' in dir() else 0,
-                        'directoryCount': len(directories) if 'directories' in dir() else 0
-                    }
-                })
+                'body': result_data
             }
 
         if action == 'autoWafrAnalyse':
@@ -2010,6 +2016,39 @@ ARCHITECTURE DOCUMENTATION:
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
                 'body': json.dumps({'analysis': analysis})
             }
+
+        if action == 'autoWafrStatus':
+            # Poll for Auto WAFR result from S3
+            review_id = body.get('reviewId', '')
+            job_key = f"{review_id}/autowafr_job.json"
+            try:
+                obj = s3.get_object(Bucket=REPORTS_BUCKET, Key=job_key)
+                result_data = json.loads(obj['Body'].read().decode('utf-8'))
+                # Delete the job file after retrieval
+                s3.delete_object(Bucket=REPORTS_BUCKET, Key=job_key)
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps(result_data)
+                }
+            except s3.exceptions.NoSuchKey:
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'status': 'pending'})
+                }
+            except Exception as e:
+                if 'NoSuchKey' in str(e) or 'Not Found' in str(e) or '404' in str(e):
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'status': 'pending'})
+                    }
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'status': 'error', 'error': str(e)})
+                }
 
         return {
             'statusCode': 400,
