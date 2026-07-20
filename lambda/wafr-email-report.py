@@ -1957,7 +1957,7 @@ ARCHITECTURE DOCUMENTATION:
                     accept='application/json',
                     body=json.dumps({
                         'anthropic_version': 'bedrock-2023-05-31',
-                        'max_tokens': 8000,
+                        'max_tokens': 4096,
                         'messages': [{'role': 'user', 'content': prompt}]
                     })
                 )
