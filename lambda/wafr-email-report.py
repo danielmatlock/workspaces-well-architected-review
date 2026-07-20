@@ -1108,8 +1108,9 @@ ARCHITECTURE DOCUMENTATION:
             target_region = body.get('region', 'eu-west-2')
             review_id = body.get('reviewId', '')
 
-            # Assume the cross-account role
-            sts = boto3.client('sts', region_name='eu-west-2')
+            # Assume the cross-account role - use eu-west-2 STS regional endpoint
+            sts = boto3.client('sts', region_name='eu-west-2',
+                endpoint_url='https://sts.eu-west-2.amazonaws.com')
             try:
                 assumed = sts.assume_role(
                     RoleArn=role_arn,
