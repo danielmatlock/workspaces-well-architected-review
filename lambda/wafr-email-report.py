@@ -1612,24 +1612,18 @@ ARCHITECTURE DOCUMENTATION:
 
             prompt = (
                 "You are a senior AWS Solutions Architect conducting a Well-Architected Review of an Amazon WorkSpaces environment. "
-                "Below is raw evidence gathered from an automated scan of the customer's AWS account. "
-                "Based ONLY on this evidence, produce a comprehensive assessment.\n\n"
-                "For each finding area you can assess, produce a JSON object with these fields:\n"
-                "- 'title': Short descriptive title (e.g. 'Protocol Migration', 'Volume Encryption')\n"
-                "- 'pillar': Which Well-Architected pillar (Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimisation, Sustainability)\n"
-                "- 'observation': Professional summary of current state (2-4 sentences, third person)\n"
-                "- 'recommendation': Actionable guidance - brief acknowledgement then 2-4 bullet points starting with bullet char, then Further Reading with 1-2 AWS docs URLs\n"
-                "- 'targetState': What fully implemented (green) looks like for this area (2-3 sentences)\n"
-                "- 'stepsToGreen': Array of 3-5 ordered steps to reach green state\n"
-                "- 'priority': 'Critical', 'High', 'Medium', or 'Low'\n"
-                "- 'rag': 'red' (not implemented/critical gap), 'amber' (partial/needs work), or 'green' (good state)\n\n"
-                "Also produce a 'notAssessed' array listing areas that CANNOT be determined from this scan data "
-                "(e.g. patching compliance, Group Policy, incident runbooks, application delivery, "
-                "user experience, backup/DR testing). Each item: {'area': '...', 'reason': '...'}.\n\n"
-                "Also produce an 'executiveSummary' string (3-4 sentences for leadership).\n\n"
-                "Format response as JSON ONLY:\n"
-                "{\"executiveSummary\": \"...\", \"findings\": [{...}], \"notAssessed\": [{\"area\": \"...\", \"reason\": \"...\"}]}\n\n"
-                "EVIDENCE FROM AWS ACCOUNT SCAN:\n" + evidence_text[:28000]
+                "Below is evidence from an automated AWS account scan. Based ONLY on this evidence, produce a concise assessment.\n\n"
+                "For each finding, produce: 'title' (short), 'pillar' (WAF pillar name), "
+                "'observation' (2-3 sentences, current state), 'recommendation' (1 sentence + 2-3 bullets + one AWS docs URL), "
+                "'targetState' (1-2 sentences, what green looks like), 'priority' (Critical/High/Medium/Low), "
+                "'rag' (red/amber/green).\n\n"
+                "Also produce 'notAssessed' array: areas NOT determinable from scan (e.g. patching, GPO, runbooks, app delivery, DR testing). "
+                "Each: {'area': '...', 'reason': '...'}.\n\n"
+                "Produce 'executiveSummary' (2-3 sentences for leadership).\n\n"
+                "JSON ONLY, no markdown:\n"
+                "{\"executiveSummary\": \"...\", \"findings\": [{\"title\":\"\",\"pillar\":\"\",\"observation\":\"\",\"recommendation\":\"\",\"targetState\":\"\",\"priority\":\"\",\"rag\":\"\"}], "
+                "\"notAssessed\": [{\"area\":\"\",\"reason\":\"\"}]}\n\n"
+                "EVIDENCE:\n" + evidence_text[:20000]
             )
 
             try:
@@ -1639,7 +1633,7 @@ ARCHITECTURE DOCUMENTATION:
                     accept='application/json',
                     body=json.dumps({
                         'anthropic_version': 'bedrock-2023-05-31',
-                        'max_tokens': 8192,
+                        'max_tokens': 4096,
                         'messages': [{'role': 'user', 'content': prompt}]
                     })
                 )
