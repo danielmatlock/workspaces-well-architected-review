@@ -3098,7 +3098,7 @@ async function runAutoWafr(id) {
 
     // Step 4: Poll for result every 5 seconds
     var pollCount = 0;
-    var maxPolls = 36; // 180 seconds max wait
+    var maxPolls = 60; // 300 seconds max wait (5 mins)
     var pollInterval = setInterval(async function() {
       pollCount++;
       if (pollCount > maxPolls) {
