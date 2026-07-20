@@ -1843,8 +1843,56 @@ ARCHITECTURE DOCUMENTATION:
             except Exception as e:
                 evidence['cost'] = f"Error: {str(e)}"
 
-            # Step 3: Build the full evidence summary for Bedrock
+            # Step 3: Save evidence to S3 and invoke analysis asynchronously
             evidence_text = "\n".join([f"=== {k.upper()} ===\n{v}" for k, v in evidence.items()])
+            
+            # Save evidence to S3 for the async analysis to pick up
+            job_key = f"{review_id}/autowafr_job.json"
+            evidence_payload = json.dumps({
+                'evidence_text': evidence_text,
+                'review_id': review_id,
+                'summary': {
+                    'workspaceCount': len(all_workspaces) if 'all_workspaces' in dir() else 0,
+                    'protocols': protocols if 'protocols' in dir() else {},
+                    'runningModes': running_modes if 'running_modes' in dir() else {},
+                    'encryptedCount': encrypted_count if 'encrypted_count' in dir() else 0,
+                    'directoryCount': len(directories) if 'directories' in dir() else 0
+                }
+            })
+            # Save as "processing" status
+            s3.put_object(Bucket=REPORTS_BUCKET, Key=job_key, Body=json.dumps({'status': 'processing'}).encode('utf-8'), ContentType='application/json')
+            # Save evidence for async pickup
+            evidence_key = f"{review_id}/autowafr_evidence.json"
+            s3.put_object(Bucket=REPORTS_BUCKET, Key=evidence_key, Body=evidence_payload.encode('utf-8'), ContentType='application/json')
+            
+            # Invoke self asynchronously for the Bedrock analysis
+            lambda_client = boto3.client('lambda', region_name='eu-west-2')
+            lambda_client.invoke(
+                FunctionName=context.function_name,
+                InvocationType='Event',  # Async - returns immediately
+                Payload=json.dumps({'body': json.dumps({'action': 'autoWafrProcess', 'reviewId': review_id})}).encode('utf-8')
+            )
+
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'status': 'started', 'message': 'Analysis started. Poll autoWafrStatus for results.'})
+            }
+
+        if action == 'autoWafrProcess':
+            # Async processor: reads evidence from S3, runs Bedrock, saves result to S3
+            review_id = body.get('reviewId', '')
+            evidence_key = f"{review_id}/autowafr_evidence.json"
+            job_key = f"{review_id}/autowafr_job.json"
+            
+            try:
+                obj = s3.get_object(Bucket=REPORTS_BUCKET, Key=evidence_key)
+                evidence_data = json.loads(obj['Body'].read().decode('utf-8'))
+                evidence_text = evidence_data['evidence_text']
+                summary_data = evidence_data.get('summary', {})
+            except Exception as e:
+                s3.put_object(Bucket=REPORTS_BUCKET, Key=job_key, Body=json.dumps({'status': 'error', 'error': f'Failed to read evidence: {str(e)}'}).encode('utf-8'), ContentType='application/json')
+                return {'statusCode': 200, 'body': json.dumps({'error': str(e)})}
 
             # Step 4: Send to Bedrock for full analysis
             prompt = (
@@ -1905,20 +1953,19 @@ ARCHITECTURE DOCUMENTATION:
             except Exception as e:
                 analysis = {'executiveSummary': f'Analysis error: {str(e)}', 'findings': [], 'notAssessed': []}
 
-            # Save result to S3 so it can be polled (in case API Gateway times out)
+            # Save result to S3 for polling
             result_data = json.dumps({
                 'analysis': analysis,
-                'summary': {
-                    'workspaceCount': len(all_workspaces) if 'all_workspaces' in dir() else 0,
-                    'protocols': protocols if 'protocols' in dir() else {},
-                    'runningModes': running_modes if 'running_modes' in dir() else {},
-                    'encryptedCount': encrypted_count if 'encrypted_count' in dir() else 0,
-                    'directoryCount': len(directories) if 'directories' in dir() else 0
-                },
+                'summary': summary_data,
                 'status': 'complete'
             })
             job_key = f"{review_id}/autowafr_job.json"
             s3.put_object(Bucket=REPORTS_BUCKET, Key=job_key, Body=result_data.encode('utf-8'), ContentType='application/json')
+            # Clean up evidence file
+            try:
+                s3.delete_object(Bucket=REPORTS_BUCKET, Key=evidence_key)
+            except:
+                pass
 
             return {
                 'statusCode': 200,
