@@ -984,14 +984,16 @@ function showReviewDashboard() {
       '<button class="btn" onclick="showConnectAccountModal(\'' + review.id + '\')">Connect Account</button>' +
       '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
   } else {
+    var isConnected = review.awsConnection && review.awsConnection.roleArn;
+    var connDot = isConnected ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#1d8102;margin-right:4px;"></span>' : '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d13212;margin-right:4px;"></span>';
     document.getElementById('topbar').innerHTML = '<h3>Dashboard</h3>' +
       '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
       '<button class="btn btn-primary" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
       '<button class="btn btn-primary" onclick="showWafrReportModal(\'' + review.id + '\')">WAFR Report</button>' +
-      '<button class="btn btn-primary" style="background:#0073bb;border-color:#0073bb;" onclick="runAutoWafr(\'' + review.id + '\')">Auto WAFR</button>' +
       '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
       '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
-      '<button class="btn" onclick="showConnectAccountModal(\'' + review.id + '\')">Connect Account</button>' +
+      '<button class="btn btn-primary" style="background:#0073bb;border-color:#0073bb;" onclick="showConnectAccountModal(\'' + review.id + '\')">' + connDot + 'Connect Account</button>' +
+      '<button class="btn btn-primary" style="background:#0073bb;border-color:#0073bb;" onclick="runAutoWafr(\'' + review.id + '\')">Auto WAFR</button>' +
       '<button class="btn" onclick="showSavedReports(\'' + review.id + '\')">Saved Reports</button></div>';
   }
   
@@ -3225,9 +3227,16 @@ function showConnectAccountModal(reviewId) {
   
   var statusHtml = '';
   if (existingConnection.roleArn) {
-    statusHtml = '<div style="background:#f0fff0;border:1px solid #1d8102;border-radius:4px;padding:10px;margin-bottom:16px;">' +
-      '<strong style="color:#1d8102;">Connected</strong> - ' + existingConnection.roleArn.split('/')[0].split(':')[4] + ' (' + (existingConnection.region || 'eu-west-2') + ')' +
-      '<br><span style="font-size:11px;color:#5f6b7a;">Last scanned: ' + (existingConnection.lastScan || 'Never') + '</span></div>';
+    statusHtml = '<div style="background:#f0fff0;border:2px solid #1d8102;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">' +
+      '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1d8102;flex-shrink:0;"></span>' +
+      '<div><strong style="color:#1d8102;font-size:14px;">Connected</strong>' +
+      '<div style="font-size:12px;color:#232f3e;">Account: ' + existingConnection.roleArn.split(':')[4] + ' | Region: ' + (existingConnection.region || 'eu-west-2') + '</div>' +
+      '<div style="font-size:11px;color:#5f6b7a;">Last scanned: ' + (existingConnection.lastScan || 'Never') + '</div></div></div>';
+  } else {
+    statusHtml = '<div style="background:#fff3f0;border:2px solid #d13212;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">' +
+      '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#d13212;flex-shrink:0;"></span>' +
+      '<div><strong style="color:#d13212;font-size:14px;">Not Connected</strong>' +
+      '<div style="font-size:12px;color:#5f6b7a;">Follow the steps below to connect an AWS account.</div></div></div>';
   }
 
   document.getElementById('modal-root').innerHTML = '<div class="modal-overlay" onclick="closeModal(event)">' +
