@@ -3192,7 +3192,7 @@ function generateAutoWafrHTML(review, analysis, summary) {
       }
       if (f.recommendation) {
         html += '<div class="section-label" style="color:#0073bb;">Recommendation</div>';
-        html += '<div class="rec-box">' + sanitize(f.recommendation).replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+        html += '<div class="rec-box">' + sanitize(f.recommendation).replace(/\n/g, '<br>').replace(/(https:\/\/[^\s<"]+\.aws\.amazon\.com\/[^\s<"]+|https:\/\/docs\.aws\.amazon\.com\/[^\s<"]+|https:\/\/aws\.amazon\.com\/[^\s<"]+|https:\/\/repost\.aws\/[^\s<"]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
       }
       if (f.targetState) {
         html += '<div class="section-label" style="color:#1d8102;">Target State (Green)</div>';
