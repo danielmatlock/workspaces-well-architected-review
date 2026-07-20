@@ -1315,6 +1315,220 @@ ARCHITECTURE DOCUMENTATION:
                 }})
             }
 
+        if action == 'autoWafr':
+            # Auto WAFR: scan account + generate full Bedrock report in one call
+            role_arn = body['roleArn']
+            external_id = body.get('externalId', '')
+            target_region = body.get('region', 'eu-west-2')
+            review_id = body.get('reviewId', '')
+            template_questions = body.get('questions', [])  # All template questions with id, q, best
+
+            # Step 1: Assume cross-account role
+            sts = boto3.client('sts', region_name='eu-west-2',
+                endpoint_url='https://sts.eu-west-2.amazonaws.com')
+            try:
+                assumed = sts.assume_role(
+                    RoleArn=role_arn,
+                    RoleSessionName='WAFRAutoScan',
+                    ExternalId=external_id,
+                    DurationSeconds=3600
+                ) if external_id else sts.assume_role(
+                    RoleArn=role_arn,
+                    RoleSessionName='WAFRAutoScan',
+                    DurationSeconds=3600
+                )
+            except Exception as e:
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': f'Failed to assume role: {str(e)}. Ensure the account is connected via Connect Account first.'})
+                }
+
+            creds = assumed['Credentials']
+            session_kwargs = {
+                'aws_access_key_id': creds['AccessKeyId'],
+                'aws_secret_access_key': creds['SecretAccessKey'],
+                'aws_session_token': creds['SessionToken'],
+                'region_name': target_region
+            }
+
+            # Step 2: Scan account (reuse scan logic)
+            ws_client = boto3.client('workspaces', **session_kwargs)
+            ds_client = boto3.client('ds', **session_kwargs)
+            ec2_client = boto3.client('ec2', **session_kwargs)
+            cw_client = boto3.client('cloudwatch', **session_kwargs)
+            ce_client = boto3.client('ce', region_name='us-east-1',
+                aws_access_key_id=creds['AccessKeyId'],
+                aws_secret_access_key=creds['SecretAccessKey'],
+                aws_session_token=creds['SessionToken'])
+
+            scan_data = {}
+            # WorkSpaces fleet
+            try:
+                all_workspaces = []
+                paginator = ws_client.get_paginator('describe_workspaces')
+                for page in paginator.paginate():
+                    all_workspaces.extend(page.get('Workspaces', []))
+                scan_data['workspaceCount'] = len(all_workspaces)
+                protocols = {}
+                bundles_used = {}
+                running_modes = {}
+                encrypted_count = 0
+                for ws in all_workspaces:
+                    proto = ws.get('WorkspaceProperties', {}).get('Protocols', ['PCOIP'])
+                    for p in (proto if isinstance(proto, list) else [proto]):
+                        protocols[p] = protocols.get(p, 0) + 1
+                    bundle = ws.get('BundleId', 'Unknown')
+                    bundles_used[bundle] = bundles_used.get(bundle, 0) + 1
+                    mode = ws.get('WorkspaceProperties', {}).get('RunningMode', 'AUTO_STOP')
+                    running_modes[mode] = running_modes.get(mode, 0) + 1
+                    if ws.get('RootVolumeEncryptionEnabled') or ws.get('UserVolumeEncryptionEnabled'):
+                        encrypted_count += 1
+                scan_data['protocols'] = protocols
+                scan_data['bundles'] = bundles_used
+                scan_data['runningModes'] = running_modes
+                scan_data['encryptedCount'] = encrypted_count
+            except Exception as e:
+                scan_data['workspacesError'] = str(e)
+
+            # Directories
+            try:
+                dirs_response = ds_client.describe_directories()
+                directories = dirs_response.get('DirectoryDescriptions', [])
+                scan_data['directories'] = [{'type': d.get('Type'), 'name': d.get('Name'), 'status': d.get('Stage'), 'radiusStatus': d.get('RadiusSettings', {}).get('RadiusStatus', 'None'), 'vpcId': d.get('VpcSettings', {}).get('VpcId'), 'subnetIds': d.get('VpcSettings', {}).get('SubnetIds', [])} for d in directories]
+            except Exception as e:
+                scan_data['directoriesError'] = str(e)
+
+            # IP Groups
+            try:
+                ip_groups = ws_client.describe_ip_groups()
+                scan_data['ipGroups'] = ip_groups.get('Result', [])
+            except Exception as e:
+                scan_data['ipGroupsError'] = str(e)
+
+            # Networking
+            try:
+                vpc_ids = set(d.get('vpcId') for d in scan_data.get('directories', []) if d.get('vpcId'))
+                if vpc_ids:
+                    subnet_ids = set()
+                    for d in scan_data.get('directories', []):
+                        subnet_ids.update(d.get('subnetIds', []))
+                    if subnet_ids:
+                        subnets = ec2_client.describe_subnets(SubnetIds=list(subnet_ids))
+                        azs = set(s['AvailabilityZone'] for s in subnets.get('Subnets', []))
+                        scan_data['azCount'] = len(azs)
+                        scan_data['azList'] = list(azs)
+                    nats = ec2_client.describe_nat_gateways(Filter=[{'Name': 'vpc-id', 'Values': list(vpc_ids)}])
+                    scan_data['natGateways'] = len(nats.get('NatGateways', []))
+            except Exception as e:
+                scan_data['networkingError'] = str(e)
+
+            # CloudWatch
+            try:
+                from datetime import datetime, timedelta
+                alarms = cw_client.describe_alarms(AlarmNamePrefix='WorkSpaces', MaxRecords=50)
+                scan_data['workspacesAlarms'] = len([a for a in alarms.get('MetricAlarms', []) if 'WorkSpaces' in a.get('Namespace', '') or 'workspaces' in a.get('AlarmName', '').lower()])
+            except Exception as e:
+                scan_data['monitoringError'] = str(e)
+
+            # Cost
+            try:
+                from datetime import datetime, timedelta
+                end_date = datetime.utcnow().strftime('%Y-%m-%d')
+                start_date = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+                cost_response = ce_client.get_cost_and_usage(
+                    TimePeriod={'Start': start_date, 'End': end_date},
+                    Granularity='MONTHLY', Metrics=['UnblendedCost'],
+                    Filter={'Dimensions': {'Key': 'SERVICE', 'Values': ['Amazon WorkSpaces']}}
+                )
+                total_cost = sum(float(r.get('Total', {}).get('UnblendedCost', {}).get('Amount', 0)) for r in cost_response.get('ResultsByTime', []))
+                scan_data['monthlyCost'] = round(total_cost, 2)
+            except Exception as e:
+                scan_data['costError'] = str(e)
+
+            # Step 3: Map findings
+            findings = map_scan_to_findings(scan_data)
+
+            # Step 4: Build context for Bedrock - for each template question, include evidence if available
+            questions_for_bedrock = []
+            for q in template_questions:
+                finding = findings.get(q['id'])
+                if finding and finding.get('evidence'):
+                    questions_for_bedrock.append({
+                        'id': q['id'], 'question': q['q'], 'best': q['best'],
+                        'score': finding.get('score', ''),
+                        'notes': f"[AUTO-SCANNED FROM AWS ACCOUNT] {finding['evidence']}"
+                    })
+                else:
+                    questions_for_bedrock.append({
+                        'id': q['id'], 'question': q['q'], 'best': q['best'],
+                        'score': '', 'notes': '[NO DATA AVAILABLE] Could not determine from account scan - manual review required.'
+                    })
+
+            # Step 5: Send to Bedrock in batches for full report
+            recommendations = {}
+            BATCH_SIZE = 5
+            for i in range(0, len(questions_for_bedrock), BATCH_SIZE):
+                batch = questions_for_bedrock[i:i + BATCH_SIZE]
+                prompt_items = []
+                for item in batch:
+                    prompt_items.append(f"ID: {item['id']}\nQuestion: {item['question']}\nScore: {item['score']}\nEvidence: {item['notes']}\nBest Practice: {item['best']}")
+                joined = "\n\n".join(prompt_items)
+
+                prompt = (
+                    "You are an AWS Solutions Architect writing a formal Well-Architected Review report based on automated account scan data. "
+                    "For each question below, produce THREE things:\n"
+                    "1. 'observation': Based on the evidence from the automated scan, write a professional summary of the current state. "
+                    "If evidence says '[NO DATA AVAILABLE]', state clearly that this could not be determined from the automated scan and requires manual review. "
+                    "Use third-person formal tone. Keep it concise (2-4 sentences).\n"
+                    "2. 'recommendation': If evidence is available, provide structured recommendations: "
+                    "brief acknowledgement (1-2 sentences), then 2-3 next-step bullet points starting with '\u2022 ', "
+                    "then a 'Further Reading:' line with 1-2 real https://docs.aws.amazon.com URLs. "
+                    "If no data was available, recommend what manual steps are needed to assess this area.\n"
+                    "3. 'dataStatus': Either 'scanned' (evidence from AWS account available), "
+                    "'partial' (some data found but incomplete), or 'manual_required' (no automated data - needs manual review).\n"
+                    "Format as JSON: {\"QUESTION-ID\": {\"observation\": \"...\", \"recommendation\": \"...\", \"dataStatus\": \"...\"}}. "
+                    "Respond with ONLY valid JSON, no markdown fences.\n\nQuestions:\n" + joined
+                )
+
+                try:
+                    response = bedrock.invoke_model(
+                        modelId=MODEL_ID,
+                        contentType='application/json',
+                        accept='application/json',
+                        body=json.dumps({
+                            'anthropic_version': 'bedrock-2023-05-31',
+                            'max_tokens': 4096,
+                            'messages': [{'role': 'user', 'content': prompt}]
+                        })
+                    )
+                    result = json.loads(response['body'].read())
+                    text = result['content'][0]['text'].strip()
+                    text = re.sub(r'^```(?:json)?\s*', '', text)
+                    text = re.sub(r'\s*```$', '', text)
+                    batch_recs = json.loads(text)
+                    recommendations.update(batch_recs)
+                except Exception as e:
+                    for item in batch:
+                        recommendations[item['id']] = {'observation': f'Error generating: {str(e)}', 'recommendation': '', 'dataStatus': 'error'}
+
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({
+                    'recommendations': recommendations,
+                    'summary': {
+                        'workspaceCount': scan_data.get('workspaceCount', 0),
+                        'protocols': scan_data.get('protocols', {}),
+                        'runningModes': scan_data.get('runningModes', {}),
+                        'monthlyCost': scan_data.get('monthlyCost', 'N/A'),
+                        'encryptedCount': scan_data.get('encryptedCount', 0),
+                        'scannedQuestions': len([q for q in questions_for_bedrock if '[AUTO-SCANNED' in q['notes']]),
+                        'manualQuestions': len([q for q in questions_for_bedrock if '[NO DATA' in q['notes']])
+                    }
+                })
+            }
+
         return {
             'statusCode': 400,
             'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},

@@ -988,6 +988,7 @@ function showReviewDashboard() {
       '<div class="topbar-actions"><button class="btn" onclick="exportReview(\'' + review.id + '\')">Export JSON</button>' +
       '<button class="btn btn-primary" onclick="showArchInfo(\'' + review.id + '\')">Arch Info</button>' +
       '<button class="btn btn-primary" onclick="showWafrReportModal(\'' + review.id + '\')">WAFR Report</button>' +
+      '<button class="btn btn-primary" style="background:#0073bb;border-color:#0073bb;" onclick="runAutoWafr(\'' + review.id + '\')">Auto WAFR</button>' +
       '<button class="btn btn-primary" onclick="exportSoWhat(\'' + review.id + '\')">So What Report</button>' +
       '<button class="btn btn-primary" onclick="exportCLevelDeck(\'' + review.id + '\')">C-Level Deck</button>' +
       '<button class="btn" onclick="showConnectAccountModal(\'' + review.id + '\')">Connect Account</button>' +
@@ -1964,7 +1965,7 @@ function loadReportSelectOptions(reviewId, selectId) {
     var reports = payload.reports || [];
     var sel = document.getElementById(selectId);
     if (!sel) return;
-    var typeLabels = { standard: 'WAFR Report', sowhat: 'So What Report', clevel: 'C-Level Deck', orr: 'ORR Report' };
+    var typeLabels = { standard: 'WAFR Report', sowhat: 'So What Report', clevel: 'C-Level Deck', orr: 'ORR Report', autowafr: 'Auto WAFR' };
     reports.forEach(function(r) {
       var label = (typeLabels[r.reportType] || r.reportType) + ' — ' + (r.timestamp || '').replace('T', ' ').substring(0, 16);
       if (r.extension === 'pptx') label += ' (PPTX)';
@@ -3024,6 +3025,143 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
   });
 }
 
+// === AUTO WAFR ===
+async function runAutoWafr(id) {
+  var review = getReview(id);
+  if (!review) return;
+
+  // Check if account is connected
+  var conn = review.awsConnection;
+  if (!conn || !conn.roleArn) {
+    alert('Please connect an AWS account first using the "Connect Account" button.');
+    showConnectAccountModal(id);
+    return;
+  }
+
+  showGeneratingOverlay();
+  document.querySelector('.modal h3').textContent = 'Running Auto WAFR...';
+  document.querySelector('.modal p').textContent = 'Scanning AWS account and generating AI-powered report. This may take 60-90 seconds.';
+
+  // Gather all template questions
+  var allQuestions = [];
+  review.pillars.forEach(function(p) {
+    p.questions.forEach(function(q) {
+      allQuestions.push({ id: q.id, q: q.q, best: q.best });
+    });
+  });
+
+  try {
+    var res = await fetch(ENV.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'autoWafr',
+        roleArn: conn.roleArn,
+        externalId: conn.externalId || '',
+        region: conn.region || 'eu-west-2',
+        reviewId: id,
+        questions: allQuestions
+      })
+    });
+    var data = await res.json();
+    var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+
+    if (payload.error) {
+      hideGeneratingOverlay();
+      alert('Auto WAFR failed: ' + payload.error);
+      return;
+    }
+
+    // Generate the HTML report
+    var html = generateAutoWafrHTML(review, payload.recommendations || {}, payload.summary || {});
+    hideGeneratingOverlay();
+    saveReportToCloud(review.id, 'autowafr', html, 'text/html', 'html', review.customer);
+    openReportInNewTab(html);
+  } catch(e) {
+    hideGeneratingOverlay();
+    alert('Auto WAFR error: ' + (e.message || e));
+  }
+}
+
+function generateAutoWafrHTML(review, recommendations, summary) {
+  function sanitizeForHTML(text) {
+    if (!text) return text;
+    return text.replace(/\u2014/g, '&mdash;').replace(/\u2013/g, '&ndash;').replace(/\u2018/g, '&lsquo;').replace(/\u2019/g, '&rsquo;').replace(/\u201C/g, '&ldquo;').replace(/\u201D/g, '&rdquo;').replace(/\u2026/g, '&hellip;').replace(/\u00A0/g, '&nbsp;');
+  }
+  var customerName = sanitizeForHTML(review.customer || 'Review');
+  var today = new Date().toISOString().split('T')[0];
+  var scannedCount = summary.scannedQuestions || 0;
+  var manualCount = summary.manualQuestions || 0;
+  var totalQuestions = scannedCount + manualCount;
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Auto WAFR - ' + customerName + '</title>';
+  html += '<style>';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:1000px;margin:0 auto;padding:40px 20px;color:#1a1a1a;line-height:1.5;}';
+  html += 'h1{color:#232f3e;margin-bottom:4px;} .subtitle{color:#5f6b7a;margin-bottom:10px;}';
+  html += '.summary-bar{background:#232f3e;color:white;padding:16px 20px;border-radius:8px;margin-bottom:30px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;}';
+  html += '.summary-stat{text-align:center;} .summary-stat .val{font-size:22px;font-weight:700;} .summary-stat .lbl{font-size:11px;color:#adb5bd;}';
+  html += '.pillar-section{margin-bottom:30px;}';
+  html += '.pillar-header{background:#232f3e;color:white;padding:12px 16px;border-radius:6px 6px 0 0;font-size:16px;font-weight:600;}';
+  html += '.q-card{border:1px solid #e0e0e0;border-top:none;padding:20px;} .q-card:last-child{border-radius:0 0 6px 6px;}';
+  html += '.q-id{font-weight:700;color:#0073bb;font-size:13px;display:flex;align-items:center;gap:8px;}';
+  html += '.q-text{font-size:15px;margin:6px 0 14px;font-weight:500;}';
+  html += '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}';
+  html += '.obs-box{background:#f5f5f5;border-left:4px solid #879596;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;}';
+  html += '.rec-box{background:#f0f4ff;border-left:4px solid #0073bb;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;} .rec-box a{color:#0073bb;}';
+  html += '.status-scanned{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#1d8102;color:white;}';
+  html += '.status-partial{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#f2a20d;color:white;}';
+  html += '.status-manual{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#d13212;color:white;}';
+  html += '.manual-box{background:#fff3f0;border-left:4px solid #d13212;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;color:#6b1a0a;}';
+  html += '.footer{margin-top:40px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:12px;color:#5f6b7a;}';
+  html += '@media print{.no-print{display:none!important;}}';
+  html += '</style></head><body>';
+  html += '<div class="no-print"><button onclick="window.print()">Save as PDF (Cmd+P)</button><button onclick="window.close()" style="margin-left:8px;">Close</button></div>';
+  html += '<h1>Auto WAFR - ' + customerName + '</h1>';
+  html += '<div class="subtitle">Automated Well-Architected Review from AWS account scan | ' + today + '</div>';
+
+  // Summary bar
+  html += '<div class="summary-bar">';
+  html += '<div class="summary-stat"><div class="val">' + (summary.workspaceCount || 0) + '</div><div class="lbl">WorkSpaces</div></div>';
+  html += '<div class="summary-stat"><div class="val">' + scannedCount + '/' + totalQuestions + '</div><div class="lbl">Auto-Scanned</div></div>';
+  html += '<div class="summary-stat"><div class="val">' + manualCount + '</div><div class="lbl">Manual Review</div></div>';
+  html += '<div class="summary-stat"><div class="val">' + (summary.monthlyCost || 'N/A') + '</div><div class="lbl">Monthly Cost (USD)</div></div>';
+  var protoText = Object.entries(summary.protocols || {}).map(function(p) { return p[1] + ' ' + p[0]; }).join(', ') || 'N/A';
+  html += '<div class="summary-stat"><div class="val" style="font-size:14px;">' + protoText + '</div><div class="lbl">Protocols</div></div>';
+  html += '</div>';
+
+  // Pillar sections
+  review.pillars.forEach(function(p) {
+    html += '<div class="pillar-section"><div class="pillar-header">' + p.name + '</div>';
+    p.questions.forEach(function(q) {
+      var rec = recommendations[q.id] || {};
+      var dataStatus = rec.dataStatus || 'manual_required';
+      var statusClass = dataStatus === 'scanned' ? 'status-scanned' : dataStatus === 'partial' ? 'status-partial' : 'status-manual';
+      var statusLabel = dataStatus === 'scanned' ? 'Auto-Scanned' : dataStatus === 'partial' ? 'Partial Data' : 'Manual Review Required';
+
+      html += '<div class="q-card">';
+      html += '<div class="q-id"><span class="' + statusClass + '">' + statusLabel + '</span> ' + q.id + '</div>';
+      html += '<div class="q-text">' + q.q + '</div>';
+
+      if (rec.observation) {
+        html += '<div class="section-label" style="color:#5f6b7a;">Observation</div>';
+        html += '<div class="obs-box">' + sanitizeForHTML(rec.observation) + '</div>';
+      }
+      if (rec.recommendation) {
+        html += '<div class="section-label" style="color:#0073bb;">Recommendation</div>';
+        html += '<div class="rec-box">' + sanitizeForHTML(rec.recommendation).replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+      }
+      if (dataStatus === 'manual_required') {
+        html += '<div class="manual-box"><strong>Manual review required:</strong> This area could not be assessed from the automated account scan. A reviewer should gather information through discussion with the customer or manual inspection.</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '<div class="footer">Generated by AWS WorkSpaces WAFR Review Tool (Auto WAFR) | ' + today + ' | Source: AWS Account ' + ((review.awsConnection || {}).accountId || 'N/A') + '</div></body></html>';
+  return html;
+}
+
 // === CONNECT AWS ACCOUNT ===
 function showConnectAccountModal(reviewId) {
   var review = getReview(reviewId);
@@ -3324,7 +3462,7 @@ function showSavedReports(id) {
     var reports = payload.reports || [];
     var el = document.getElementById('saved-reports-list');
     if (reports.length === 0) { el.innerHTML = '<p style="color:#5f6b7a;">No saved reports yet. Generate a report and it will automatically save here.</p>'; return; }
-    var typeOrder = { sowhat: 0, orr: 1, clevel: 2, standard: 3 };
+    var typeOrder = { sowhat: 0, autowafr: 1, orr: 2, clevel: 3, standard: 4 };
     reports.sort(function(a, b) {
       var ta = typeOrder[a.reportType] !== undefined ? typeOrder[a.reportType] : 9;
       var tb = typeOrder[b.reportType] !== undefined ? typeOrder[b.reportType] : 9;
@@ -3334,7 +3472,7 @@ function showSavedReports(id) {
     var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
       '<tr style="border-bottom:2px solid #e0e0e0;"><th style="text-align:left;padding:8px;">Type</th><th style="text-align:left;padding:8px;">Date</th><th style="padding:8px;">Actions</th></tr>';
     reports.forEach(function(r) {
-      var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : r.reportType === 'orr' ? 'ORR Report' : 'C-Level Deck';
+      var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : r.reportType === 'orr' ? 'ORR Report' : r.reportType === 'autowafr' ? 'Auto WAFR' : 'C-Level Deck';
       var ts = r.timestamp.replace('T', ' ').replace(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2})(\d{2})$/, '$1 $2:$3:$4');
       html += '<tr style="border-bottom:1px solid #eee;"><td style="padding:8px;">' + typeLabel + '</td><td style="padding:8px;">' + ts + '</td>' +
         '<td style="padding:8px;text-align:center;white-space:nowrap;">';
@@ -3472,7 +3610,7 @@ async function loadChatContext() {
       reportMeta += 'Total reports generated: ' + reports.length + '\n';
       var typeCounts = {};
       reports.forEach(function(r) {
-        var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : r.reportType === 'orr' ? 'ORR Report' : 'C-Level Deck';
+        var typeLabel = r.reportType === 'standard' ? 'WAFR Report' : r.reportType === 'sowhat' ? 'So What Report' : r.reportType === 'orr' ? 'ORR Report' : r.reportType === 'autowafr' ? 'Auto WAFR' : 'C-Level Deck';
         typeCounts[typeLabel] = (typeCounts[typeLabel] || 0) + 1;
         var ts = r.timestamp.replace('T', ' ').replace(/^(\d{4}-\d{2}-\d{2}) (\d{2})(\d{2})(\d{2})$/, '$1 $2:$3:$4');
         reportMeta += '- ' + typeLabel + ' | Generated: ' + ts + ' | Extension: ' + r.extension + ' | Size: ' + r.size + ' bytes\n';
