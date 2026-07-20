@@ -1931,23 +1931,15 @@ ARCHITECTURE DOCUMENTATION:
                 evidence_text = f"=== FLEET SUMMARY ===\nWorkSpaces: {summary_data.get('workspaceCount', 0)}, Protocols: {summary_data.get('protocols', {})}, Running modes: {summary_data.get('runningModes', {})}, Encrypted: {summary_data.get('encryptedCount', 0)}, Monthly cost: {summary_data.get('monthlyCost', 'N/A')}\n\n" + evidence_text
 
             prompt = (
-                "You are a senior AWS Solutions Architect conducting a Well-Architected Review of an Amazon WorkSpaces environment. "
-                "Below is evidence from an automated AWS account scan. Based ONLY on this evidence, produce a detailed assessment.\n\n"
-                "For each finding, produce a JSON object with:\n"
-                "- 'title': Short descriptive title\n"
-                "- 'pillar': WAF pillar (Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimisation, Sustainability)\n"
-                "- 'observation': Detailed professional summary of current state (3-5 sentences). Include specific numbers and configuration details from the evidence. Use third person.\n"
-                "- 'recommendation': Start with a brief current-state acknowledgement, then 2-3 actionable bullet points. "
-                "Include a 'Further Reading:' line at the end with 1-2 AWS docs URLs where possible.\n"
-                "- 'targetState': What fully implemented looks like (2-3 sentences, concrete and measurable)\n"
-                "- 'priority': Critical/High/Medium/Low\n"
-                "- 'rag': red (critical gap), amber (partial), green (good)\n\n"
-                "Also produce 'notAssessed' array: areas NOT determinable from scan. Each: {'area': '...', 'reason': '...', 'suggestedAction': '...'}.\n\n"
-                "Produce 'executiveSummary' (3-4 sentences for leadership audience).\n\n"
-                "JSON ONLY, no markdown:\n"
-                "{\"executiveSummary\": \"...\", \"findings\": [{\"title\":\"\",\"pillar\":\"\",\"observation\":\"\",\"recommendation\":\"\",\"targetState\":\"\",\"priority\":\"\",\"rag\":\"\"}], "
-                "\"notAssessed\": [{\"area\":\"\",\"reason\":\"\",\"suggestedAction\":\"\"}]}\n\n"
-                "EVIDENCE:\n" + evidence_text[:20000]
+                "You are an AWS Solutions Architect reviewing an Amazon WorkSpaces environment. "
+                "Based on the scan evidence below, produce a JSON assessment.\n\n"
+                "For each finding: 'title', 'pillar' (WAF pillar), "
+                "'observation' (2 sentences), 'recommendation' (2-3 bullets + 1 AWS docs URL), "
+                "'targetState' (1 sentence), 'priority' (Critical/High/Medium/Low), 'rag' (red/amber/green).\n\n"
+                "Also: 'notAssessed' array: [{area, reason}]. 'executiveSummary' (2 sentences).\n\n"
+                "JSON ONLY:\n"
+                "{\"executiveSummary\":\"\",\"findings\":[{\"title\":\"\",\"pillar\":\"\",\"observation\":\"\",\"recommendation\":\"\",\"targetState\":\"\",\"priority\":\"\",\"rag\":\"\"}],\"notAssessed\":[{\"area\":\"\",\"reason\":\"\"}]}\n\n"
+                "EVIDENCE:\n" + evidence_text[:10000]
             )
 
             try:
