@@ -3028,7 +3028,7 @@ function buildCuratedCLevelPptx(review, curated, pillarScores, overallScore, not
 function showConnectAccountModal(reviewId) {
   var review = getReview(reviewId);
   var existingConnection = review.awsConnection || {};
-  var externalId = existingConnection.externalId || ('wafr-' + reviewId.replace('review-', '').slice(0, 8) + '-' + Date.now().toString(36));
+  var externalId = existingConnection.externalId || ('wafr-' + reviewId.replace('review-', '').slice(0, 16));
   
   var statusHtml = '';
   if (existingConnection.roleArn) {
