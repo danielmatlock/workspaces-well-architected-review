@@ -1325,6 +1325,104 @@ ARCHITECTURE DOCUMENTATION:
             except Exception as e:
                 scan_data['cloudTrailError'] = str(e)
 
+            # ─── WORKSPACES IMAGES ────────────────────────────────────────
+            try:
+                images = ws_client.describe_workspace_images(ImageType='OWNED')
+                scan_data['images'] = [{'id': img.get('ImageId'), 'name': img.get('Name', ''), 'os': img.get('OperatingSystem', {}).get('Type', ''), 'state': img.get('State', ''), 'created': str(img.get('Created', ''))} for img in images.get('Images', [])]
+            except Exception as e:
+                scan_data['imagesError'] = str(e)
+
+            # ─── WORKSPACES BUNDLES (custom) ──────────────────────────────
+            try:
+                bundles_resp = ws_client.describe_workspace_bundles(Owner='AMAZON')
+                custom_bundles = ws_client.describe_workspace_bundles()
+                scan_data['customBundles'] = [{'id': b.get('BundleId'), 'name': b.get('Name', ''), 'compute': b.get('ComputeType', {}).get('Name', ''), 'rootStorage': b.get('RootStorage', {}).get('Capacity', ''), 'userStorage': b.get('UserStorage', {}).get('Capacity', '')} for b in custom_bundles.get('Bundles', []) if b.get('Owner') != 'Amazon']
+            except Exception as e:
+                scan_data['bundlesError'] = str(e)
+
+            # ─── CONNECTION STATUS (unused WorkSpaces) ────────────────────
+            try:
+                from datetime import datetime, timedelta
+                conn_status = ws_client.describe_workspaces_connection_status()
+                inactive_count = 0
+                thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+                for cs in conn_status.get('WorkspacesConnectionStatus', []):
+                    last_known = cs.get('LastKnownUserConnectionTimestamp')
+                    if last_known and last_known.replace(tzinfo=None) < thirty_days_ago:
+                        inactive_count += 1
+                    elif not last_known:
+                        inactive_count += 1
+                scan_data['inactiveWorkspaces'] = inactive_count
+                scan_data['totalConnectionStatuses'] = len(conn_status.get('WorkspacesConnectionStatus', []))
+            except Exception as e:
+                scan_data['connectionStatusError'] = str(e)
+
+            # ─── TAGS (sample WorkSpaces for tagging compliance) ──────────
+            try:
+                tagged_count = 0
+                untagged_count = 0
+                sample_tags = {}
+                for ws in all_workspaces[:10]:
+                    try:
+                        tags_resp = ws_client.describe_tags(ResourceId=ws['WorkspaceId'])
+                        tags = tags_resp.get('TagList', [])
+                        if tags:
+                            tagged_count += 1
+                            for t in tags:
+                                sample_tags[t['Key']] = sample_tags.get(t['Key'], 0) + 1
+                        else:
+                            untagged_count += 1
+                    except:
+                        untagged_count += 1
+                scan_data['tagging'] = {'tagged': tagged_count, 'untagged': untagged_count, 'sampleSize': min(len(all_workspaces), 10), 'tagKeys': list(sample_tags.keys())}
+            except Exception as e:
+                scan_data['taggingError'] = str(e)
+
+            # ─── ROUTE TABLES ─────────────────────────────────────────────
+            try:
+                if vpc_ids:
+                    route_tables = ec2_client.describe_route_tables(Filters=[{'Name': 'vpc-id', 'Values': list(vpc_ids)}])
+                    scan_data['routeTables'] = []
+                    for rt in route_tables.get('RouteTables', []):
+                        has_igw = any('igw-' in str(r.get('GatewayId', '')) for r in rt.get('Routes', []))
+                        has_nat = any('nat-' in str(r.get('NatGatewayId', '')) for r in rt.get('Routes', []))
+                        scan_data['routeTables'].append({'id': rt['RouteTableId'], 'hasInternetGateway': has_igw, 'hasNatGateway': has_nat, 'routeCount': len(rt.get('Routes', []))})
+            except Exception as e:
+                scan_data['routeTablesError'] = str(e)
+
+            # ─── EVENTBRIDGE RULES ────────────────────────────────────────
+            try:
+                eb_client = boto3.client('events', **session_kwargs)
+                rules = eb_client.list_rules(Limit=50)
+                ws_rules = [r for r in rules.get('Rules', []) if 'workspace' in r.get('Name', '').lower() or 'workspace' in str(r.get('Description', '')).lower() or 'aws.workspaces' in str(r.get('EventPattern', '')).lower()]
+                scan_data['eventBridgeRules'] = {'total': len(rules.get('Rules', [])), 'workspacesRelated': len(ws_rules), 'ruleNames': [r['Name'] for r in ws_rules[:5]]}
+            except Exception as e:
+                scan_data['eventBridgeError'] = str(e)
+
+            # ─── AWS BACKUP ───────────────────────────────────────────────
+            try:
+                backup_client = boto3.client('backup', **session_kwargs)
+                plans = backup_client.list_backup_plans()
+                scan_data['backupPlans'] = [{'name': p.get('BackupPlanName', ''), 'id': p.get('BackupPlanId', '')} for p in plans.get('BackupPlansList', [])]
+                # Check for protected WorkSpaces resources
+                try:
+                    protected = backup_client.list_protected_resources(MaxResults=100)
+                    ws_protected = [r for r in protected.get('Results', []) if 'workspaces' in r.get('ResourceType', '').lower() or 'ec2' in r.get('ResourceType', '').lower()]
+                    scan_data['backupProtectedResources'] = len(ws_protected)
+                except:
+                    scan_data['backupProtectedResources'] = 0
+            except Exception as e:
+                scan_data['backupError'] = str(e)
+
+            # ─── IAM (WorkSpaces-related roles) ───────────────────────────
+            try:
+                iam_client = boto3.client('iam', **session_kwargs)
+                roles = iam_client.list_roles(MaxItems=100)
+                ws_roles = [r['RoleName'] for r in roles.get('Roles', []) if 'workspace' in r['RoleName'].lower() or 'workspaces' in r.get('Description', '').lower()]
+                scan_data['iamRoles'] = {'totalRoles': len(roles.get('Roles', [])), 'workspacesRoles': ws_roles}
+            except Exception as e:
+                scan_data['iamError'] = str(e)
+
             # ─── COST EXPLORER ────────────────────────────────────────────
             try:
                 from datetime import datetime, timedelta
@@ -1402,6 +1500,40 @@ ARCHITECTURE DOCUMENTATION:
                 raw_evidence['cloudTrail'] = "No CloudTrail trails configured in this account."
             if scan_data.get('monthlyCost') is not None:
                 raw_evidence['cost'] = f"Monthly WorkSpaces cost: ${scan_data.get('monthlyCost', 0)} {scan_data.get('costCurrency', 'USD')}."
+            # Images
+            if scan_data.get('images'):
+                img_details = [f"{img['name']} (OS: {img['os']}, State: {img['state']}, Created: {img['created']})" for img in scan_data['images']]
+                raw_evidence['images'] = f"{len(scan_data['images'])} custom image(s): " + "; ".join(img_details)
+            # Custom bundles
+            if scan_data.get('customBundles'):
+                bundle_details = [f"{b['name']} (Compute: {b['compute']}, Root: {b['rootStorage']}GB, User: {b['userStorage']}GB)" for b in scan_data['customBundles']]
+                raw_evidence['customBundles'] = f"{len(scan_data['customBundles'])} custom bundle(s): " + "; ".join(bundle_details)
+            # Connection status / unused WorkSpaces
+            if scan_data.get('inactiveWorkspaces') is not None:
+                raw_evidence['utilisation'] = f"Inactive WorkSpaces (no connection in 30+ days): {scan_data['inactiveWorkspaces']} of {scan_data.get('totalConnectionStatuses', 0)}."
+            # Tagging
+            if scan_data.get('tagging'):
+                t = scan_data['tagging']
+                raw_evidence['tagging'] = f"Tagging compliance (sample of {t['sampleSize']}): {t['tagged']} tagged, {t['untagged']} untagged. Tag keys found: {t['tagKeys']}."
+            # Route tables
+            if scan_data.get('routeTables'):
+                rt_with_igw = len([r for r in scan_data['routeTables'] if r['hasInternetGateway']])
+                rt_with_nat = len([r for r in scan_data['routeTables'] if r['hasNatGateway']])
+                raw_evidence['routing'] = f"{len(scan_data['routeTables'])} route table(s). {rt_with_igw} with Internet Gateway, {rt_with_nat} with NAT Gateway."
+            # EventBridge
+            if scan_data.get('eventBridgeRules'):
+                eb = scan_data['eventBridgeRules']
+                raw_evidence['automation'] = f"EventBridge: {eb['total']} total rules, {eb['workspacesRelated']} WorkSpaces-related. Rule names: {eb['ruleNames']}."
+            # Backup
+            if scan_data.get('backupPlans') is not None:
+                if scan_data['backupPlans']:
+                    raw_evidence['backup'] = f"{len(scan_data['backupPlans'])} backup plan(s): {[p['name'] for p in scan_data['backupPlans']]}. Protected resources: {scan_data.get('backupProtectedResources', 0)}."
+                else:
+                    raw_evidence['backup'] = "No AWS Backup plans configured."
+            # IAM
+            if scan_data.get('iamRoles'):
+                iam = scan_data['iamRoles']
+                raw_evidence['iam'] = f"IAM: {iam['totalRoles']} total roles. WorkSpaces-related roles: {iam['workspacesRoles'] if iam['workspacesRoles'] else 'None found'}."
 
             return {
                 'statusCode': 200,
