@@ -316,7 +316,8 @@ var ENV = (function() {
       cognitoClientId: '1kj98mt2cjbci4sa9okfg4o5dk',
       appsyncEndpoint: 'https://onspvolhtvgzronj367lyx5wy4.appsync-api.eu-west-2.amazonaws.com/graphql',
       emailEndpoint: 'https://6m3zxv0zxa.execute-api.eu-west-2.amazonaws.com/email-report',
-      explainEndpoint: 'https://6m3zxv0zxa.execute-api.eu-west-2.amazonaws.com/explain'
+      explainEndpoint: 'https://6m3zxv0zxa.execute-api.eu-west-2.amazonaws.com/explain',
+      lambdaDirectUrl: 'https://b4cpufnikaqf25n6ld65lwux740zroif.lambda-url.eu-west-2.on.aws/'
     };
   }
   return {
@@ -3082,7 +3083,8 @@ async function runAutoWafr(id) {
     document.querySelector('.modal p').textContent = 'Scan complete. Generating AI assessment with Bedrock...';
 
     // Step 2a: Send evidence to Bedrock for security/reliability analysis
-    var analyseRes1 = await fetch(ENV.emailEndpoint, {
+    var analyseUrl = ENV.lambdaDirectUrl || ENV.emailEndpoint;
+    var analyseRes1 = await fetch(analyseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3098,7 +3100,7 @@ async function runAutoWafr(id) {
     document.querySelector('.modal p').textContent = 'Security analysis complete. Generating operational assessment...';
 
     // Step 2b: Send evidence to Bedrock for ops/cost/perf analysis
-    var analyseRes2 = await fetch(ENV.emailEndpoint, {
+    var analyseRes2 = await fetch(analyseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

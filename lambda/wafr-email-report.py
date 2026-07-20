@@ -1954,15 +1954,16 @@ ARCHITECTURE DOCUMENTATION:
                 "- 'pillar': WAF pillar name\n"
                 "- 'observation': Professional summary of current state (3-4 sentences with specific numbers)\n"
                 "- 'recommendation': Brief acknowledgement then 3-4 actionable bullet points. "
-                "End with 'Further Reading:' followed by 1-2 real https://docs.aws.amazon.com URLs. ALWAYS include URLs.\n"
-                "- 'targetState': What fully implemented looks like (2 sentences)\n"
+                "End with 'Further Reading:' followed by 2 real https://docs.aws.amazon.com URLs. ALWAYS include URLs. Never omit them.\n"
+                "- 'targetState': What fully implemented looks like (2-3 sentences)\n"
+                "- 'stepsToGreen': Array of 3-5 ordered steps to reach green\n"
                 "- 'priority': Critical/High/Medium/Low\n"
                 "- 'rag': red/amber/green\n\n"
                 + not_assessed_instruction +
-                "Produce 'executiveSummary' (2-3 sentences).\n\n"
+                "Produce 'executiveSummary' (3-4 sentences).\n\n"
                 "JSON ONLY, no markdown:\n"
                 "{\"executiveSummary\":\"\",\"findings\":[{...}]" + (",\"notAssessed\":[{...}]" if include_not_assessed else "") + "}\n\n"
-                "EVIDENCE:\n" + evidence_text[:15000]
+                "EVIDENCE:\n" + evidence_text[:20000]
             )
 
             try:
@@ -1972,7 +1973,7 @@ ARCHITECTURE DOCUMENTATION:
                     accept='application/json',
                     body=json.dumps({
                         'anthropic_version': 'bedrock-2023-05-31',
-                        'max_tokens': 4096,
+                        'max_tokens': 8192,
                         'messages': [{'role': 'user', 'content': prompt}]
                     })
                 )
