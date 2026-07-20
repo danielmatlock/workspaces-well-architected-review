@@ -1231,25 +1231,42 @@ ARCHITECTURE DOCUMENTATION:
                 for d in scan_data.get('directories', []):
                     if d.get('vpcId'):
                         vpc_ids.add(d['vpcId'])
-                if vpc_ids:
+                # If no VPCs from directories, get all VPCs in the account
+                if not vpc_ids:
+                    all_vpcs = ec2_client.describe_vpcs()
+                    vpc_ids = set(v['VpcId'] for v in all_vpcs.get('Vpcs', []))
+                    scan_data['vpcs'] = all_vpcs.get('Vpcs', [])
+                else:
                     vpcs = ec2_client.describe_vpcs(VpcIds=list(vpc_ids))
                     scan_data['vpcs'] = vpcs.get('Vpcs', [])
-                    # Get subnets
-                    subnet_ids = set()
-                    for d in scan_data.get('directories', []):
-                        subnet_ids.update(d.get('subnetIds', []))
-                    if subnet_ids:
-                        subnets = ec2_client.describe_subnets(SubnetIds=list(subnet_ids))
-                        scan_data['subnets'] = subnets.get('Subnets', [])
-                        # Check AZ spread
-                        azs = set(s['AvailabilityZone'] for s in scan_data['subnets'])
-                        scan_data['azCount'] = len(azs)
-                        scan_data['azList'] = list(azs)
+                # Get all subnets in those VPCs
+                if vpc_ids:
+                    subnets = ec2_client.describe_subnets(Filters=[{'Name': 'vpc-id', 'Values': list(vpc_ids)}])
+                    scan_data['subnets'] = subnets.get('Subnets', [])
+                    azs = set(s['AvailabilityZone'] for s in scan_data['subnets'])
+                    scan_data['azCount'] = len(azs)
+                    scan_data['azList'] = list(azs)
+                    scan_data['subnetCount'] = len(scan_data['subnets'])
                     # NAT Gateways
                     nats = ec2_client.describe_nat_gateways(
-                        Filter=[{'Name': 'vpc-id', 'Values': list(vpc_ids)}]
+                        Filter=[{'Name': 'vpc-id', 'Values': list(vpc_ids)}, {'Name': 'state', 'Values': ['available']}]
                     )
                     scan_data['natGateways'] = len(nats.get('NatGateways', []))
+                    # VPC Endpoints
+                    endpoints = ec2_client.describe_vpc_endpoints(Filters=[{'Name': 'vpc-id', 'Values': list(vpc_ids)}])
+                    scan_data['vpcEndpoints'] = [e.get('ServiceName', '').split('.')[-1] for e in endpoints.get('VpcEndpoints', [])]
+                    # Security Groups
+                    sgs = ec2_client.describe_security_groups(Filters=[{'Name': 'vpc-id', 'Values': list(vpc_ids)}])
+                    scan_data['securityGroups'] = []
+                    for sg in sgs.get('SecurityGroups', []):
+                        open_to_all = any('0.0.0.0/0' in str(r.get('IpRanges', [])) for r in sg.get('IpPermissions', []))
+                        scan_data['securityGroups'].append({
+                            'name': sg.get('GroupName'),
+                            'id': sg.get('GroupId'),
+                            'inboundRules': len(sg.get('IpPermissions', [])),
+                            'outboundRules': len(sg.get('IpPermissionsEgress', [])),
+                            'openToAll': open_to_all
+                        })
             except Exception as e:
                 scan_data['networkingError'] = str(e)
 
@@ -1315,7 +1332,18 @@ ARCHITECTURE DOCUMENTATION:
                 else:
                     raw_evidence['ipAccessGroups'] = "No IP Access Control Groups configured. Any network can connect."
             if scan_data.get('azCount') is not None:
-                raw_evidence['networking'] = f"AZ spread: {scan_data.get('azCount', 0)} AZs ({scan_data.get('azList', [])}). NAT Gateways: {scan_data.get('natGateways', 0)}."
+                vpc_info = f"VPCs: {len(scan_data.get('vpcs', []))}. "
+                vpc_info += f"Subnets: {scan_data.get('subnetCount', 0)} across {scan_data.get('azCount', 0)} AZs ({scan_data.get('azList', [])}). "
+                vpc_info += f"NAT Gateways: {scan_data.get('natGateways', 0)}. "
+                if scan_data.get('vpcEndpoints'):
+                    vpc_info += f"VPC Endpoints: {scan_data['vpcEndpoints']}. "
+                if scan_data.get('securityGroups'):
+                    sg_count = len(scan_data['securityGroups'])
+                    open_sgs = [sg['name'] for sg in scan_data['securityGroups'] if sg.get('openToAll')]
+                    vpc_info += f"Security Groups: {sg_count} total."
+                    if open_sgs:
+                        vpc_info += f" WARNING: {len(open_sgs)} SG(s) open to 0.0.0.0/0: {open_sgs}."
+                raw_evidence['networking'] = vpc_info
             if scan_data.get('workspacesAlarms') is not None:
                 raw_evidence['monitoring'] = f"WorkSpaces-specific CloudWatch alarms: {scan_data.get('workspacesAlarms', 0)}."
             if scan_data.get('monthlyCost') is not None:
