@@ -1502,6 +1502,58 @@ ARCHITECTURE DOCUMENTATION:
             except Exception as e:
                 scan_data['configError'] = str(e)
 
+            # ─── WORKSPACES POOLS ─────────────────────────────────────────
+            try:
+                pools = ws_client.describe_workspaces_pools()
+                scan_data['pools'] = [{'id': p.get('PoolId', ''), 'name': p.get('PoolName', ''), 'state': p.get('State', ''), 'capacity': p.get('Capacity', {})} for p in pools.get('WorkspacesPools', [])]
+            except Exception as e:
+                scan_data['poolsError'] = str(e)
+
+            # ─── VPC FLOW LOGS ────────────────────────────────────────────
+            try:
+                if vpc_ids:
+                    flow_logs = ec2_client.describe_flow_logs(Filter=[{'Name': 'resource-id', 'Values': list(vpc_ids)}])
+                    scan_data['flowLogs'] = [{'id': fl.get('FlowLogId', ''), 'status': fl.get('FlowLogStatus', ''), 'trafficType': fl.get('TrafficType', ''), 'destination': fl.get('LogDestinationType', '')} for fl in flow_logs.get('FlowLogs', [])]
+                else:
+                    # Check all flow logs in the account
+                    flow_logs = ec2_client.describe_flow_logs(MaxResults=20)
+                    scan_data['flowLogs'] = [{'id': fl.get('FlowLogId', ''), 'status': fl.get('FlowLogStatus', ''), 'trafficType': fl.get('TrafficType', ''), 'destination': fl.get('LogDestinationType', '')} for fl in flow_logs.get('FlowLogs', [])]
+            except Exception as e:
+                scan_data['flowLogsError'] = str(e)
+
+            # ─── GUARDDUTY ────────────────────────────────────────────────
+            try:
+                gd_client = boto3.client('guardduty', **session_kwargs)
+                detectors = gd_client.list_detectors()
+                detector_ids = detectors.get('DetectorIds', [])
+                scan_data['guardDuty'] = {'enabled': len(detector_ids) > 0, 'detectorCount': len(detector_ids)}
+                if detector_ids:
+                    detector_info = gd_client.get_detector(DetectorId=detector_ids[0])
+                    scan_data['guardDuty']['status'] = detector_info.get('Status', '')
+                    scan_data['guardDuty']['findingPublishingFrequency'] = detector_info.get('FindingPublishingFrequency', '')
+            except Exception as e:
+                scan_data['guardDutyError'] = str(e)
+
+            # ─── SERVICE QUOTAS (WorkSpaces limits) ───────────────────────
+            try:
+                sq_client = boto3.client('service-quotas', **session_kwargs)
+                ws_quota = sq_client.get_service_quota(ServiceCode='workspaces', QuotaCode='L-34278094')
+                scan_data['serviceQuotas'] = {'workspacesLimit': ws_quota.get('Quota', {}).get('Value', 'Unknown'), 'currentUsage': len(all_workspaces) if 'all_workspaces' in dir() else 0}
+            except Exception as e:
+                scan_data['serviceQuotasError'] = str(e)
+
+            # ─── CLIENT BRANDING ──────────────────────────────────────────
+            try:
+                dir_ids = [d.get('id') or d.get('DirectoryId', '') for d in scan_data.get('directories', [])] or [wd.get('directoryId', '') for wd in scan_data.get('wsDirectories', [])]
+                if dir_ids and dir_ids[0]:
+                    branding = ws_client.describe_client_branding(ResourceId=dir_ids[0])
+                    has_branding = bool(branding.get('DeviceTypeWindows') or branding.get('DeviceTypeOsx') or branding.get('DeviceTypeAndroid') or branding.get('DeviceTypeIos') or branding.get('DeviceTypeLinux') or branding.get('DeviceTypeWeb'))
+                    scan_data['clientBranding'] = {'configured': has_branding}
+                else:
+                    scan_data['clientBranding'] = {'configured': False}
+            except Exception as e:
+                scan_data['clientBrandingError'] = str(e)
+
             # ─── COST EXPLORER ────────────────────────────────────────────
             try:
                 from datetime import datetime, timedelta
@@ -1640,6 +1692,34 @@ ARCHITECTURE DOCUMENTATION:
             if scan_data.get('configRules'):
                 cfg = scan_data['configRules']
                 raw_evidence['configCompliance'] = f"AWS Config: {cfg['totalRules']} rules. Relevant rules: {cfg['relevantRules'] if cfg['relevantRules'] else 'None WorkSpaces-specific'}."
+            # WorkSpaces Pools
+            if scan_data.get('pools') is not None:
+                if scan_data.get('pools'):
+                    pool_details = [f"{p['name']} (State: {p['state']}, Capacity: {p['capacity']})" for p in scan_data['pools']]
+                    raw_evidence['pools'] = f"{len(scan_data['pools'])} WorkSpaces Pool(s): " + "; ".join(pool_details)
+                else:
+                    raw_evidence['pools'] = "No WorkSpaces Pools configured. All WorkSpaces are Personal (persistent)."
+            # VPC Flow Logs
+            if scan_data.get('flowLogs') is not None:
+                if scan_data['flowLogs']:
+                    fl_details = [f"{fl['id']} (Status: {fl['status']}, Traffic: {fl['trafficType']}, Dest: {fl['destination']})" for fl in scan_data['flowLogs']]
+                    raw_evidence['flowLogs'] = f"{len(scan_data['flowLogs'])} VPC Flow Log(s): " + "; ".join(fl_details)
+                else:
+                    raw_evidence['flowLogs'] = "No VPC Flow Logs configured. Network traffic is not being logged for audit or forensics."
+            # GuardDuty
+            if scan_data.get('guardDuty'):
+                gd = scan_data['guardDuty']
+                if gd.get('enabled'):
+                    raw_evidence['threatDetection'] = f"GuardDuty enabled. Status: {gd.get('status', 'N/A')}. Publishing frequency: {gd.get('findingPublishingFrequency', 'N/A')}."
+                else:
+                    raw_evidence['threatDetection'] = "GuardDuty NOT enabled. No automated threat detection for this account."
+            # Service Quotas
+            if scan_data.get('serviceQuotas'):
+                sq = scan_data['serviceQuotas']
+                raw_evidence['capacity'] = f"WorkSpaces service quota: {sq['workspacesLimit']}. Current usage: {sq['currentUsage']}. Headroom: {int(sq.get('workspacesLimit', 0)) - sq.get('currentUsage', 0) if isinstance(sq.get('workspacesLimit'), (int, float)) else 'Unknown'}."
+            # Client Branding
+            if scan_data.get('clientBranding'):
+                raw_evidence['branding'] = f"Custom client branding: {'Configured' if scan_data['clientBranding'].get('configured') else 'Not configured (default AWS branding)'}."
 
             return {
                 'statusCode': 200,
