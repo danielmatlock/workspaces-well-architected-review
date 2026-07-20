@@ -3228,13 +3228,13 @@ function showConnectAccountModal(reviewId) {
   
   var statusHtml = '';
   if (existingConnection.roleArn) {
-    statusHtml = '<div style="background:#f0fff0;border:2px solid #1d8102;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">' +
+    statusHtml = '<div id="conn-status-box" style="background:#f0fff0;border:2px solid #1d8102;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">' +
       '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1d8102;flex-shrink:0;"></span>' +
       '<div><strong style="color:#1d8102;font-size:14px;">Connected</strong>' +
       '<div style="font-size:12px;color:#232f3e;">Account: ' + existingConnection.roleArn.split(':')[4] + ' | Region: ' + (existingConnection.region || 'eu-west-2') + '</div>' +
       '<div style="font-size:11px;color:#5f6b7a;">Last scanned: ' + (existingConnection.lastScan || 'Never') + '</div></div></div>';
   } else {
-    statusHtml = '<div style="background:#fff3f0;border:2px solid #d13212;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">' +
+    statusHtml = '<div id="conn-status-box" style="background:#fff3f0;border:2px solid #d13212;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">' +
       '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#d13212;flex-shrink:0;"></span>' +
       '<div><strong style="color:#d13212;font-size:14px;">Not Connected</strong>' +
       '<div style="font-size:12px;color:#5f6b7a;">Follow the steps below to connect an AWS account.</div></div></div>';
@@ -3353,10 +3353,15 @@ async function connectAndScan(reviewId, externalId) {
     }
 
     updateReview(review);
-    // Update modal status to show connected
-    var modalStatus = document.querySelector('.modal h3');
-    if (modalStatus) modalStatus.insertAdjacentHTML('afterend', '<div style="background:#f0fff0;border:2px solid #1d8102;border-radius:8px;padding:10px;margin:12px 0;display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1d8102;"></span><strong style="color:#1d8102;">Connected</strong> - Account ' + review.awsConnection.accountId + '</div>');
-    setTimeout(function() { closeModal(); showReviewDashboard(); }, 1500);
+    // Update the status box in-place to show connected (don't close modal)
+    var statusBox = document.getElementById('conn-status-box');
+    if (statusBox) {
+      statusBox.outerHTML = '<div id="conn-status-box" style="background:#f0fff0;border:2px solid #1d8102;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">' +
+        '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#1d8102;flex-shrink:0;"></span>' +
+        '<div><strong style="color:#1d8102;font-size:14px;">Connected</strong>' +
+        '<div style="font-size:12px;color:#232f3e;">Account: ' + review.awsConnection.accountId + ' | Region: ' + (review.awsConnection.region || 'eu-west-2') + '</div>' +
+        '<div style="font-size:11px;color:#5f6b7a;">Last scanned: ' + review.awsConnection.lastScan + '</div></div></div>';
+    }
   } catch(e) {
     statusEl.innerHTML = '<span style="color:#d13212;">Connection failed: ' + (e.message || e) + '</span>';
   }
