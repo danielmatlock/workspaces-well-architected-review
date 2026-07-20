@@ -3030,7 +3030,6 @@ async function runAutoWafr(id) {
   var review = getReview(id);
   if (!review) return;
 
-  // Check if account is connected
   var conn = review.awsConnection;
   if (!conn || !conn.roleArn) {
     alert('Please connect an AWS account first using the "Connect Account" button.');
@@ -3040,15 +3039,7 @@ async function runAutoWafr(id) {
 
   showGeneratingOverlay();
   document.querySelector('.modal h3').textContent = 'Running Auto WAFR...';
-  document.querySelector('.modal p').textContent = 'Scanning AWS account and generating AI-powered report. This may take 60-90 seconds.';
-
-  // Gather all template questions
-  var allQuestions = [];
-  review.pillars.forEach(function(p) {
-    p.questions.forEach(function(q) {
-      allQuestions.push({ id: q.id, q: q.q, best: q.best });
-    });
-  });
+  document.querySelector('.modal p').textContent = 'Scanning AWS account and generating AI-powered assessment. This may take 60-90 seconds.';
 
   try {
     var res = await fetch(ENV.emailEndpoint, {
@@ -3059,8 +3050,7 @@ async function runAutoWafr(id) {
         roleArn: conn.roleArn,
         externalId: conn.externalId || '',
         region: conn.region || 'eu-west-2',
-        reviewId: id,
-        questions: allQuestions
+        reviewId: id
       })
     });
     var data = await res.json();
@@ -3072,8 +3062,7 @@ async function runAutoWafr(id) {
       return;
     }
 
-    // Generate the HTML report
-    var html = generateAutoWafrHTML(review, payload.recommendations || {}, payload.summary || {});
+    var html = generateAutoWafrHTML(review, payload.analysis || {}, payload.summary || {});
     hideGeneratingOverlay();
     saveReportToCloud(review.id, 'autowafr', html, 'text/html', 'html', review.customer);
     openReportInNewTab(html);
@@ -3083,80 +3072,112 @@ async function runAutoWafr(id) {
   }
 }
 
-function generateAutoWafrHTML(review, recommendations, summary) {
-  function sanitizeForHTML(text) {
+function generateAutoWafrHTML(review, analysis, summary) {
+  function sanitize(text) {
     if (!text) return text;
-    return text.replace(/\u2014/g, '&mdash;').replace(/\u2013/g, '&ndash;').replace(/\u2018/g, '&lsquo;').replace(/\u2019/g, '&rsquo;').replace(/\u201C/g, '&ldquo;').replace(/\u201D/g, '&rdquo;').replace(/\u2026/g, '&hellip;').replace(/\u00A0/g, '&nbsp;');
+    return text.replace(/\u2014/g, '&mdash;').replace(/\u2013/g, '&ndash;').replace(/\u2018/g, '&lsquo;').replace(/\u2019/g, '&rsquo;').replace(/\u201C/g, '&ldquo;').replace(/\u201D/g, '&rdquo;').replace(/\u2026/g, '&hellip;');
   }
-  var customerName = sanitizeForHTML(review.customer || 'Review');
+  var customer = sanitize(review.customer || 'Review');
   var today = new Date().toISOString().split('T')[0];
-  var scannedCount = summary.scannedQuestions || 0;
-  var manualCount = summary.manualQuestions || 0;
-  var totalQuestions = scannedCount + manualCount;
+  var findings = analysis.findings || [];
+  var notAssessed = analysis.notAssessed || [];
+  var execSummary = analysis.executiveSummary || '';
 
-  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Auto WAFR - ' + customerName + '</title>';
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Auto WAFR - ' + customer + '</title>';
   html += '<style>';
-  html += 'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:1000px;margin:0 auto;padding:40px 20px;color:#1a1a1a;line-height:1.5;}';
-  html += 'h1{color:#232f3e;margin-bottom:4px;} .subtitle{color:#5f6b7a;margin-bottom:10px;}';
-  html += '.summary-bar{background:#232f3e;color:white;padding:16px 20px;border-radius:8px;margin-bottom:30px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;}';
-  html += '.summary-stat{text-align:center;} .summary-stat .val{font-size:22px;font-weight:700;} .summary-stat .lbl{font-size:11px;color:#adb5bd;}';
-  html += '.pillar-section{margin-bottom:30px;}';
-  html += '.pillar-header{background:#232f3e;color:white;padding:12px 16px;border-radius:6px 6px 0 0;font-size:16px;font-weight:600;}';
-  html += '.q-card{border:1px solid #e0e0e0;border-top:none;padding:20px;} .q-card:last-child{border-radius:0 0 6px 6px;}';
-  html += '.q-id{font-weight:700;color:#0073bb;font-size:13px;display:flex;align-items:center;gap:8px;}';
-  html += '.q-text{font-size:15px;margin:6px 0 14px;font-weight:500;}';
-  html += '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}';
-  html += '.obs-box{background:#f5f5f5;border-left:4px solid #879596;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;}';
-  html += '.rec-box{background:#f0f4ff;border-left:4px solid #0073bb;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;} .rec-box a{color:#0073bb;}';
-  html += '.status-scanned{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#1d8102;color:white;}';
-  html += '.status-partial{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#f2a20d;color:white;}';
-  html += '.status-manual{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#d13212;color:white;}';
-  html += '.manual-box{background:#fff3f0;border-left:4px solid #d13212;padding:12px;margin-bottom:12px;border-radius:4px;font-size:14px;color:#6b1a0a;}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:1000px;margin:0 auto;padding:40px 20px;color:#1a1a1a;line-height:1.6;}';
+  html += 'h1{color:#232f3e;margin-bottom:4px;} h2{color:#232f3e;margin-top:30px;border-bottom:2px solid #ff9900;padding-bottom:6px;} h3{margin-top:0;}';
+  html += '.subtitle{color:#5f6b7a;margin-bottom:20px;}';
+  html += '.exec-summary{background:#232f3e;color:white;padding:20px;border-radius:8px;margin-bottom:30px;font-size:14px;line-height:1.6;}';
+  html += '.summary-bar{background:#f8f9fa;border:1px solid #e0e0e0;padding:16px 20px;border-radius:8px;margin-bottom:30px;display:flex;gap:24px;align-items:center;flex-wrap:wrap;}';
+  html += '.summary-stat{text-align:center;} .summary-stat .val{font-size:20px;font-weight:700;color:#232f3e;} .summary-stat .lbl{font-size:11px;color:#5f6b7a;}';
+  html += '.finding-card{border:1px solid #e0e0e0;border-radius:8px;padding:20px;margin-bottom:16px;position:relative;}';
+  html += '.finding-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}';
+  html += '.rag-badge{display:inline-block;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;color:white;}';
+  html += '.rag-red{background:#d13212;} .rag-amber{background:#f2a20d;} .rag-green{background:#1d8102;}';
+  html += '.priority-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;border:1px solid #ddd;color:#5f6b7a;}';
+  html += '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;margin-top:12px;}';
+  html += '.obs-box{background:#f5f5f5;border-left:4px solid #879596;padding:12px;border-radius:4px;font-size:14px;}';
+  html += '.rec-box{background:#f0f4ff;border-left:4px solid #0073bb;padding:12px;border-radius:4px;font-size:14px;} .rec-box a{color:#0073bb;}';
+  html += '.target-box{background:#f0fff0;border-left:4px solid #1d8102;padding:12px;border-radius:4px;font-size:14px;}';
+  html += '.steps-box{background:#fff8f0;border-left:4px solid #f2a20d;padding:12px;border-radius:4px;font-size:14px;} .steps-box ol{margin:4px 0 0 16px;padding:0;} .steps-box li{margin-bottom:4px;}';
+  html += '.not-assessed{background:#fff3f0;border:1px solid #ffccc7;border-radius:8px;padding:20px;margin-top:30px;}';
+  html += '.not-assessed h2{color:#d13212;border-color:#d13212;}';
+  html += '.na-item{padding:8px 0;border-bottom:1px solid #ffe8e4;font-size:14px;} .na-item:last-child{border:none;}';
+  html += '.na-area{font-weight:600;color:#232f3e;} .na-reason{color:#5f6b7a;font-size:13px;}';
+  html += '.pillar-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#e8e8e8;color:#5f6b7a;}';
   html += '.footer{margin-top:40px;padding-top:16px;border-top:1px solid #e0e0e0;font-size:12px;color:#5f6b7a;}';
   html += '@media print{.no-print{display:none!important;}}';
   html += '</style></head><body>';
-  html += '<div class="no-print"><button onclick="window.print()">Save as PDF (Cmd+P)</button><button onclick="window.close()" style="margin-left:8px;">Close</button></div>';
-  html += '<h1>Auto WAFR - ' + customerName + '</h1>';
-  html += '<div class="subtitle">Automated Well-Architected Review from AWS account scan | ' + today + '</div>';
+  html += '<div class="no-print"><button onclick="window.print()">Save as PDF</button><button onclick="window.close()" style="margin-left:8px;">Close</button></div>';
+  html += '<h1>Auto WAFR - ' + customer + '</h1>';
+  html += '<div class="subtitle">Automated Well-Architected Review from AWS Account Scan | ' + today + '</div>';
+
+  // Executive Summary
+  if (execSummary) {
+    html += '<div class="exec-summary">' + sanitize(execSummary) + '</div>';
+  }
 
   // Summary bar
   html += '<div class="summary-bar">';
   html += '<div class="summary-stat"><div class="val">' + (summary.workspaceCount || 0) + '</div><div class="lbl">WorkSpaces</div></div>';
-  html += '<div class="summary-stat"><div class="val">' + scannedCount + '/' + totalQuestions + '</div><div class="lbl">Auto-Scanned</div></div>';
-  html += '<div class="summary-stat"><div class="val">' + manualCount + '</div><div class="lbl">Manual Review</div></div>';
-  html += '<div class="summary-stat"><div class="val">' + (summary.monthlyCost || 'N/A') + '</div><div class="lbl">Monthly Cost (USD)</div></div>';
+  html += '<div class="summary-stat"><div class="val">' + findings.length + '</div><div class="lbl">Findings</div></div>';
+  html += '<div class="summary-stat"><div class="val">' + notAssessed.length + '</div><div class="lbl">Not Assessed</div></div>';
+  html += '<div class="summary-stat"><div class="val">' + (summary.encryptedCount || 0) + '/' + (summary.workspaceCount || 0) + '</div><div class="lbl">Encrypted</div></div>';
   var protoText = Object.entries(summary.protocols || {}).map(function(p) { return p[1] + ' ' + p[0]; }).join(', ') || 'N/A';
-  html += '<div class="summary-stat"><div class="val" style="font-size:14px;">' + protoText + '</div><div class="lbl">Protocols</div></div>';
+  html += '<div class="summary-stat"><div class="val" style="font-size:13px;">' + protoText + '</div><div class="lbl">Protocols</div></div>';
   html += '</div>';
 
-  // Pillar sections
-  review.pillars.forEach(function(p) {
-    html += '<div class="pillar-section"><div class="pillar-header">' + p.name + '</div>';
-    p.questions.forEach(function(q) {
-      var rec = recommendations[q.id] || {};
-      var dataStatus = rec.dataStatus || 'manual_required';
-      var statusClass = dataStatus === 'scanned' ? 'status-scanned' : dataStatus === 'partial' ? 'status-partial' : 'status-manual';
-      var statusLabel = dataStatus === 'scanned' ? 'Auto-Scanned' : dataStatus === 'partial' ? 'Partial Data' : 'Manual Review Required';
+  // Findings grouped by pillar
+  var pillarGroups = {};
+  findings.forEach(function(f) {
+    var pillar = f.pillar || 'General';
+    if (!pillarGroups[pillar]) pillarGroups[pillar] = [];
+    pillarGroups[pillar].push(f);
+  });
 
-      html += '<div class="q-card">';
-      html += '<div class="q-id"><span class="' + statusClass + '">' + statusLabel + '</span> ' + q.id + '</div>';
-      html += '<div class="q-text">' + q.q + '</div>';
+  Object.keys(pillarGroups).forEach(function(pillar) {
+    html += '<h2>' + pillar + '</h2>';
+    pillarGroups[pillar].forEach(function(f) {
+      var ragClass = f.rag === 'red' ? 'rag-red' : f.rag === 'amber' ? 'rag-amber' : 'rag-green';
+      var ragLabel = f.rag === 'red' ? 'Not Implemented' : f.rag === 'amber' ? 'Partial' : 'Good';
+      html += '<div class="finding-card">';
+      html += '<div class="finding-header"><span class="rag-badge ' + ragClass + '">' + ragLabel + '</span>';
+      html += '<h3 style="margin:0;">' + sanitize(f.title || '') + '</h3>';
+      if (f.priority) html += '<span class="priority-badge">' + f.priority + '</span>';
+      html += '<span class="pillar-tag">' + pillar + '</span></div>';
 
-      if (rec.observation) {
+      if (f.observation) {
         html += '<div class="section-label" style="color:#5f6b7a;">Observation</div>';
-        html += '<div class="obs-box">' + sanitizeForHTML(rec.observation) + '</div>';
+        html += '<div class="obs-box">' + sanitize(f.observation) + '</div>';
       }
-      if (rec.recommendation) {
+      if (f.recommendation) {
         html += '<div class="section-label" style="color:#0073bb;">Recommendation</div>';
-        html += '<div class="rec-box">' + sanitizeForHTML(rec.recommendation).replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
+        html += '<div class="rec-box">' + sanitize(f.recommendation).replace(/\n/g, '<br>').replace(/(https:\/\/docs\.aws\.amazon\.com\/[^\s<]+)/g, '<a href="$1" target="_blank">$1</a>') + '</div>';
       }
-      if (dataStatus === 'manual_required') {
-        html += '<div class="manual-box"><strong>Manual review required:</strong> This area could not be assessed from the automated account scan. A reviewer should gather information through discussion with the customer or manual inspection.</div>';
+      if (f.targetState) {
+        html += '<div class="section-label" style="color:#1d8102;">Target State (Green)</div>';
+        html += '<div class="target-box">' + sanitize(f.targetState) + '</div>';
+      }
+      if (f.stepsToGreen && f.stepsToGreen.length > 0) {
+        html += '<div class="section-label" style="color:#b7791b;">Steps to Reach Green</div>';
+        html += '<div class="steps-box"><ol>';
+        f.stepsToGreen.forEach(function(step) { html += '<li>' + sanitize(step.replace(/^\d+\.\s*/, '')) + '</li>'; });
+        html += '</ol></div>';
       }
       html += '</div>';
     });
-    html += '</div>';
   });
+
+  // Not Assessed section
+  if (notAssessed.length > 0) {
+    html += '<div class="not-assessed"><h2>Areas Not Assessed</h2>';
+    html += '<p style="font-size:13px;color:#5f6b7a;margin-bottom:12px;">The following areas could not be determined from the automated account scan and require manual review:</p>';
+    notAssessed.forEach(function(na) {
+      html += '<div class="na-item"><span class="na-area">' + sanitize(na.area || '') + '</span><br><span class="na-reason">' + sanitize(na.reason || '') + '</span></div>';
+    });
+    html += '</div>';
+  }
 
   html += '<div class="footer">Generated by AWS WorkSpaces WAFR Review Tool (Auto WAFR) | ' + today + ' | Source: AWS Account ' + ((review.awsConnection || {}).accountId || 'N/A') + '</div></body></html>';
   return html;
