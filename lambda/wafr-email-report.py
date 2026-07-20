@@ -1579,6 +1579,74 @@ ARCHITECTURE DOCUMENTATION:
                 })
             }
 
+        if action == 'autoWafrAnalyse':
+            # Auto WAFR Step 2: Send scan evidence to Bedrock for analysis
+            evidence = body.get('evidence', {})
+            summary_data = body.get('summary', {})
+            evidence_text = "\n".join([f"=== {k.upper()} ===\n{v}" for k, v in evidence.items()])
+
+            # Add summary context
+            if summary_data:
+                evidence_text = f"=== FLEET SUMMARY ===\nWorkSpaces: {summary_data.get('workspaceCount', 0)}, Protocols: {summary_data.get('protocols', {})}, Running modes: {summary_data.get('runningModes', {})}, Encrypted: {summary_data.get('encryptedCount', 0)}, Monthly cost: {summary_data.get('monthlyCost', 'N/A')}\n\n" + evidence_text
+
+            prompt = (
+                "You are a senior AWS Solutions Architect conducting a Well-Architected Review of an Amazon WorkSpaces environment. "
+                "Below is raw evidence gathered from an automated scan of the customer's AWS account. "
+                "Based ONLY on this evidence, produce a comprehensive assessment.\n\n"
+                "For each finding area you can assess, produce a JSON object with these fields:\n"
+                "- 'title': Short descriptive title (e.g. 'Protocol Migration', 'Volume Encryption')\n"
+                "- 'pillar': Which Well-Architected pillar (Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimisation, Sustainability)\n"
+                "- 'observation': Professional summary of current state (2-4 sentences, third person)\n"
+                "- 'recommendation': Actionable guidance - brief acknowledgement then 2-4 bullet points starting with bullet char, then Further Reading with 1-2 AWS docs URLs\n"
+                "- 'targetState': What fully implemented (green) looks like for this area (2-3 sentences)\n"
+                "- 'stepsToGreen': Array of 3-5 ordered steps to reach green state\n"
+                "- 'priority': 'Critical', 'High', 'Medium', or 'Low'\n"
+                "- 'rag': 'red' (not implemented/critical gap), 'amber' (partial/needs work), or 'green' (good state)\n\n"
+                "Also produce a 'notAssessed' array listing areas that CANNOT be determined from this scan data "
+                "(e.g. patching compliance, Group Policy, incident runbooks, application delivery, "
+                "user experience, backup/DR testing). Each item: {'area': '...', 'reason': '...'}.\n\n"
+                "Also produce an 'executiveSummary' string (3-4 sentences for leadership).\n\n"
+                "Format response as JSON ONLY:\n"
+                "{\"executiveSummary\": \"...\", \"findings\": [{...}], \"notAssessed\": [{\"area\": \"...\", \"reason\": \"...\"}]}\n\n"
+                "EVIDENCE FROM AWS ACCOUNT SCAN:\n" + evidence_text[:28000]
+            )
+
+            try:
+                response = bedrock.invoke_model(
+                    modelId=MODEL_ID,
+                    contentType='application/json',
+                    accept='application/json',
+                    body=json.dumps({
+                        'anthropic_version': 'bedrock-2023-05-31',
+                        'max_tokens': 8192,
+                        'messages': [{'role': 'user', 'content': prompt}]
+                    })
+                )
+                result = json.loads(response['body'].read())
+                text = result['content'][0]['text'].strip()
+                text = re.sub(r'^```(?:json)?\s*', '', text)
+                text = re.sub(r'\s*```$', '', text)
+                brace_count = 0
+                json_end = 0
+                for ci, ch in enumerate(text):
+                    if ch == '{': brace_count += 1
+                    elif ch == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            json_end = ci + 1
+                            break
+                if json_end > 0:
+                    text = text[:json_end]
+                analysis = json.loads(text)
+            except Exception as e:
+                analysis = {'executiveSummary': f'Analysis error: {str(e)}', 'findings': [], 'notAssessed': []}
+
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({'analysis': analysis})
+            }
+
         return {
             'statusCode': 400,
             'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},

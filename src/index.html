@@ -3042,27 +3042,61 @@ async function runAutoWafr(id) {
   document.querySelector('.modal p').textContent = 'Scanning AWS account and generating AI-powered assessment. This may take 60-90 seconds.';
 
   try {
-    var res = await fetch(ENV.emailEndpoint, {
+    // Step 1: Scan the account (fast, <10s)
+    var scanRes = await fetch(ENV.emailEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        action: 'autoWafr',
+        action: 'scanAccount',
         roleArn: conn.roleArn,
         externalId: conn.externalId || '',
         region: conn.region || 'eu-west-2',
         reviewId: id
       })
     });
-    var data = await res.json();
-    var payload = typeof data.body === 'string' ? JSON.parse(data.body) : data;
+    var scanData = await scanRes.json();
+    var scanPayload = typeof scanData.body === 'string' ? JSON.parse(scanData.body) : scanData;
 
-    if (payload.error) {
+    if (scanPayload.error) {
       hideGeneratingOverlay();
-      alert('Auto WAFR failed: ' + payload.error);
+      alert('Auto WAFR scan failed: ' + scanPayload.error);
       return;
     }
 
-    var html = generateAutoWafrHTML(review, payload.analysis || {}, payload.summary || {});
+    // Build evidence text from the scan findings
+    var evidence = {};
+    var summary = scanPayload.summary || {};
+    if (scanPayload.findings) {
+      Object.keys(scanPayload.findings).forEach(function(qId) {
+        var f = scanPayload.findings[qId];
+        if (f.evidence) evidence[qId] = f.evidence;
+      });
+    }
+
+    // Update overlay
+    document.querySelector('.modal p').textContent = 'Scan complete. Generating AI assessment with Bedrock...';
+
+    // Step 2: Send evidence to Bedrock for analysis (<30s)
+    var evidenceText = Object.entries(evidence).map(function(e) { return e[0] + ': ' + e[1]; }).join('\n');
+    var analyseRes = await fetch(ENV.emailEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'autoWafrAnalyse',
+        evidence: evidence,
+        summary: summary
+      })
+    });
+    var analyseData = await analyseRes.json();
+    var analysePayload = typeof analyseData.body === 'string' ? JSON.parse(analyseData.body) : analyseData;
+
+    if (analysePayload.error) {
+      hideGeneratingOverlay();
+      alert('Auto WAFR analysis failed: ' + analysePayload.error);
+      return;
+    }
+
+    var html = generateAutoWafrHTML(review, analysePayload.analysis || {}, summary);
     hideGeneratingOverlay();
     saveReportToCloud(review.id, 'autowafr', html, 'text/html', 'html', review.customer);
     openReportInNewTab(html);
