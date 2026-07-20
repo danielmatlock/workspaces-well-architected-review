@@ -1423,6 +1423,85 @@ ARCHITECTURE DOCUMENTATION:
             except Exception as e:
                 scan_data['iamError'] = str(e)
 
+            # ─── WORKSPACES ACCOUNT CONFIG (BYOL/Tenancy) ─────────────────
+            try:
+                account_info = ws_client.describe_account()
+                scan_data['accountConfig'] = {
+                    'dedicatedTenancy': account_info.get('DedicatedTenancySupport', 'DISABLED'),
+                    'dedicatedTenancyManagementCidr': account_info.get('DedicatedTenancyManagementCidrRange', 'None'),
+                    'dedicatedTenancyAuthorization': account_info.get('DedicatedTenancyAccountType', 'None')
+                }
+            except Exception as e:
+                scan_data['accountConfigError'] = str(e)
+
+            # ─── CLIENT PROPERTIES (redirection/reconnect) ────────────────
+            try:
+                dir_ids = [d.get('id') or d.get('DirectoryId', '') for d in scan_data.get('directories', [])] or [wd.get('directoryId', '') for wd in scan_data.get('wsDirectories', [])]
+                if dir_ids and dir_ids[0]:
+                    client_props = ws_client.describe_client_properties(ResourceIds=dir_ids[:5])
+                    scan_data['clientProperties'] = [{'resourceId': cp.get('ResourceId', ''), 'reconnectEnabled': cp.get('ClientProperties', {}).get('ReconnectEnabled', ''), 'logUploadEnabled': cp.get('ClientProperties', {}).get('LogUploadEnabled', '')} for cp in client_props.get('ClientPropertiesList', [])]
+            except Exception as e:
+                scan_data['clientPropsError'] = str(e)
+
+            # ─── WORKSPACE SNAPSHOTS (sample - first 5 WorkSpaces) ────────
+            try:
+                snapshot_data = []
+                for ws in all_workspaces[:5]:
+                    try:
+                        snaps = ws_client.describe_workspace_snapshots(WorkspaceId=ws['WorkspaceId'])
+                        rebuild_snaps = snaps.get('RebuildSnapshots', [])
+                        restore_snaps = snaps.get('RestoreSnapshots', [])
+                        snapshot_data.append({'workspaceId': ws['WorkspaceId'], 'rebuildSnapshots': len(rebuild_snaps), 'restoreSnapshots': len(restore_snaps)})
+                    except:
+                        pass
+                scan_data['snapshots'] = snapshot_data
+            except Exception as e:
+                scan_data['snapshotsError'] = str(e)
+
+            # ─── CONNECTION ALIASES (cross-region DR) ─────────────────────
+            try:
+                aliases = ws_client.describe_connection_aliases()
+                scan_data['connectionAliases'] = [{'id': a.get('ConnectionAliasId', ''), 'state': a.get('State', ''), 'owner': a.get('OwnerAccountId', '')} for a in aliases.get('ConnectionAliases', [])]
+            except Exception as e:
+                scan_data['connectionAliasesError'] = str(e)
+
+            # ─── SSM PATCH COMPLIANCE ─────────────────────────────────────
+            try:
+                ssm_client = boto3.client('ssm', **session_kwargs)
+                instances = ssm_client.describe_instance_information(MaxResults=50)
+                managed_instances = instances.get('InstanceInformationList', [])
+                ws_managed = [i for i in managed_instances if 'workspace' in i.get('Name', '').lower() or i.get('ResourceType', '') == 'ManagedInstance']
+                compliant_count = 0
+                non_compliant_count = 0
+                if managed_instances:
+                    try:
+                        compliance = ssm_client.list_compliance_summaries(
+                            Filters=[{'Key': 'ComplianceType', 'Values': ['Patch'], 'Type': 'EQUAL'}]
+                        )
+                        for s in compliance.get('ComplianceSummaryItems', []):
+                            compliant_count += s.get('CompliantSummary', {}).get('CompliantCount', 0)
+                            non_compliant_count += s.get('NonCompliantSummary', {}).get('NonCompliantCount', 0)
+                    except:
+                        pass
+                scan_data['ssmCompliance'] = {
+                    'totalManagedInstances': len(managed_instances),
+                    'workspacesManaged': len(ws_managed),
+                    'patchCompliant': compliant_count,
+                    'patchNonCompliant': non_compliant_count
+                }
+            except Exception as e:
+                scan_data['ssmError'] = str(e)
+
+            # ─── AWS CONFIG (compliance rules) ────────────────────────────
+            try:
+                config_client = boto3.client('config', **session_kwargs)
+                rules = config_client.describe_config_rules(Limit=50) if hasattr(config_client, 'describe_config_rules') else {'ConfigRules': []}
+                config_rules = rules.get('ConfigRules', [])
+                ws_rules = [r['ConfigRuleName'] for r in config_rules if 'workspace' in r.get('ConfigRuleName', '').lower() or 'ec2' in r.get('ConfigRuleName', '').lower()]
+                scan_data['configRules'] = {'totalRules': len(config_rules), 'relevantRules': ws_rules[:10]}
+            except Exception as e:
+                scan_data['configError'] = str(e)
+
             # ─── COST EXPLORER ────────────────────────────────────────────
             try:
                 from datetime import datetime, timedelta
@@ -1534,6 +1613,33 @@ ARCHITECTURE DOCUMENTATION:
             if scan_data.get('iamRoles'):
                 iam = scan_data['iamRoles']
                 raw_evidence['iam'] = f"IAM: {iam['totalRoles']} total roles. WorkSpaces-related roles: {iam['workspacesRoles'] if iam['workspacesRoles'] else 'None found'}."
+            # Account config (BYOL)
+            if scan_data.get('accountConfig'):
+                ac = scan_data['accountConfig']
+                raw_evidence['accountConfig'] = f"Dedicated tenancy: {ac['dedicatedTenancy']}. Management CIDR: {ac['dedicatedTenancyManagementCidr']}."
+            # Client properties
+            if scan_data.get('clientProperties'):
+                cp_details = [f"Dir {cp['resourceId']}: reconnect={cp['reconnectEnabled']}, logUpload={cp['logUploadEnabled']}" for cp in scan_data['clientProperties']]
+                raw_evidence['clientSettings'] = f"Client properties: " + "; ".join(cp_details)
+            # Snapshots
+            if scan_data.get('snapshots'):
+                total_rebuild = sum(s['rebuildSnapshots'] for s in scan_data['snapshots'])
+                total_restore = sum(s['restoreSnapshots'] for s in scan_data['snapshots'])
+                raw_evidence['snapshots'] = f"WorkSpace snapshots (sample of {len(scan_data['snapshots'])}): {total_rebuild} rebuild snapshot(s), {total_restore} restore snapshot(s) available."
+            # Connection aliases (DR)
+            if scan_data.get('connectionAliases') is not None:
+                if scan_data['connectionAliases']:
+                    raw_evidence['drReadiness'] = f"{len(scan_data['connectionAliases'])} connection alias(es) configured for cross-region failover."
+                else:
+                    raw_evidence['drReadiness'] = "No connection aliases configured. No cross-region DR capability for WorkSpaces."
+            # SSM compliance
+            if scan_data.get('ssmCompliance'):
+                ssm = scan_data['ssmCompliance']
+                raw_evidence['patchCompliance'] = f"SSM: {ssm['totalManagedInstances']} managed instances, {ssm['workspacesManaged']} WorkSpaces-managed. Patch compliance: {ssm['patchCompliant']} compliant, {ssm['patchNonCompliant']} non-compliant."
+            # AWS Config
+            if scan_data.get('configRules'):
+                cfg = scan_data['configRules']
+                raw_evidence['configCompliance'] = f"AWS Config: {cfg['totalRules']} rules. Relevant rules: {cfg['relevantRules'] if cfg['relevantRules'] else 'None WorkSpaces-specific'}."
 
             return {
                 'statusCode': 200,
