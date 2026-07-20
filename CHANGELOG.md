@@ -157,6 +157,108 @@ Since Amplify CI/CD with GitHub isn't working (IAM service role issue), deployme
 
 ## Known Issues
 
+## 2026-07-20 (Dev Branch)
+
+### Auto WAFR - AWS Account Connection & Automated Assessment
+- **Connect Account** feature: connect to any AWS account via cross-account IAM role
+  - CloudFormation template (`cfn/wafr-readonly-role.yaml`) for one-click role setup
+  - Connect Account modal with 2-step flow (deploy template, paste Role ARN)
+  - Green/red status dot on button shows connection state
+  - Connection details saved to review (persisted to DynamoDB)
+- **Auto WAFR** button (blue) - one-click environment scan + AI-powered report
+  - Scans 20+ data sources from the connected AWS account:
+    - Fleet: WorkSpaces count, protocols, running modes, encryption, states
+    - Identity: Directories (AD Connector/Managed AD), MFA/RADIUS, SSO
+    - Networking: VPCs, subnets, AZs, NAT Gateways, VPC Endpoints, Security Groups, Route Tables
+    - Security: Encryption status, IP Access Control Groups, open SGs flagged
+    - Monitoring: CloudWatch alarms, dashboards, log groups, active metrics
+    - Auditing: CloudTrail trails, logging status, multi-region, log validation
+    - Cost: 90-day spend breakdown by month
+    - Utilisation: Connection status (identifies WorkSpaces unused 30+ days)
+    - Images: Custom images, OS version, age
+    - Bundles: Custom bundle compute specs
+    - Governance: Tagging compliance (sampled)
+    - Automation: EventBridge rules (WorkSpaces-related)
+    - Backup/DR: AWS Backup plans, connection aliases
+    - Patching: SSM managed instances, patch compliance
+    - IAM: WorkSpaces-related roles, BYOL/tenancy config
+    - Client: Reconnect settings, log upload
+    - Snapshots: Rebuild/restore availability
+    - Config: AWS Config compliance rules
+  - Bedrock generates comprehensive assessment with:
+    - Executive summary for leadership
+    - Findings by WAF pillar (Observation, Recommendation, Target State, Priority, RAG)
+    - AWS documentation links per finding
+    - "Areas Not Assessed" section with suggested manual actions
+  - Two-call architecture to avoid API Gateway 30s timeout (scan then analyse)
+  - Report saved to S3 as `autowafr` type
+
+### ORR-Specific Features
+- ORR reviews show different topbar buttons (no So What, no C-Level, no Arch Info)
+- **ORR Report** button (orange) - AI-powered report with 5 fields per question:
+  - Observation, Recommendation, Target State, Steps to Green, Priority
+- Separate Lambda handler (`generateOrr` action) with ORR-specific Bedrock prompt
+- ORR prompt grounded in ORR Best Practices (failure modeling, operational processes, etc.)
+- All answered questions sent to Bedrock (not just those with notes)
+
+### C-Level Deck Redesign
+- Complete rewrite of `buildCuratedCLevelPptx` to match manual Executive Briefing:
+  - Cover: dark Squid Ink + orange left accent bar + "Must/Should/Could conversation"
+  - Executive Summary: single paragraph text + 2x2 KPI stat boxes (aligned)
+  - Scorecard: horizontal RAG bars sorted highest to lowest, 70%+ = green
+  - Critical Findings: 2x2 card grid with colored top accents
+  - Must/Should/Could: 3 equal columns with colored header bands + flow arrow
+  - Quick Wins: 2x2 cards with green accents + effort pill badges (colored shapes)
+  - Avoidable Crises: side-by-side cards + "NEEDS MORE RESEARCH" callout
+  - SHOULD: 3x2 card grid + amber effort badges
+  - COULD: 2x2 card grid + effort badges
+  - Cost: table + "Needs more research" sidebar callout
+  - 90-Day Roadmap: 4 equal columns (This Week/30/60/90 Days) + "THE ASK" bar
+  - Closing: dark background with "Where do we start?"
+- Fuzzy deduplication on roadmap items (first 4 words matching)
+- Scorecard sorted highest to lowest, 70%+ threshold for green
+
+### So What Report Enhancements
+- Added **"What this means for users"** field (end-user impact perspective)
+- Bedrock prompt now generates 3 fields: observation, recommendation, userImpact
+- Blue-accented box in report for user impact section
+
+### UI Improvements
+- **My Reviews grouped by template type**: "Amazon WorkSpaces WAFR" (orange) and "Operational Readiness Review - ORR" (blue) sections
+- **Version bumped to v4.1**
+- Saved reports sorted: So What > Auto WAFR > ORR > C-Level > WAFR
+- Type labels updated across all report displays
+
+### Encoding Fixes
+- Fixed `a` character corruption in So What report (em dashes replaced with HTML entities)
+- Added `sanitizeForHTML()` for AI-generated content
+- Fixed emoji icons in Architecture Assessment (replaced with HTML entities)
+- Customer name sanitised in report headings
+- Saved reports from S3 sanitised on retrieval
+
+### DynamoDB Sync Optimisation
+- `saveReviews()` no longer syncs ALL reviews on every change
+- `updateReview()` syncs only the specific changed review
+- Import review flow now explicitly syncs to DynamoDB
+
+### Deployment Infrastructure
+- Dev/prod environment separation (Amplify `dev` branch, `wafr-email-report-dev` Lambda)
+- Amplify custom rewrite rule for root URL routing
+- Updated DEPLOYMENT.md with troubleshooting (rewrite rules, stuck jobs, private repo)
+- Cognito SES email configuration documented
+
+### AWS Resources (Dev Environment)
+| Resource | Identifier | Region |
+|----------|-----------|--------|
+| Amplify Branch | `dev` | eu-west-2 |
+| Lambda Function | `wafr-email-report-dev` (300s, 256MB) | eu-west-2 |
+| API Gateway (HTTP) | `6m3zxv0zxa` | eu-west-2 |
+| S3 Bucket | `wafr-reports-danmmat-dev` | eu-west-2 |
+| CFN Template | `cfn/wafr-readonly-role.yaml` | - |
+| Cross-Account Role | `WAFRReviewToolReadOnly` (in customer account) | - |
+
+## Known Issues
+
 - Amplify CI/CD via GitHub not functional — "Unable to assume specified IAM Role" even with service-linked role. Using manual deployment as workaround.
 - GitHub personal access token has limited scope — webhook permissions required for repo connection.
 - Claude 3 Haiku/Sonnet base model IDs don't work on-demand — must use inference profile IDs (e.g. `eu.anthropic.claude-haiku-4-5-20251001-v1:0`).
