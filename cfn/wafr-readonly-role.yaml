@@ -88,8 +88,12 @@ Resources:
                   - 'cloudwatch:ListMetrics'
                   - 'cloudwatch:DescribeAlarms'
                   - 'cloudwatch:GetMetricStatistics'
+                  - 'cloudwatch:ListDashboards'
                   - 'logs:DescribeLogGroups'
                   - 'logs:FilterLogEvents'
+                  - 'cloudtrail:DescribeTrails'
+                  - 'cloudtrail:GetTrailStatus'
+                  - 'cloudtrail:LookupEvents'
                 Resource: '*'
               - Sid: CostReadOnly
                 Effect: Allow

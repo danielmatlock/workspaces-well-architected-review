@@ -1270,7 +1270,7 @@ ARCHITECTURE DOCUMENTATION:
             except Exception as e:
                 scan_data['networkingError'] = str(e)
 
-            # ─── CLOUDWATCH METRICS ───────────────────────────────────────
+            # ─── CLOUDWATCH & CLOUDTRAIL ─────────────────────────────────
             try:
                 from datetime import datetime, timedelta
                 end_time = datetime.utcnow()
@@ -1285,15 +1285,45 @@ ARCHITECTURE DOCUMENTATION:
                     Statistics=['Maximum']
                 )
                 scan_data['unhealthyMetric'] = unhealthy.get('Datapoints', [])
-                # Check existing alarms for WorkSpaces
-                alarms = cw_client.describe_alarms(
-                    AlarmNamePrefix='WorkSpaces',
-                    MaxRecords=50
-                )
-                ws_alarms = [a for a in alarms.get('MetricAlarms', []) if 'WorkSpaces' in a.get('Namespace', '') or 'workspaces' in a.get('AlarmName', '').lower()]
+                # All alarms
+                alarms = cw_client.describe_alarms(MaxRecords=100)
+                all_alarms = alarms.get('MetricAlarms', [])
+                ws_alarms = [a for a in all_alarms if 'WorkSpaces' in a.get('Namespace', '') or 'workspace' in a.get('AlarmName', '').lower()]
                 scan_data['workspacesAlarms'] = len(ws_alarms)
+                scan_data['totalAlarms'] = len(all_alarms)
+                scan_data['alarmNames'] = [a['AlarmName'] for a in ws_alarms[:10]]
+                # CloudWatch dashboards
+                dashboards = cw_client.list_dashboards()
+                scan_data['dashboards'] = [d['DashboardName'] for d in dashboards.get('DashboardEntries', [])]
+                # CloudWatch Log Groups (WorkSpaces related)
+                logs_client = boto3.client('logs', **session_kwargs)
+                log_groups = logs_client.describe_log_groups(limit=50)
+                scan_data['logGroups'] = [lg['logGroupName'] for lg in log_groups.get('logGroups', [])]
+                scan_data['wsLogGroups'] = [lg for lg in scan_data['logGroups'] if 'workspace' in lg.lower() or 'workspaces' in lg.lower()]
+                # Active WorkSpaces metrics
+                metrics = cw_client.list_metrics(Namespace='AWS/WorkSpaces')
+                scan_data['activeMetrics'] = list(set(m['MetricName'] for m in metrics.get('Metrics', [])))
             except Exception as e:
                 scan_data['monitoringError'] = str(e)
+
+            # ─── CLOUDTRAIL ───────────────────────────────────────────────
+            try:
+                ct_client = boto3.client('cloudtrail', **session_kwargs)
+                trails = ct_client.describe_trails()
+                scan_data['cloudTrail'] = []
+                for trail in trails.get('trailList', []):
+                    trail_status = ct_client.get_trail_status(Name=trail['TrailARN'])
+                    scan_data['cloudTrail'].append({
+                        'name': trail.get('Name'),
+                        'isMultiRegion': trail.get('IsMultiRegionTrail', False),
+                        'isOrganizationTrail': trail.get('IsOrganizationTrail', False),
+                        'isLogging': trail_status.get('IsLogging', False),
+                        'hasLogFileValidation': trail.get('LogFileValidationEnabled', False),
+                        's3Bucket': trail.get('S3BucketName', ''),
+                        'cloudWatchLogGroup': trail.get('CloudWatchLogsLogGroupArn', 'None')
+                    })
+            except Exception as e:
+                scan_data['cloudTrailError'] = str(e)
 
             # ─── COST EXPLORER ────────────────────────────────────────────
             try:
@@ -1345,7 +1375,31 @@ ARCHITECTURE DOCUMENTATION:
                         vpc_info += f" WARNING: {len(open_sgs)} SG(s) open to 0.0.0.0/0: {open_sgs}."
                 raw_evidence['networking'] = vpc_info
             if scan_data.get('workspacesAlarms') is not None:
-                raw_evidence['monitoring'] = f"WorkSpaces-specific CloudWatch alarms: {scan_data.get('workspacesAlarms', 0)}."
+                mon_info = f"Total CloudWatch alarms: {scan_data.get('totalAlarms', 0)}. WorkSpaces-specific alarms: {scan_data.get('workspacesAlarms', 0)}."
+                if scan_data.get('alarmNames'):
+                    mon_info += f" Alarm names: {scan_data['alarmNames']}."
+                if scan_data.get('dashboards'):
+                    mon_info += f" Dashboards: {scan_data['dashboards']}."
+                else:
+                    mon_info += " No CloudWatch dashboards configured."
+                if scan_data.get('activeMetrics'):
+                    mon_info += f" Active WorkSpaces metrics: {scan_data['activeMetrics']}."
+                if scan_data.get('wsLogGroups'):
+                    mon_info += f" WorkSpaces log groups: {scan_data['wsLogGroups']}."
+                else:
+                    mon_info += " No WorkSpaces-specific log groups found."
+                raw_evidence['monitoring'] = mon_info
+            if scan_data.get('cloudTrail'):
+                ct_info = f"{len(scan_data['cloudTrail'])} CloudTrail trail(s): "
+                ct_details = []
+                for ct in scan_data['cloudTrail']:
+                    ct_details.append(f"{ct['name']} (logging: {ct['isLogging']}, multi-region: {ct['isMultiRegion']}, log validation: {ct['hasLogFileValidation']}, CloudWatch: {ct.get('cloudWatchLogGroup', 'None')})")
+                ct_info += "; ".join(ct_details)
+                raw_evidence['cloudTrail'] = ct_info
+            elif scan_data.get('cloudTrailError'):
+                raw_evidence['cloudTrail'] = f"CloudTrail scan error: {scan_data['cloudTrailError']}"
+            else:
+                raw_evidence['cloudTrail'] = "No CloudTrail trails configured in this account."
             if scan_data.get('monthlyCost') is not None:
                 raw_evidence['cost'] = f"Monthly WorkSpaces cost: ${scan_data.get('monthlyCost', 0)} {scan_data.get('costCurrency', 'USD')}."
 
