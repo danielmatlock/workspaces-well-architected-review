@@ -1931,14 +1931,23 @@ ARCHITECTURE DOCUMENTATION:
             if summary_data:
                 evidence_text = f"=== FLEET SUMMARY ===\nWorkSpaces: {summary_data.get('workspaceCount', 0)}, Protocols: {summary_data.get('protocols', {})}, Running modes: {summary_data.get('runningModes', {})}, Encrypted: {summary_data.get('encryptedCount', 0)}, Monthly cost: {summary_data.get('monthlyCost', 'N/A')}\n\n" + evidence_text
 
-            if focus == 'security_reliability':
-                pillar_instruction = "Focus ONLY on Security, Reliability, and Networking findings. Ignore cost, performance, and operational topics."
+            if focus == 'security':
+                pillar_instruction = "Focus ONLY on Security findings (encryption, MFA, access controls, network security, data protection). Produce 2-3 findings maximum."
+                include_not_assessed = False
+            elif focus == 'ops_reliability':
+                pillar_instruction = "Focus ONLY on Operational Excellence and Reliability findings (monitoring, automation, directory health, AZ resilience, DR). Produce 2-3 findings maximum."
+                include_not_assessed = False
+            elif focus == 'cost_perf_sustainability':
+                pillar_instruction = "Focus ONLY on Cost Optimisation, Performance Efficiency, and Sustainability findings (running modes, bundle sizing, utilisation, protocol). Produce 2-3 findings maximum."
+                include_not_assessed = True
+            elif focus == 'security_reliability':
+                pillar_instruction = "Focus ONLY on Security and Reliability findings. Produce 3-4 findings maximum."
                 include_not_assessed = False
             elif focus == 'ops_cost_perf':
-                pillar_instruction = "Focus ONLY on Operational Excellence, Cost Optimisation, Performance Efficiency, and Sustainability findings. Ignore security and reliability topics."
+                pillar_instruction = "Focus ONLY on Operational Excellence, Cost Optimisation, Performance Efficiency, and Sustainability. Produce 3-4 findings maximum."
                 include_not_assessed = True
             else:
-                pillar_instruction = "Cover all Well-Architected pillars."
+                pillar_instruction = "Cover all Well-Architected pillars. Produce 5-8 findings maximum."
                 include_not_assessed = True
 
             not_assessed_instruction = ""
@@ -1963,7 +1972,7 @@ ARCHITECTURE DOCUMENTATION:
                 "Produce 'executiveSummary' (3-4 sentences).\n\n"
                 "JSON ONLY, no markdown:\n"
                 "{\"executiveSummary\":\"\",\"findings\":[{...}]" + (",\"notAssessed\":[{...}]" if include_not_assessed else "") + "}\n\n"
-                "EVIDENCE:\n" + evidence_text[:20000]
+                "EVIDENCE:\n" + evidence_text[:12000]
             )
 
             try:
@@ -1973,7 +1982,7 @@ ARCHITECTURE DOCUMENTATION:
                     accept='application/json',
                     body=json.dumps({
                         'anthropic_version': 'bedrock-2023-05-31',
-                        'max_tokens': 8192,
+                        'max_tokens': 4096,
                         'messages': [{'role': 'user', 'content': prompt}]
                     })
                 )
