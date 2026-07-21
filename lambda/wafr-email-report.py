@@ -2022,7 +2022,7 @@ ARCHITECTURE DOCUMENTATION:
                 "  \"findings\": [{...}, {...}],\n"
                 "  \"notAssessed\": [{\"area\": \"...\", \"reason\": \"...\"}]\n"
                 "}\n\n"
-                "EVIDENCE FROM AWS ACCOUNT SCAN:\n" + evidence_text[:28000]
+                "EVIDENCE FROM AWS ACCOUNT SCAN:\n" + evidence_text[:8000]
             )
 
             try:
@@ -2032,7 +2032,7 @@ ARCHITECTURE DOCUMENTATION:
                     accept='application/json',
                     body=json.dumps({
                         'anthropic_version': 'bedrock-2023-05-31',
-                        'max_tokens': 8192,
+                        'max_tokens': 4096,
                         'messages': [{'role': 'user', 'content': prompt}]
                     })
                 )
