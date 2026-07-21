@@ -1058,9 +1058,12 @@ function renderRadar(review) {
   // Labels
   for (var i = 0; i < n; i++) {
     var a = start + i * step;
-    var lx = cx + (r + 25) * Math.cos(a);
+    var lx = cx + (r + 30) * Math.cos(a);
     var ly = cy + (r + 25) * Math.sin(a);
-    svg += '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" font-size="10" fill="#545b64">' + labels[i] + '</text>';
+    var anchor = 'middle';
+    if (lx < cx - 20) anchor = 'end';
+    else if (lx > cx + 20) anchor = 'start';
+    svg += '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="' + anchor + '" dominant-baseline="middle" font-size="10" fill="#545b64">' + labels[i] + '</text>';
   }
   
   svg += '</svg>';
